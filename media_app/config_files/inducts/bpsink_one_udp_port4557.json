@@ -1,0 +1,12 @@
+{
+    "inductConfigName": "MediaAppFileSink",
+    "inductVector": [
+        {
+            "name": "media_app_file_sink",
+            "convergenceLayer": "udp",
+            "boundPort": 4000,
+            "numRxCircularBufferElements": 200,
+            "numRxCircularBufferBytesPerElement": 65535
+        }
+    ]
+}

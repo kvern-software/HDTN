@@ -1,0 +1,6 @@
+[submodule "media_app/media_app/include/imgui"]
+	path = media_app/media_app/include/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "media_app/include/imgui"]
+	path = media_app/include/imgui
+	url = https://github.com/ocornut/imgui.git
