@@ -3,14 +3,6 @@
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
-static int xioctl(int fh, int request, void *arg) {
-        int r;
-        do {
-            r = ioctl(fh, request, arg);
-        } while (-1 == r && EINTR == errno);
-        return r;
-}
-
 VideoDriver::VideoDriver(/* args */)
 {
 
@@ -21,11 +13,11 @@ VideoDriver::~VideoDriver()
 
 }
 
-void VideoDriver::Start(uint64_t frames_per_second) {
+void VideoDriver::Start() {
     if (!m_running) {
         m_running = true;
         m_VideoDriverBufferFillerThreadPtr = boost::make_unique<boost::thread>(
-        boost::bind(&VideoDriver::BufferFillerThreadFunc, this, frames_per_second)); //create and start the worker thread
+        boost::bind(&VideoDriver::BufferFillerThreadFunc, this)); //create and start the worker thread
     }
 }
 
@@ -64,12 +56,12 @@ int VideoDriver::CheckDeviceCapability() {
     }
 
     if (!(capability.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
-        fprintf(stderr, "%s is not video capture device\n", device);
+        LOG_ERROR(subprocess) << "not a valid video capture device";
         return -1;    
     }
 
     if (!(capability.capabilities & V4L2_CAP_STREAMING)) {
-        fprintf(stderr, "%s does not support streaming i/o\n", device);
+        LOG_ERROR(subprocess) << "video capture device does not support  does not support streaming i/o";
         return -1;
     }
 
@@ -125,14 +117,17 @@ int VideoDriver::SetFramerate(uint64_t frames_per_second) {
         LOG_ERROR(subprocess) << "Device could not set format, VIDIOC_S_PARM";
     }
 
+    m_frames_per_second = frames_per_second;
+
+    return 0;
 }
 
 /*
     Request buffer from video device
 */
-int VideoDriver::RequestBuffer(unsigned int num_buffers=1, unsigned int type=V4L2_BUF_TYPE_VIDEO_CAPTURE, unsigned int memory=V4L2_MEMORY_MMAP) {
-    requestBuffer.count = num_buffers; // one request buffer
-    requestBuffer.type = type; // request a buffer wich we an use for capturing frames
+int VideoDriver::RequestBuffer(unsigned int type=V4L2_BUF_TYPE_VIDEO_CAPTURE, unsigned int memory=V4L2_MEMORY_MMAP) {
+    requestBuffer.count = m_frames_per_second; // num buffers = frames / second
+    requestBuffer.type = type; // request a buffer which we an use for capturing frames
     requestBuffer.memory = memory;
 
     if(ioctl(fd, VIDIOC_REQBUFS, &requestBuffer) < 0){
@@ -142,47 +137,65 @@ int VideoDriver::RequestBuffer(unsigned int num_buffers=1, unsigned int type=V4L
 
     LOG_INFO(subprocess) <<  "Requested buffer";
 
-
     return 0;
 }
 
-/*
-    Allocates memory for the buffer request
-*/
-int VideoDriver::QueryBuffer(unsigned int index=0) {
-    queryBuffer.type = requestBuffer.type;
-    queryBuffer.memory = requestBuffer.memory;
-    queryBuffer.index = index;
-    if(ioctl(fd, VIDIOC_QUERYBUF, &queryBuffer) < 0){
-        LOG_ERROR(subprocess) << "Device did not return the buffer information, VIDIOC_QUERYBUF";
-        return 1;
+void VideoDriver::AllocateLocalBuffers() {
+    image_buffers = reinterpret_cast<buffer *>(calloc(requestBuffer.count, sizeof(*image_buffers)));
+    if (!image_buffers) {
+        LOG_ERROR(subprocess) << "Out of memory";
+        exit(EXIT_FAILURE);
     }
-
-    LOG_INFO(subprocess) << "Allocated memory for buffer";
-
-    return 0;
 }
 
 // use a pointer to point to the newly created buffer
 // mmap() will map the memory address of the device to
 // an address in memory
 void VideoDriver::MapMemory() {
-    image_data = (char *)reinterpret_cast<char*>(mmap(NULL, queryBuffer.length, PROT_READ | PROT_WRITE, MAP_SHARED,
-                        fd, queryBuffer.m.offset));
-    memset(image_data, 0, queryBuffer.length);
+    // image_data = (char *)reinterpret_cast<char*>(mmap(NULL, bufToQuery.length, PROT_READ | PROT_WRITE, MAP_SHARED,
+                        // fd, bufToQuery.m.offset));
+    // memset(image_data, 0, bufToQuery.length);
+    for (uint64_t buf_idx = 0; buf_idx < requestBuffer.count; ++buf_idx) {
+        QueryBuffer(buf_idx);
+
+        image_buffers[buf_idx].length = bufToQuery.length;
+        image_buffers[buf_idx].start =
+                mmap(NULL /* start anywhere */,
+                    bufToQuery.length,
+                    PROT_READ | PROT_WRITE /* required */,
+                    MAP_SHARED /* recommended */,
+                    fd, bufToQuery.m.offset);
+            
+        if (MAP_FAILED == image_buffers[m_frames_per_second].start) {
+            LOG_ERROR(subprocess) << "mmap error";
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+/*
+    Allocates memory for the buffer request
+*/
+int VideoDriver::QueryBuffer(unsigned int index=0) {
+    bufToQuery.type = requestBuffer.type; /// pull general buffer information from the request buffer into the query buffer
+    bufToQuery.memory = requestBuffer.memory;
+    bufToQuery.index = index;
+
+    if(ioctl(fd, VIDIOC_QUERYBUF, &bufToQuery) < 0){
+        LOG_ERROR(subprocess) << "Device did not return the buffer information, VIDIOC_QUERYBUF";
+        return 1;
+    }
+
+    LOG_INFO(subprocess) << "Allocated memory for buffer";
+    return 0;
 }
 
 /*
     Informs kernel we will be requesting buffers to be filled
 */
 int VideoDriver::StartVideoStream() {
-    memset(&bufferinfo, 0, sizeof(bufferinfo));
-    bufferinfo.type = requestBuffer.type;
-    bufferinfo.memory = V4L2_MEMORY_MMAP;
-    bufferinfo.index = 0;
-
     // Activate streaming
-    int type = bufferinfo.type;
+    int type = requestBuffer.type;
     if(ioctl(fd, VIDIOC_STREAMON, &type) < 0){
         LOG_ERROR(subprocess) << "Could not start streaming, VIDIOC_STREAMON";
         return 1;
@@ -211,9 +224,13 @@ int VideoDriver::EndVideoStream() {
     preallocated buffer to be filled with video data.
 */
 int VideoDriver::QueueBuffer() {
-    if(ioctl(fd, VIDIOC_QBUF, &bufferinfo) < 0){
-        LOG_ERROR(subprocess) << "Could not queue buffer, VIDIOC_QBUF";
-        return 1;
+    for (uint64_t i = 0; i < m_frames_per_second; i++) {
+        bufToQuery.index = i;
+    
+        if(ioctl(fd, VIDIOC_QBUF, &bufToQuery) < 0){
+            LOG_ERROR(subprocess) << "Could not queue buffer, VIDIOC_QBUF";
+            return 1;
+        }
     }
 
     return 0;
@@ -226,7 +243,7 @@ int VideoDriver::QueueBuffer() {
     written AFTER dequeing the buffer.
 */
 int VideoDriver::DequeueBuffer() {
-    if(ioctl(fd, VIDIOC_DQBUF, &bufferinfo) < 0){
+    if(ioctl(fd, VIDIOC_DQBUF, &bufToQuery) < 0){
         LOG_ERROR(subprocess) << "Could not dequeue the buffer, VIDIOC_DQBUF";
         return 1;
     }
@@ -240,86 +257,140 @@ int VideoDriver::DequeueBuffer() {
     sizes can be used depending on the platform capabilities.
 */
 int VideoDriver::WriteBufferToFile(std::string filePath, unsigned int chunkSize) {
-    LOG_INFO(subprocess) << "Buffer has: " << (double)bufferinfo.bytesused / 1024 << " KBytes of data";
+    LOG_INFO(subprocess) << "Buffer has: " << (double)bufToQuery.bytesused / 1024 << " KBytes of data";
 
-    std::ofstream outFile;
-    outFile.open(filePath.c_str(), std::ios::binary | std::ios::app);
+    // std::ofstream outFile;
+    // outFile.open(filePath.c_str(), std::ios::binary | std::ios::app);
 
-    int bufPos = 0, outFileMemBlockSize = 0;  // the position in the buffer and the amoun to copy from the buffer
-    int remainingBufferSize = bufferinfo.bytesused; // the remaining buffer size, is decremented by memBlockSize amount on each loop so we do not overwrite the buffer
-    char* outFileMemBlock = NULL;  // a pointer to a new memory block
-    int itr = 0; // counts the number of iterations
+    // int bufPos = 0, outFileMemBlockSize = 0;  // the position in the buffer and the amoun to copy from the buffer
+    // int remainingBufferSize = bufferinfo.bytesused; // the remaining buffer size, is decremented by memBlockSize amount on each loop so we do not overwrite the buffer
+    // char* outFileMemBlock = NULL;  // a pointer to a new memory block
+    // int itr = 0; // counts the number of iterations
 
-    while(remainingBufferSize > 0) {
-        bufPos += outFileMemBlockSize;  // increment the buffer pointer on each loop
-                                        // initialise bufPos before outFileMemBlockSize so we can start
-                                        // at the begining of the buffer
+    // while(remainingBufferSize > 0) {
+    //     bufPos += outFileMemBlockSize;  // increment the buffer pointer on each loop
+    //                                     // initialise bufPos before outFileMemBlockSize so we can start
+    //                                     // at the begining of the buffer
 
-        outFileMemBlockSize = chunkSize;    // set the output block size to a preferable size. 1024 :)
-        outFileMemBlock = new char[sizeof(char) * outFileMemBlockSize];
+    //     outFileMemBlockSize = chunkSize;    // set the output block size to a preferable size. 1024 :)
+    //     outFileMemBlock = new char[sizeof(char) * outFileMemBlockSize];
 
-        // copy 1024 bytes of data starting from buffer+bufPos
-        memcpy(outFileMemBlock, image_data+bufPos, outFileMemBlockSize);
-        outFile.write(outFileMemBlock,outFileMemBlockSize);
+    //     // copy 1024 bytes of data starting from buffer+bufPos
+    //     memcpy(outFileMemBlock, image_data+bufPos, outFileMemBlockSize);
+    //     outFile.write(outFileMemBlock,outFileMemBlockSize);
 
-        // calculate the amount of memory left to read
-        // if the memory block size is greater than the remaining
-        // amount of data we have to copy
-        if(outFileMemBlockSize > remainingBufferSize)
-            outFileMemBlockSize = remainingBufferSize;
+    //     // calculate the amount of memory left to read
+    //     // if the memory block size is greater than the remaining
+    //     // amount of data we have to copy
+    //     if(outFileMemBlockSize > remainingBufferSize)
+    //         outFileMemBlockSize = remainingBufferSize;
 
-        // subtract the amount of data we have to copy from the remaining buffer size
-        remainingBufferSize -= outFileMemBlockSize;
+    //     // subtract the amount of data we have to copy from the remaining buffer size
+    //     remainingBufferSize -= outFileMemBlockSize;
 
-        // display the remaining buffer size
-        LOG_INFO(subprocess) << itr++ << " Remaining bytes: "<< remainingBufferSize;
-    }
+    //     // display the remaining buffer size
+    //     LOG_INFO(subprocess) << itr++ << " Remaining bytes: "<< remainingBufferSize;
+    // }
 
-    // Close the file
-    outFile.close();
+    // // Close the file
+    // outFile.close();
 
-    LOG_INFO(subprocess) << filePath.c_str() << " written to storage";
+    // LOG_INFO(subprocess) << filePath.c_str() << " written to storage";
 
     return 0;
 }
 
 
-void VideoDriver::BufferFillerThreadFunc(uint64_t frames_per_second) {
+int VideoDriver::CaptureFrames() {
+    for (uint64_t i = 0; i < m_frames_per_second + 1; i++) {
+        for (;;) {
+            fd_set fds;
+            struct timeval tv;
+            int ret;
+
+            FD_ZERO(&fds);
+            FD_SET(fd, &fds);
+
+            /* Timeout. */
+            tv.tv_sec = 2;
+            tv.tv_usec = 0;
+            ret = select(fd + 1, &fds, NULL, NULL, &tv);
+            if (-1 == ret) {
+                    if (EINTR == errno)
+                            continue;
+                    // errno_exit("select");
+            }
+            if (0 == ret) {
+                    fprintf(stderr, "select timeout\n");
+                    exit(EXIT_FAILURE);
+            }
+
+            /* dequeue captured buffer */
+            // CLEAR(bufToQuery);
+            // bufToQuery.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+            // bufToQuery.memory = V4L2_MEMORY_MMAP;
+            DequeueBuffer();
+            // assert(buf.index < n_buffers);
+
+            /* skip first image as it may not be sync'd */
+            if (i > 0) {
+                    // process_image(buffers[buf.index].start,
+                            // &fmt.fmt.pix);
+                    // sprintf(filename, "frame%d.raw", i);
+                    // save_frame(filename,
+                            // buffers[buf.index].start,
+                            // buf.bytesused);
+            }
+
+            /* queue buffer */
+            QueueBuffer();
+            break;
+        }
+    }
+
+    return 0;
+}
+
+void VideoDriver::BufferFillerThreadFunc() {
     // boost::posix_time::time_duration period (boost::posix_time::milliseconds(1/frames_per_second * 1000)); // milliseconds per frame
     // boost::asio::io_service io;
 
     // boost::asio::deadline_timer t(io, period);
+    RequestBuffer(V4L2_BUF_TYPE_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
+    AllocateLocalBuffers();    
+    MapMemory();
+    StartVideoStream();
+    CaptureFrames();
+    // while (m_running) 
+    // {      
+    //     // request buffer
+        
+    //     // allocate buffer
 
-    while (m_running) 
-    {      
-        // request buffer
+    //     // mmap buffer
 
-        // allocate buffer
+    //     // queue buffer
 
-        // mmap buffer
+    //     // capture
 
-        // queue buffer
+    //     // capture n frames
 
-        // capture
+    //         // dequeue captured buffer
 
-        // capture n frames
-
-            // dequeue captured buffer
-
-            // queue buffer
+    //         // queue buffer
 
         
-        videoDriver.QueueBuffer();  
+    //     videoDriver.QueueBuffer();  
 
-        videoDriver.DequeueBuffer();
+    //     videoDriver.DequeueBuffer();
 
 
-        // if (elapsed_time > period) {
-        //     LOG_ERROR(subprocess) << "Buffer seconds per frame exceeded. Is FPS set too high?";
-        //     continue;   
-        // } else {
-            // t.wait();
-        // }
-    }
+    //     // if (elapsed_time > period) {
+    //     //     LOG_ERROR(subprocess) << "Buffer seconds per frame exceeded. Is FPS set too high?";
+    //     //     continue;   
+    //     // } else {
+    //         // t.wait();
+    //     // }
+    // }
 
 }

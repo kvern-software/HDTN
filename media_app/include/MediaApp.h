@@ -35,7 +35,7 @@ public:
     void DisplayImage(); // loads image from local video device into imgui buffer
     void UpdateImage(boost::filesystem::path filePath); // if a new image has been delivered, load it
     bool LoadTextureFromFile(const char* filename); // loads image from storage (ie disk) into RAM
-    bool LoadTextureFromVideoDevice(char * img_location, int size); //loads image from another location (like kernel) into our memory space
+    bool LoadTextureFromVideoDevice(void * img_location, int size); //loads image from another location (like kernel) into our memory space
     void DataToOpenGLTexture(void * image_data, int image_width, int image_height); // converts raw memory into open GL viewable texture
     void ExitButton();
 

@@ -84,7 +84,7 @@ void MediaApp::Close() {
 //     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 // }
 
-bool MediaApp::LoadTextureFromVideoDevice(char* img_location, int size ) {
+bool MediaApp::LoadTextureFromVideoDevice(void* img_location, int size ) {
     int image_width = 0;
     int image_height = 0;
 

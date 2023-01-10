@@ -184,17 +184,17 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
         if (!video_device.empty()) {
             mediaSource.videoDriver.device = video_device;
             mediaSource.video_driver_enabled = true;
-
             // initialize video driver
             mediaSource.videoDriver.OpenFD();
             mediaSource.videoDriver.CheckDeviceCapability();
             mediaSource.videoDriver.SetImageFormat(DEFAULT_VIDEO_CAPTURE, frame_width, frame_height, 
                     DEFAULT_PIXEL_FORMAT, DEFAULT_FIELD);
-            mediaSource.videoDriver.RequestBuffer(1, DEFAULT_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
-            mediaSource.videoDriver.QueryBuffer(0);
-            mediaSource.videoDriver.MapMemory();
-            mediaSource.videoDriver.StartVideoStream();
-            mediaSource.videoDriver.Start(frames_per_second);
+            mediaSource.videoDriver.SetFramerate(frames_per_second);
+            // mediaSource.videoDriver.RequestBuffer(1, DEFAULT_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
+            // mediaSource.videoDriver.QueryBuffer(0);
+            // mediaSource.videoDriver.MapMemory();
+            // mediaSource.videoDriver.StartVideoStream();
+            mediaSource.videoDriver.Start();
         } else {
             LOG_INFO(subprocess) << "started with no video driver";
         }
@@ -261,7 +261,7 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
 
             // GUI
             if (gui_enabled) {
-                mediaSource.mediaApp.LoadTextureFromVideoDevice(mediaSource.videoDriver.image_data, mediaSource.videoDriver.bufferinfo.bytesused);
+                mediaSource.mediaApp.LoadTextureFromVideoDevice(mediaSource.videoDriver.image_buffers[0].start, mediaSource.videoDriver.image_buffers[0].length);
 
                 mediaSource.mediaApp.NewFrame();
                 mediaSource.mediaApp.DisplayImage();

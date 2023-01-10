@@ -22,10 +22,11 @@ MediaSource::~MediaSource() {}
 uint64_t MediaSource::GetNextPayloadLength_Step1() {
 
     if (video_driver_enabled) {
-        videoDriver.QueueBuffer();  
-        videoDriver.DequeueBuffer();
-        std::cout << videoDriver.bufferinfo.bytesused << std::endl;
-        return videoDriver.bufferinfo.bytesused;
+        // videoDriver.QueueBuffer();  
+        // videoDriver.DequeueBuffer();
+        return 0;
+        // std::cout << videoDriver.bufferinfo.bytesused << std::endl;
+        // return videoDriver.bufferinfo.bytesused;
     } else {
         return m_bundleSizeBytes;
     }
@@ -34,7 +35,7 @@ uint64_t MediaSource::GetNextPayloadLength_Step1() {
 bool MediaSource::CopyPayload_Step2(uint8_t * destinationBuffer) {
     // bpgen_hdr bpGenHeader;
     // bpGenHeader.seq = m_bpGenSequenceNumber++;
-    memcpy(destinationBuffer, videoDriver.image_data, videoDriver.bufferinfo.bytesused);
+    // memcpy(destinationBuffer, videoDriver.image_data, videoDriver.bufferinfo.bytesused);
     std::cout << "copied" << std::endl;
     return true;
 }
