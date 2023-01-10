@@ -17,7 +17,21 @@
 #include <string>
 #include <memory>
 #include <boost/filesystem.hpp>
+#include <boost/asio.hpp>
+#include <boost/thread.hpp>
+#include <boost/make_unique.hpp>
 
+
+
+struct buffer {
+        void   *start;
+        size_t  length;
+};
+
+
+
+
+#define CLEAR(x) memset(&(x), 0, sizeof(x))
 #define DEFAULT_CHUNK_WRITE_SIZE 8192*4
 
 #define DEFAULT_VIDEO_CAPTURE V4L2_BUF_TYPE_VIDEO_CAPTURE
@@ -28,10 +42,16 @@
 class VideoDriver
 {
 private:
+    std::unique_ptr<boost::thread> m_VideoDriverBufferFillerThreadPtr;
+    volatile bool m_running;
+
     /* data */
 public:
     VideoDriver(/* args */);
     ~VideoDriver();
+
+    void Start(uint64_t frames_per_second);
+    void Stop();
 
     int OpenFD();
     int CheckDeviceCapability();
@@ -44,10 +64,14 @@ public:
     int StartVideoStream();
     int EndVideoStream();
 
+    // call these to get data
     int QueueBuffer();
     int DequeueBuffer();
 
+    void BufferFillerThreadFunc(uint64_t frames_per_second);
+
     int WriteBufferToFile(std::string filePath, unsigned int chunkSize);
+
 
     // members
     int fd; // file descriptor 

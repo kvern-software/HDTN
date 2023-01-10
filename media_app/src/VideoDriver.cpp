@@ -3,6 +3,14 @@
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
+static int xioctl(int fh, int request, void *arg) {
+        int r;
+        do {
+            r = ioctl(fh, request, arg);
+        } while (-1 == r && EINTR == errno);
+        return r;
+}
+
 VideoDriver::VideoDriver(/* args */)
 {
 
@@ -11,6 +19,23 @@ VideoDriver::VideoDriver(/* args */)
 VideoDriver::~VideoDriver()
 {
 
+}
+
+void VideoDriver::Start(uint64_t frames_per_second) {
+    if (!m_running) {
+        m_running = true;
+        m_VideoDriverBufferFillerThreadPtr = boost::make_unique<boost::thread>(
+        boost::bind(&VideoDriver::BufferFillerThreadFunc, this, frames_per_second)); //create and start the worker thread
+    }
+}
+
+void VideoDriver::Stop() {
+    m_running = false; //thread stopping criteria
+
+    if(m_VideoDriverBufferFillerThreadPtr) {
+        m_VideoDriverBufferFillerThreadPtr->join();
+        m_VideoDriverBufferFillerThreadPtr.reset(); //delete it
+    }
 }
 
 /*
@@ -36,6 +61,16 @@ int VideoDriver::CheckDeviceCapability() {
     if(ioctl(fd, VIDIOC_QUERYCAP, &capability) < 0){
         LOG_ERROR(subprocess) << ("Failed to get device capabilities, VIDIOC_QUERYCAP");
         return 1;
+    }
+
+    if (!(capability.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
+        fprintf(stderr, "%s is not video capture device\n", device);
+        return -1;    
+    }
+
+    if (!(capability.capabilities & V4L2_CAP_STREAMING)) {
+        fprintf(stderr, "%s does not support streaming i/o\n", device);
+        return -1;
     }
 
     return 0;
@@ -78,6 +113,18 @@ int VideoDriver::SetImageFormat(v4l2_format imageFormat_) {
     LOG_INFO(subprocess) << "Set image format";
 
     return 0;
+}
+
+int VideoDriver::SetFramerate(uint64_t frames_per_second) {
+    struct v4l2_streamparm parameters;
+    CLEAR(parameters);
+    parameters.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    parameters.parm.capture.timeperframe.numerator = frames_per_second;
+    parameters.parm.capture.timeperframe.denominator = 1;
+    if (ioctl(fd, VIDIOC_S_PARM, &parameters) == -1) {
+        LOG_ERROR(subprocess) << "Device could not set format, VIDIOC_S_PARM";
+    }
+
 }
 
 /*
@@ -234,4 +281,45 @@ int VideoDriver::WriteBufferToFile(std::string filePath, unsigned int chunkSize)
     LOG_INFO(subprocess) << filePath.c_str() << " written to storage";
 
     return 0;
+}
+
+
+void VideoDriver::BufferFillerThreadFunc(uint64_t frames_per_second) {
+    // boost::posix_time::time_duration period (boost::posix_time::milliseconds(1/frames_per_second * 1000)); // milliseconds per frame
+    // boost::asio::io_service io;
+
+    // boost::asio::deadline_timer t(io, period);
+
+    while (m_running) 
+    {      
+        // request buffer
+
+        // allocate buffer
+
+        // mmap buffer
+
+        // queue buffer
+
+        // capture
+
+        // capture n frames
+
+            // dequeue captured buffer
+
+            // queue buffer
+
+        
+        videoDriver.QueueBuffer();  
+
+        videoDriver.DequeueBuffer();
+
+
+        // if (elapsed_time > period) {
+        //     LOG_ERROR(subprocess) << "Buffer seconds per frame exceeded. Is FPS set too high?";
+        //     continue;   
+        // } else {
+            // t.wait();
+        // }
+    }
+
 }

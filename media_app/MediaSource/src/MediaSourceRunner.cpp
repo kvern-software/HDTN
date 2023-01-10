@@ -57,6 +57,8 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
         bool gui_enabled;
         bool save_local_copy;
         boost::filesystem::path video_device;
+        uint64_t frame_width, frame_height = 0;
+        uint64_t frames_per_second = 0;
 
         boost::program_options::options_description desc("Allowed options");
         try {
@@ -79,6 +81,10 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
                     ("video-device",  boost::program_options::value<boost::filesystem::path>()->default_value(""), "Path to camera device Empty=>No Camera")
                     ("gui", boost::program_options::value<bool>()->default_value(true), "Enable graphical user interface")
                     ("save-local-copy", boost::program_options::value<bool>()->default_value(false), "Save local copy of media to disk")
+                    ("frames-per-second", boost::program_options::value<uint64_t>()->default_value(30), "FPS, network should be faster than required transfer rate, else delays")
+                    ("frame-width", boost::program_options::value<uint64_t>()->default_value(1920), "Camera resolution in X axis")
+                    ("frame-height", boost::program_options::value<uint64_t>()->default_value(1080), "Camera resolation in Y axis")
+                    ("frames-per-second", boost::program_options::value<uint64_t>()->default_value(60), "Number of buffered frames kept in memory")
                     ;
 
                 boost::program_options::variables_map vm;
@@ -152,7 +158,9 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
                 video_device = vm["video-device"].as<boost::filesystem::path>();
                 gui_enabled = vm["gui"].as<bool>();
                 save_local_copy = vm["save-local-copy"].as<bool>();
-
+                frame_width = vm["frame-width"].as<uint64_t>();
+                frame_height = vm["frame-height"].as<uint64_t>();
+                frames_per_second = vm["frames-per-second"].as<uint64_t>();
         }
         catch (boost::bad_any_cast & e) {
                 LOG_ERROR(subprocess) << "invalid data error: " << e.what();
@@ -176,8 +184,21 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
         if (!video_device.empty()) {
             mediaSource.videoDriver.device = video_device;
             mediaSource.video_driver_enabled = true;
+
+            // initialize video driver
+            mediaSource.videoDriver.OpenFD();
+            mediaSource.videoDriver.CheckDeviceCapability();
+            mediaSource.videoDriver.SetImageFormat(DEFAULT_VIDEO_CAPTURE, frame_width, frame_height, 
+                    DEFAULT_PIXEL_FORMAT, DEFAULT_FIELD);
+            mediaSource.videoDriver.RequestBuffer(1, DEFAULT_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
+            mediaSource.videoDriver.QueryBuffer(0);
+            mediaSource.videoDriver.MapMemory();
+            mediaSource.videoDriver.StartVideoStream();
+            mediaSource.videoDriver.Start(frames_per_second);
+        } else {
+            LOG_INFO(subprocess) << "started with no video driver";
         }
-        
+
         mediaSource.Start(
             outductsConfigPtr,
             inductsConfigPtr,
@@ -205,22 +226,9 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
             sigHandler.Start(false);
         }
 
-        // initialize video driver
-        if (mediaSource.video_driver_enabled) {
-            mediaSource.videoDriver.OpenFD();
-            mediaSource.videoDriver.CheckDeviceCapability();
-            mediaSource.videoDriver.SetImageFormat(DEFAULT_VIDEO_CAPTURE, 1920, 1080, 
-                    DEFAULT_PIXEL_FORMAT, DEFAULT_FIELD);
-            mediaSource.videoDriver.RequestBuffer(1, DEFAULT_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
-            mediaSource.videoDriver.QueryBuffer(0);
-            mediaSource.videoDriver.MapMemory();
-            mediaSource.videoDriver.StartVideoStream();
-        } else {
-        LOG_INFO(subprocess) << "started with no video driver";
-        }
-
+       
         if (!gui_enabled) {
-        LOG_INFO(subprocess) << "running without a GUI";
+            LOG_INFO(subprocess) << "running without a GUI";
         }
 
         LOG_INFO(subprocess) << "MediaSource up and running";
@@ -240,8 +248,8 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
             }
 
             if (mediaSource.video_driver_enabled) {   
-                mediaSource.videoDriver.QueueBuffer();  
-                mediaSource.videoDriver.DequeueBuffer();
+                              // std::cout << mediaSource.videoDriver.bufferinfo.bytesused << std::endl;
+
                 if (save_local_copy) {
                     mediaSource.saveFileFullFilename = ("file_");
                     mediaSource.saveFileFullFilename.append(std::to_string(mediaSource.file_number));
@@ -266,7 +274,8 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
         }
 
         
-
+        mediaSource.videoDriver.Stop();
+        mediaSource.mediaApp.Close();
 
         LOG_INFO(subprocess) << "MediaSourceRunner::Run: exiting cleanly..";
         mediaSource.Stop();

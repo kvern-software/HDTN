@@ -2,15 +2,15 @@
 
 # path variables
 config_files=$HDTN_MEDIA_APP_DIR/config_files
-sink_config=$config_files/inducts/bpsink_one_udp_port4557.json
+sink_config=$config_files/inducts/mediasink_udp.json
 media_path = $HDTN_MEDIA_APP_DIR/test_media
 
 cd $HDTN_MEDIA_APP_DIR
 
 # Media app start. Media app inherits from BpSinkPattern and functions very similarly to bpreceive file
-./build/media_app --save-directory=testdir --my-uri-eid=ipn:2.1 --inducts-config-file=$sink_config &
+./build/media_sink --save-directory=testdir --my-uri-eid=ipn:2.1 --inducts-config-file=$sink_config &
 bpreceive_PID=$!
-sleep 3
+# sleep 3                
 
 # HDTN one process this is just copy and pasted from the HDTN build dir
 # ./build/module/hdtn_one_process/hdtn-one-process --hdtn-config-file=$hdtn_config &
