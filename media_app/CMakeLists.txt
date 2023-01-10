@@ -16,10 +16,11 @@ SET(CMAKE_PREFIX_PATH $ENV{HDTN_INSTALL_ROOT} CACHE PATH "Path for find_package 
 
 #HDTN - not sure which of these I need yet, just most all of them for now
 find_package(HDTNUtil REQUIRED)
+find_package(StatsLoggerLib REQUIRED)
+find_package(Bpcodec REQUIRED)
 find_package(TelemetryDefinitions REQUIRED)
 find_package(LtpLib REQUIRED)
 find_package(BpAppPatternsLib REQUIRED)
-find_package(Bpcodec REQUIRED)
 find_package(EgressLib REQUIRED)
 find_package(HDTNConfigLib REQUIRED)
 find_package(HDTNCgrLib REQUIRED)
@@ -34,11 +35,13 @@ find_package(UdpLib REQUIRED)
 find_package(UdpDelaySimLib REQUIRED)
 find_package(Boost "1.67.0" REQUIRED timer unit_test_framework)
 
-add_executable(${PROJECT_NAME} 
+add_executable(media_sink
     src/VideoDriver.cpp
-	src/MediaAppRunner.cpp
 	src/MediaApp.cpp
-    src/MediaAppMain.cpp
+	
+	MediaSink/src/MediaSinkMain.cpp
+	MediaSink/src/MediaSinkRunner.cpp
+	MediaSink/src/MediaSink.cpp
 	
 	# gui library backend files
 	include/imgui/imgui.cpp
@@ -50,17 +53,78 @@ add_executable(${PROJECT_NAME}
     include/imgui/backends/imgui_impl_opengl3.cpp
 )
 
-target_include_directories(${PROJECT_NAME}
+target_include_directories(media_sink
 	PUBLIC 
 		
-		include/ #user code
-		include/imgui #gui 
-		include/imgui/backends #gui
-		include/stb #quick file loader
+	include/ #user code
+	MediaSink/include/
+	include/imgui #gui 
+	include/imgui/backends #gui
+	include/stb #quick file loader
 )
 
+target_link_libraries(media_sink
+	#gui
+  	glfw 
+	OpenGL::GL 
+	${CMAKE_DL_LIBS}
+    
+	#HDTN
+	HDTN::HDTNUtil
+	HDTN::Bpcodec
+	HDTN::TelemetryDefinitions
+	HDTN::LtpLib
+	HDTN::BpAppPatternsLib
+	HDTN::EgressLib
+	HDTN::HDTNConfigLib
+	HDTN::HDTNCgrLib
+	HDTN::InductManagerLib
+	HDTN::IngressLib
+	HDTN::LoggerLib
+	HDTN::OutductManagerLib
+	HDTN::StcpLib
+	HDTN::StorageLib
+	HDTN::TcpclLib
+	HDTN::UdpLib
+	HDTN::UdpDelaySimLib
 
-target_link_libraries(${PROJECT_NAME} 
+	Boost::unit_test_framework
+	Boost::timer
+    Boost::program_options 
+	Boost::thread
+	Boost::log
+) 
+
+
+add_executable(media_source 
+	src/VideoDriver.cpp
+	src/MediaApp.cpp
+
+	MediaSource/src/MediaSourceMain.cpp
+	MediaSource/src/MediaSourceRunner.cpp
+	MediaSource/src/MediaSource.cpp
+	
+	# gui library backend files
+	include/imgui/imgui.cpp
+    include/imgui/imgui_demo.cpp
+    include/imgui/imgui_draw.cpp
+    include/imgui/imgui_widgets.cpp
+    include/imgui/imgui_tables.cpp
+    include/imgui/backends/imgui_impl_glfw.cpp
+    include/imgui/backends/imgui_impl_opengl3.cpp
+)
+
+target_include_directories(media_source
+	PUBLIC 
+		
+	include/ #user code
+	MediaSource/include/
+	include/imgui #gui 
+	include/imgui/backends #gui
+	include/stb #quick file loader
+)
+
+target_link_libraries(media_source
 	#gui
   	glfw 
 	OpenGL::GL 
@@ -90,6 +154,4 @@ target_link_libraries(${PROJECT_NAME}
     Boost::program_options 
 	Boost::thread
 	Boost::log
-	
-
 ) 

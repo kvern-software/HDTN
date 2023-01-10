@@ -1,6 +1,5 @@
-#include "MediaApp.h"
-#include "MediaAppRunner.h"
-#include "VideoDriver.h"
+#include "MediaSink.h"
+#include "MediaSinkRunner.h"
 
 #include "SignalHandler.h"
 #include "Logger.h"
@@ -11,32 +10,28 @@
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
-MediaAppRunner::MediaAppRunner() {}
-MediaAppRunner::~MediaAppRunner() {}
+MediaSinkRunner::MediaSinkRunner() {}
+MediaSinkRunner::~MediaSinkRunner() {}
 
 
-void MediaAppRunner::MonitorExitKeypressThreadFunction() {
+void MediaSinkRunner::MonitorExitKeypressThreadFunction() {
     LOG_INFO(subprocess) << "Keyboard Interrupt.. exiting";
     m_runningFromSigHandler = false; //do this first
 }
 
-
-void MediaAppRunner::Print() {
-    std::cout << "printing" << std::endl;
-}
-
-bool MediaAppRunner::Run(int argc, const char* const argv[], volatile bool & running, bool useSignalHandler) {   
+bool MediaSinkRunner::Run(int argc, const char* const argv[], volatile bool & running, bool useSignalHandler) {   
     //scope to ensure clean exit before return 0
     {
         running = true;
         m_runningFromSigHandler = true;
-        SignalHandler sigHandler(boost::bind(&MediaAppRunner::MonitorExitKeypressThreadFunction, this));
+        SignalHandler sigHandler(boost::bind(&MediaSinkRunner::MonitorExitKeypressThreadFunction, this));
         InductsConfig_ptr inductsConfigPtr;
         OutductsConfig_ptr outductsConfigPtr;
         cbhe_eid_t myEid;
         bool isAcsAware;
         boost::filesystem::path saveDirectory;
         uint64_t maxBundleSizeBytes;
+        bool gui_enabled;
 
         boost::program_options::options_description desc("Allowed options");
         try {
@@ -48,6 +43,7 @@ bool MediaAppRunner::Run(int argc, const char* const argv[], volatile bool & run
                 ("custody-transfer-outducts-config-file", boost::program_options::value<std::string>()->default_value(""), "Outducts Configuration File for custody transfer (use custody if present).")
                 ("acs-aware-bundle-agent", "Custody transfer should support Aggregate Custody Signals if valid CTEB present.")
                 ("max-rx-bundle-size-bytes", boost::program_options::value<uint64_t>()->default_value(10000000), "Max bundle size bytes to receive (default=10MB).")
+                ("gui", boost::program_options::value<bool>()->default_value(true), "Enable graphical user interface")
                 ;
 
             boost::program_options::variables_map vm;
@@ -66,7 +62,9 @@ bool MediaAppRunner::Run(int argc, const char* const argv[], volatile bool & run
 
             const std::string configFileNameInducts = vm["inducts-config-file"].as<std::string>();
             if (configFileNameInducts.length()) {
-                inductsConfigPtr = InductsConfig::CreateFromJsonFile(configFileNameInducts);
+                inductsConfigPtr  = InductsConfig::CreateFromJsonFilePath(configFileNameInducts);
+                // inductsConfigPtr = InductsConfig::CreateFromJsonFile(configFileNameInducts);
+
                 if (!inductsConfigPtr) {
                     LOG_ERROR(subprocess) << "error loading config file: " << configFileNameInducts;
                     return false;
@@ -83,7 +81,7 @@ bool MediaAppRunner::Run(int argc, const char* const argv[], volatile bool & run
             //create outduct for custody signals
             const std::string outductsConfigFileName = vm["custody-transfer-outducts-config-file"].as<std::string>();
             if (outductsConfigFileName.length()) {
-                outductsConfigPtr = OutductsConfig::CreateFromJsonFile(outductsConfigFileName);
+                outductsConfigPtr = OutductsConfig::CreateFromJsonFilePath(outductsConfigFileName);
                 if (!outductsConfigPtr) {
                     LOG_ERROR(subprocess) << "error loading config file: " << outductsConfigFileName;
                     return false;
@@ -96,6 +94,7 @@ bool MediaAppRunner::Run(int argc, const char* const argv[], volatile bool & run
             isAcsAware = (vm.count("acs-aware-bundle-agent"));
             saveDirectory = vm["save-directory"].as<boost::filesystem::path>();
             maxBundleSizeBytes = vm["max-rx-bundle-size-bytes"].as<uint64_t>();
+            gui_enabled = vm["gui"].as<bool>();
         }
         catch (boost::bad_any_cast & e) {
             LOG_ERROR(subprocess) << "invalid data error: " << e.what() << "\n";
@@ -115,68 +114,44 @@ bool MediaAppRunner::Run(int argc, const char* const argv[], volatile bool & run
 
         // Start core media app functionality 
         LOG_INFO(subprocess) << "starting..";
-        MediaApp mediaApp(saveDirectory);
-        mediaApp.Init(inductsConfigPtr, outductsConfigPtr, isAcsAware, myEid, 0, maxBundleSizeBytes);
 
-        VideoDriver videoDriver; 
-        // initialize the video driver
-        videoDriver.device = "/dev/video0";
-        videoDriver.OpenFD();
-        videoDriver.CheckDeviceCapability();
-        videoDriver.SetImageFormat(DEFAULT_VIDEO_CAPTURE, 1920, 1080, 
-                DEFAULT_PIXEL_FORMAT, DEFAULT_FIELD);
-        videoDriver.RequestBuffer(1, DEFAULT_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
-        videoDriver.QueryBuffer(0);
-        videoDriver.MapMemory();
-        videoDriver.StartVideoStream();
-
+        MediaSink mediaSink(saveDirectory);
+        mediaSink.Init(inductsConfigPtr, outductsConfigPtr, isAcsAware, myEid, 0, maxBundleSizeBytes);
 
         if (useSignalHandler) {
             sigHandler.Start(false);
         }
         
+        if (!gui_enabled) {
+            LOG_INFO(subprocess) << "Starting without GUI";
+        }
+        
         LOG_INFO(subprocess) << "Up and running";
 
-        // Begin main loop. Media player control
-        // std::string filename("/home/kyle/nasa/dev/HDTN/media_app/test_media/cat.jpg");
-        // bool ret = mediaApp.LoadTextureFromFile(filename.c_str());
-        // IM_ASSERT(ret);
-        
-        
-        while (running && m_runningFromSigHandler && !mediaApp.should_close) {
-            // std::string file("img_"); file.append(std::to_string(mediaApp.file_number)); file.append(".jpeg");
-            videoDriver.QueueBuffer();  
-            videoDriver.DequeueBuffer();
 
-            // if saving to file
-            // videoDriver.WriteBufferToFile(file.c_str(), DEFAULT_CHUNK_WRITE_SIZE);
-            // mediaApp.should_update_image = true;
-            // mediaApp.nextFileFullPathFileName = file.c_str();
-            // mediaApp.UpdateImage(); // updates image displayed if we have sent a new image to storage
-            // else 
-            mediaApp.LoadTextureFromMemory(videoDriver.image_data, videoDriver.bufferinfo.bytesused);
-            // endif 
+        // main loop  
+        while (running && m_runningFromSigHandler && !mediaSink.mediaApp.should_close) {
+            if (gui_enabled) {
+                mediaSink.mediaApp.NewFrame();
+                if (mediaSink.mediaApp.should_update_image == true) 
+                    mediaSink.mediaApp.UpdateImage(mediaSink.nextFileFullPathFileName);
+            
+                mediaSink.mediaApp.DisplayImage();
+                mediaSink.mediaApp.ExitButton();
 
-            mediaApp.NewFrame();
-            mediaApp.DisplayImage();
-            mediaApp.ExitButton();
-
-            mediaApp.Render();
+                mediaSink.mediaApp.Render();
+            }
 
 
             if (useSignalHandler) {
                 sigHandler.PollOnce();
             }
-
-            // todo: write runtime input option to enable saving of frames to memory
-            // boost::filesystem::remove(file.c_str());
-            // mediaApp.file_number++;
         }
 
         LOG_INFO(subprocess) << "Exiting cleanly..";
-        mediaApp.Close(); // clean up gui
+        mediaSink.mediaApp.Close(); // clean up gui
 
-        mediaApp.Stop(); // clean up networking
+        mediaSink.Stop(); // clean up networking
 
         //safe to get any stats now if needed
     }

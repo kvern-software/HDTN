@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +16,7 @@
 #include <fstream>
 #include <string>
 #include <memory>
+#include <boost/filesystem.hpp>
 
 #define DEFAULT_CHUNK_WRITE_SIZE 8192*4
 
@@ -48,7 +51,7 @@ public:
 
     // members
     int fd; // file descriptor 
-    std::string device; // path to device e.g. /dev/video0
+    boost::filesystem::path device; // path to device e.g. /dev/video0
     char * image_data; // this points to the memory address of the device
     // video related members
     v4l2_capability capability;
