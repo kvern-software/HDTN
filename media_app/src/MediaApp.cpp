@@ -42,6 +42,18 @@ MediaApp::MediaApp()
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
+
+    // Create a OpenGL texture identifier for displaying images (textures)
+    glGenTextures(1, &imageData.image_texture);
+    glBindTexture(GL_TEXTURE_2D, imageData.image_texture);
+    // Setup filtering parameters for displaying images
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+    #if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    #endif
 }
 
 MediaApp::~MediaApp(){
@@ -87,16 +99,20 @@ void MediaApp::Close() {
 bool MediaApp::LoadTextureFromVideoDevice(void* img_location, int size ) {
     int image_width = 0;
     int image_height = 0;
-
+    
+    copying = true;
     char * image_data = (char *) stbi_load_from_memory(
         reinterpret_cast<unsigned char *>(img_location), size, &image_width, &image_height, NULL, 4);
+    copying = false;
 
     if (image_data == NULL) {
-        LOG_ERROR(subprocess) << "Null image data";
+        LOG_ERROR(subprocess) << "Null image data, failed to get data from VideoDriver";
         return false;
     }
 
     DataToOpenGLTexture(image_data, image_width, image_height);
+
+    stbi_image_free(image_data);
 
     return true;
 }
@@ -106,36 +122,21 @@ bool MediaApp::LoadTextureFromFile(const char* filename) {
     // Load from file
     int image_width = 0;
     int image_height = 0;
-    unsigned char* image_data = stbi_load(filename, &image_width, &image_height, NULL, 4);
+    unsigned char* image_data = nullptr; // = stbi_load(filename, &image_width, &image_height, NULL, 4);
     
     if (image_data == NULL) {
         LOG_ERROR(subprocess) << "Null image data";
         return false;
     }
-
+    
     DataToOpenGLTexture(image_data, image_width, image_height);
     
     return true;
 }
 
 void MediaApp::DataToOpenGLTexture(void * image_data, int image_width, int image_height) {
-     // Create a OpenGL texture identifier
-    glGenTextures(1, &imageData.image_texture);
-    glBindTexture(GL_TEXTURE_2D, imageData.image_texture);
-
-    // Setup filtering parameters for display
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
-
     // Upload pixels into texture
-#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
-    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-#endif
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
-    stbi_image_free(image_data);
-
     imageData.image_width = image_width;
     imageData.image_height = image_height;
 }
@@ -172,3 +173,8 @@ void MediaApp::UpdateImage(boost::filesystem::path filePath) {
     }
 }
 
+void MediaApp::CopyFrame(void * location, uint64_t length) {
+    rawFrameBuffer.location = malloc(length);
+    rawFrameBuffer.size = length;
+    memcpy(rawFrameBuffer.location, location, rawFrameBuffer.size);
+}

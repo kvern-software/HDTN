@@ -1,9 +1,10 @@
 #include "VideoDriver.h"
 #include "Logger.h"
-
+            #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/thread/thread.hpp> 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
-VideoDriver::VideoDriver(/* args */)
+VideoDriver::VideoDriver()
 {
 
 }
@@ -16,6 +17,7 @@ VideoDriver::~VideoDriver()
 void VideoDriver::Start() {
     if (!m_running) {
         m_running = true;
+        // std::cout << "starting " << std::endl;
         m_VideoDriverBufferFillerThreadPtr = boost::make_unique<boost::thread>(
         boost::bind(&VideoDriver::BufferFillerThreadFunc, this)); //create and start the worker thread
     }
@@ -28,6 +30,8 @@ void VideoDriver::Stop() {
         m_VideoDriverBufferFillerThreadPtr->join();
         m_VideoDriverBufferFillerThreadPtr.reset(); //delete it
     }
+
+    EndVideoStream();
 }
 
 /*
@@ -118,10 +122,14 @@ int VideoDriver::SetFramerate(uint64_t frames_per_second) {
     }
 
     m_frames_per_second = frames_per_second;
+    LOG_INFO(subprocess) << "Set framerate";
 
     return 0;
 }
 
+void VideoDriver::SetCaptureMode(int mode) {
+    m_mode = mode;
+}
 /*
     Request buffer from video device
 */
@@ -186,7 +194,7 @@ int VideoDriver::QueryBuffer(unsigned int index=0) {
         return 1;
     }
 
-    LOG_INFO(subprocess) << "Allocated memory for buffer";
+    // LOG_INFO(subprocess) << "Allocated memory for buffer";
     return 0;
 }
 
@@ -223,7 +231,7 @@ int VideoDriver::EndVideoStream() {
     This effectively informs the kernel that we would like our 
     preallocated buffer to be filled with video data.
 */
-int VideoDriver::QueueBuffer() {
+int VideoDriver::QueueBuffers() {
     for (uint64_t i = 0; i < m_frames_per_second; i++) {
         bufToQuery.index = i;
     
@@ -236,17 +244,42 @@ int VideoDriver::QueueBuffer() {
     return 0;
 }
 
+int VideoDriver::QueueBuffer(int buffer_idx) {
+    bufToQuery.index = buffer_idx;
+    
+    if(ioctl(fd, VIDIOC_QBUF, &bufToQuery) < 0){
+        LOG_ERROR(subprocess) << "Could not queue buffer, VIDIOC_QBUF";
+        return 1;
+    }
+
+    return 0;
+}
+
 /*
     This effectively informs the kernel that we would like
     to access the data inside our buffer. Must be called before
     accessing the data through our pointer since the frame gets
     written AFTER dequeing the buffer.
 */
-int VideoDriver::DequeueBuffer() {
+int VideoDriver::DequeueBuffers() {
+    for (uint64_t i = 0; i < m_frames_per_second; i++) {
+        bufToQuery.index = i;
+        if(ioctl(fd, VIDIOC_DQBUF, &bufToQuery) < 0){
+            LOG_ERROR(subprocess) << "Could not dequeue the buffer, VIDIOC_DQBUF";
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int VideoDriver::DequeueBuffer(int buffer_idx) {
+    bufToQuery.index = buffer_idx;
     if(ioctl(fd, VIDIOC_DQBUF, &bufToQuery) < 0){
         LOG_ERROR(subprocess) << "Could not dequeue the buffer, VIDIOC_DQBUF";
         return 1;
     }
+    
 
     return 0;
 }
@@ -302,95 +335,45 @@ int VideoDriver::WriteBufferToFile(std::string filePath, unsigned int chunkSize)
 
 
 int VideoDriver::CaptureFrames() {
-    for (uint64_t i = 0; i < m_frames_per_second + 1; i++) {
-        for (;;) {
-            fd_set fds;
-            struct timeval tv;
-            int ret;
+    // LOG_INFO(subprocess) << "capturing " << m_frames_per_second << " frames";
 
-            FD_ZERO(&fds);
-            FD_SET(fd, &fds);
+    QueueBuffers();
+    DequeueBuffers();
+    
+    m_mediaApp->CopyFrame(image_buffers[0].start, image_buffers[0].length);
 
-            /* Timeout. */
-            tv.tv_sec = 2;
-            tv.tv_usec = 0;
-            ret = select(fd + 1, &fds, NULL, NULL, &tv);
-            if (-1 == ret) {
-                    if (EINTR == errno)
-                            continue;
-                    // errno_exit("select");
-            }
-            if (0 == ret) {
-                    fprintf(stderr, "select timeout\n");
-                    exit(EXIT_FAILURE);
-            }
+    return 0;
+}
 
-            /* dequeue captured buffer */
-            // CLEAR(bufToQuery);
-            // bufToQuery.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-            // bufToQuery.memory = V4L2_MEMORY_MMAP;
-            DequeueBuffer();
-            // assert(buf.index < n_buffers);
+int VideoDriver::CaptureFramesFIFO() {
+    for (uint64_t i=0; i < m_frames_per_second; i++) {
+        // LOG_INFO(subprocess) << "capturing " << m_frames_per_second << " frames " << i;
 
-            /* skip first image as it may not be sync'd */
-            if (i > 0) {
-                    // process_image(buffers[buf.index].start,
-                            // &fmt.fmt.pix);
-                    // sprintf(filename, "frame%d.raw", i);
-                    // save_frame(filename,
-                            // buffers[buf.index].start,
-                            // buf.bytesused);
-            }
+        QueueBuffer(i);
+        DequeueBuffer(i);
+      
+        m_mediaApp->CopyFrame(image_buffers[i].start, image_buffers[i].length);
 
-            /* queue buffer */
-            QueueBuffer();
-            break;
-        }
     }
 
     return 0;
 }
 
 void VideoDriver::BufferFillerThreadFunc() {
-    // boost::posix_time::time_duration period (boost::posix_time::milliseconds(1/frames_per_second * 1000)); // milliseconds per frame
-    // boost::asio::io_service io;
-
-    // boost::asio::deadline_timer t(io, period);
-    RequestBuffer(V4L2_BUF_TYPE_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
-    AllocateLocalBuffers();    
     MapMemory();
     StartVideoStream();
-    CaptureFrames();
-    // while (m_running) 
-    // {      
-    //     // request buffer
-        
-    //     // allocate buffer
+    while (m_running) {
+        if (m_mode == FIFO) {
+            CaptureFramesFIFO();
+        } else if (m_mode == NEVER_DROP) {
+            CaptureFrames();
+        }
 
-    //     // mmap buffer
-
-    //     // queue buffer
-
-    //     // capture
-
-    //     // capture n frames
-
-    //         // dequeue captured buffer
-
-    //         // queue buffer
-
-        
-    //     videoDriver.QueueBuffer();  
-
-    //     videoDriver.DequeueBuffer();
+        // boost::this_thread::sleep(boost::posix_time::milliseconds(20));
+    }
+}
 
 
-    //     // if (elapsed_time > period) {
-    //     //     LOG_ERROR(subprocess) << "Buffer seconds per frame exceeded. Is FPS set too high?";
-    //     //     continue;   
-    //     // } else {
-    //         // t.wait();
-    //     // }
-    // }
-
+void VideoDriver::RegisterCallback(MediaApp* mediaApp) {
+    m_mediaApp = mediaApp; 
 }

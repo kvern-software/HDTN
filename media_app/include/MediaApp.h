@@ -39,8 +39,11 @@ public:
     void DataToOpenGLTexture(void * image_data, int image_width, int image_height); // converts raw memory into open GL viewable texture
     void ExitButton();
 
+    void CopyFrame(void * location, uint64_t length);
+
     bool should_close = false;
     volatile bool should_update_image = false;
+    bool copying = false;
     unsigned int file_number; // if we are saving frames to a local file, this is the  most recent file written to storage
     
 
@@ -48,6 +51,11 @@ public:
         int image_width;
         int image_height;
         GLuint image_texture = 0;
+
     } imageData;
 
+    struct buffer {
+        void * location = nullptr;
+        int size;
+    } rawFrameBuffer;
 };

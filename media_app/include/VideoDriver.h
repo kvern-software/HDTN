@@ -20,7 +20,10 @@
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 #include <boost/make_unique.hpp>
+#include <boost/thread/lockable_adapter.hpp>
+#include <boost/thread/strict_lock.hpp>
 
+#include "MediaApp.h"
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 #define DEFAULT_CHUNK_WRITE_SIZE 8192*4
@@ -35,16 +38,22 @@ struct buffer {
         size_t  length;
 };
 
+enum modes {
+    FIFO=0,
+    NEVER_DROP=1
+};
+
 class VideoDriver
 {
 private:
     std::unique_ptr<boost::thread> m_VideoDriverBufferFillerThreadPtr;
-    volatile bool m_running;
-    
+    volatile bool m_running = false;
+    MediaApp *m_mediaApp = nullptr;
+    int m_mode = 0;
     uint64_t m_frames_per_second;
     /* data */
 public:
-    VideoDriver(/* args */);
+    VideoDriver();
     ~VideoDriver();
 
     void Start();
@@ -57,6 +66,8 @@ public:
             unsigned int pixelformat, unsigned int field);
     int SetImageFormat(v4l2_format imageFormat); 
     int SetFramerate(uint64_t frames_per_second);
+    void RegisterCallback(MediaApp* mediaApp);
+    void SetCaptureMode(int mode);
 
     // Repeatedly called members for collecting data
     int RequestBuffer(unsigned int type, unsigned int memory);
@@ -65,12 +76,19 @@ public:
     int QueryBuffer(unsigned int index);
     int StartVideoStream();
     int EndVideoStream();
+
     int CaptureFrames();
+    int CaptureFramesFIFO();
 
-    // call these to get data
-    int QueueBuffer();
-    int DequeueBuffer();
+    // internally called to get video frames from device
+    int QueueBuffers(); // queue FPS frames
+    int QueueBuffer(int buffer_idx); // single frame queue
+    int DequeueBuffers(); // dequeue FPS frames
+    int DequeueBuffer(int buffer_idx); // single frame dequeue
 
+    // externally called to prevent video frames to be written to while being read
+    int RetrieveFrame(int index, boost::strict_lock<VideoDriver>&);
+    
     void BufferFillerThreadFunc();
     int WriteBufferToFile(std::string filePath, unsigned int chunkSize);
 
@@ -79,13 +97,13 @@ public:
     int fd; // file descriptor 
     boost::filesystem::path device; // path to device e.g. /dev/video0
 
+
     // video related members
     v4l2_capability capability;
     v4l2_format imageFormat;
 
     // char * image_data; // this points to the memory address of the device
     v4l2_requestbuffers requestBuffer = {0};
-    buffer *image_buffers; // this holdes the image data of multiple frames
+    buffer *image_buffers; // this holds the image data of multiple frames
     v4l2_buffer bufToQuery; 
-
 };

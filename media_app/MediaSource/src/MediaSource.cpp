@@ -20,22 +20,22 @@ MediaSource::~MediaSource() {}
 
 
 uint64_t MediaSource::GetNextPayloadLength_Step1() {
-
-    if (video_driver_enabled) {
-        // videoDriver.QueueBuffer();  
-        // videoDriver.DequeueBuffer();
-        return 0;
-        // std::cout << videoDriver.bufferinfo.bytesused << std::endl;
-        // return videoDriver.bufferinfo.bytesused;
+    if (video_driver_enabled && videoDriver.image_buffers[0].start != nullptr) {
+        std::cout << videoDriver.image_buffers[0].length << std::endl;
+        return videoDriver.image_buffers[0].length;
     } else {
-        return m_bundleSizeBytes;
+        return 0;
     }
 }
 
 bool MediaSource::CopyPayload_Step2(uint8_t * destinationBuffer) {
     // bpgen_hdr bpGenHeader;
     // bpGenHeader.seq = m_bpGenSequenceNumber++;
-    // memcpy(destinationBuffer, videoDriver.image_data, videoDriver.bufferinfo.bytesused);
-    std::cout << "copied" << std::endl;
+    if (video_driver_enabled && mediaApp.rawFrameBuffer.location != nullptr)  {
+        memcpy(destinationBuffer, mediaApp.rawFrameBuffer.location, mediaApp.rawFrameBuffer.size);
+        std::cout << "copied" << std::endl;
+        return true;
+    } 
+
     return true;
 }

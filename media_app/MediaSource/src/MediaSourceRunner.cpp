@@ -81,7 +81,6 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
                     ("video-device",  boost::program_options::value<boost::filesystem::path>()->default_value(""), "Path to camera device Empty=>No Camera")
                     ("gui", boost::program_options::value<bool>()->default_value(true), "Enable graphical user interface")
                     ("save-local-copy", boost::program_options::value<bool>()->default_value(false), "Save local copy of media to disk")
-                    ("frames-per-second", boost::program_options::value<uint64_t>()->default_value(30), "FPS, network should be faster than required transfer rate, else delays")
                     ("frame-width", boost::program_options::value<uint64_t>()->default_value(1920), "Camera resolution in X axis")
                     ("frame-height", boost::program_options::value<uint64_t>()->default_value(1080), "Camera resolation in Y axis")
                     ("frames-per-second", boost::program_options::value<uint64_t>()->default_value(60), "Number of buffered frames kept in memory")
@@ -190,11 +189,12 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
             mediaSource.videoDriver.SetImageFormat(DEFAULT_VIDEO_CAPTURE, frame_width, frame_height, 
                     DEFAULT_PIXEL_FORMAT, DEFAULT_FIELD);
             mediaSource.videoDriver.SetFramerate(frames_per_second);
-            // mediaSource.videoDriver.RequestBuffer(1, DEFAULT_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
-            // mediaSource.videoDriver.QueryBuffer(0);
-            // mediaSource.videoDriver.MapMemory();
-            // mediaSource.videoDriver.StartVideoStream();
+            mediaSource.videoDriver.SetCaptureMode(FIFO); // todo get input come command line
+            mediaSource.videoDriver.RequestBuffer(V4L2_BUF_TYPE_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
+            mediaSource.videoDriver.AllocateLocalBuffers();    
+            mediaSource.videoDriver.RegisterCallback(&mediaSource.mediaApp);
             mediaSource.videoDriver.Start();
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
         } else {
             LOG_INFO(subprocess) << "started with no video driver";
         }
@@ -232,6 +232,8 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
         }
 
         LOG_INFO(subprocess) << "MediaSource up and running";
+        
+        
         while (running && m_runningFromSigHandler && mediaSource.mediaApp.should_close==false) {
             if (durationSeconds) {
                 if ((!startedTimer) && mediaSource.m_allOutductsReady) {
@@ -248,8 +250,6 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
             }
 
             if (mediaSource.video_driver_enabled) {   
-                              // std::cout << mediaSource.videoDriver.bufferinfo.bytesused << std::endl;
-
                 if (save_local_copy) {
                     mediaSource.saveFileFullFilename = ("file_");
                     mediaSource.saveFileFullFilename.append(std::to_string(mediaSource.file_number));
@@ -261,7 +261,7 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
 
             // GUI
             if (gui_enabled) {
-                mediaSource.mediaApp.LoadTextureFromVideoDevice(mediaSource.videoDriver.image_buffers[0].start, mediaSource.videoDriver.image_buffers[0].length);
+                mediaSource.mediaApp.LoadTextureFromVideoDevice(mediaSource.mediaApp.rawFrameBuffer.location, mediaSource.mediaApp.rawFrameBuffer.size);
 
                 mediaSource.mediaApp.NewFrame();
                 mediaSource.mediaApp.DisplayImage();
@@ -273,10 +273,15 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
             
         }
 
-        
+        LOG_INFO(subprocess) << "VideoDriver exiting cleanly..";
         mediaSource.videoDriver.Stop();
+        LOG_INFO(subprocess) << "VideoDriver exited cleanly..";
+        
+        LOG_INFO(subprocess) << "MediaApp exiting cleanly..";
         mediaSource.mediaApp.Close();
+        LOG_INFO(subprocess) << "MediaApp exited cleanly..";
 
+        
         LOG_INFO(subprocess) << "MediaSourceRunner::Run: exiting cleanly..";
         mediaSource.Stop();
         m_bundleCount = mediaSource.m_bundleCount;

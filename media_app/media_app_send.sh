@@ -12,7 +12,7 @@ cd $HDTN_MEDIA_APP_DIR
 # sleep 10
 
 #bpgen
-./build/media_source --video-device=/dev/video0 --bundle-size=100000 --bundle-rate=0 --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --duration=40 --outducts-config-file=$gen_config &
+./build/media_source  --frames-per-second=30 --video-device=/dev/video0 --bundle-size=100000 --bundle-rate=0 --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --duration=400 --outducts-config-file=$gen_config &
 # sleep 8
 
 
