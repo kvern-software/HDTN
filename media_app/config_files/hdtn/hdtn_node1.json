@@ -12,11 +12,11 @@
     "retransmitBundleAfterNoCustodySignalMilliseconds": 10000,
     "maxBundleSizeBytes": 10000000,
     "maxIngressBundleWaitOnEgressMilliseconds": 2000,
+    "bufferRxToStorageOnLinkUpSaturation": false,
     "maxLtpReceiveUdpPacketSizeBytes": 65536,
     "zmqIngressAddress": "localhost",
     "zmqEgressAddress": "localhost",
     "zmqStorageAddress": "localhost",
-    "zmqRegistrationServerAddress": "localhost",
     "zmqSchedulerAddress": "localhost",
     "zmqRouterAddress": "localhost",
     "zmqBoundIngressToConnectingEgressPortPath": 10100,
@@ -27,20 +27,21 @@
     "zmqConnectingStorageToBoundIngressPortPath": 10150,
     "zmqConnectingStorageToBoundEgressPortPath": 10120,
     "zmqBoundEgressToConnectingStoragePortPath": 10130,
-    "zmqRegistrationServerPortPath": 10140,
     "zmqBoundSchedulerPubSubPortPath": 10200,
     "zmqBoundRouterPubSubPortPath": 10210,
-    "zmqMaxMessagesPerPath": 5,
-    "zmqMaxMessageSizeBytes": 100000000,
+    "zmqRegistrationServerAddress":"localhost",
+    "zmqRegistrationServerPortPath":10140,
+    "zmqMaxMessagesPerPath":10,
+    "zmqMaxMessageSizeBytes":100000000,
     "inductsConfig": {
-        "inductConfigName": "myconfig",
+        "inductConfigName": "myconfig", 
         "inductVector": [
             {
-                "name": "udp_ingress",
-                "convergenceLayer": "udp",
-                "boundPort": 4556,
+                "name": "from bpsendfile",
+                "convergenceLayer": "stcp",
+                "boundPort": 5000,
                 "numRxCircularBufferElements": 200,
-                "numRxCircularBufferBytesPerElement": 65535
+                "keepAliveIntervalSeconds": 15
             }
         ]
     },
@@ -48,28 +49,21 @@
         "outductConfigName": "myconfig",
         "outductVector": [
             {
-                "name": "udp_egress1",
-                "convergenceLayer": "udp",
-                "nextHopNodeId": 1,
+                "name": "to media sink",
+                "convergenceLayer": "stcp",
+                "nextHopNodeId": 20,
                 "remoteHostname": "localhost",
-                "remotePort": 4557,
-                "bundlePipelineLimit": 50,
+                "remotePort": 5001,
+                "maxNumberOfBundlesInPipeline": 15,
+                "maxSumOfBundleBytesInPipeline": 50000000,
                 "finalDestinationEidUris": [
-                    "ipn:1.1"
+                    "ipn:1.*",
+                    "ipn:2.*",
+                    "ipn:3.*"
                 ],
-                "udpRateBps": 800000
-            },
-            {
-                "name": "udp_egress2",
-                "convergenceLayer": "udp",
-                "nextHopNodeId": 2,
-                "remoteHostname": "localhost",
-                "remotePort": 4558,
-                "bundlePipelineLimit": 50,
-                "finalDestinationEidUris": [
-                    "ipn:2.1"
-                ],
-                "udpRateBps": 800000
+                "keepAliveIntervalSeconds": 17,
+                "bundlePipelineLimit":50
+
             }
         ]
     },
@@ -77,7 +71,7 @@
         "storageImplementation": "asio_single_threaded",
         "tryToRestoreFromDisk": false,
         "autoDeleteFilesOnExit": true,
-        "totalStorageCapacityBytes": 8192000000,
+        "totalStorageCapacityBytes": 81920000000,
         "storageDiskConfigVector": [
             {
                 "name": "d1",

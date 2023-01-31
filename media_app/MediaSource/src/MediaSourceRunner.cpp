@@ -181,19 +181,19 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
         MediaSource mediaSource(bundleSizeBytes);
         
         if (!video_device.empty()) {
-            mediaSource.videoDriver.device = video_device;
-            mediaSource.video_driver_enabled = true;
             // initialize video driver
-            mediaSource.videoDriver.OpenFD();
-            mediaSource.videoDriver.CheckDeviceCapability();
-            mediaSource.videoDriver.SetImageFormat(DEFAULT_VIDEO_CAPTURE, frame_width, frame_height, 
+            mediaSource.videoDriverPtr->device = video_device;
+            mediaSource.video_driver_enabled = true;
+            mediaSource.videoDriverPtr->OpenFD();
+            mediaSource.videoDriverPtr->CheckDeviceCapability();
+            mediaSource.videoDriverPtr->SetImageFormat(DEFAULT_VIDEO_CAPTURE, frame_width, frame_height, 
                     DEFAULT_PIXEL_FORMAT, DEFAULT_FIELD);
-            mediaSource.videoDriver.SetFramerate(frames_per_second);
-            mediaSource.videoDriver.SetCaptureMode(FIFO); // todo get input come command line
-            mediaSource.videoDriver.RequestBuffer(V4L2_BUF_TYPE_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
-            mediaSource.videoDriver.AllocateLocalBuffers();    
-            mediaSource.videoDriver.RegisterCallback(&mediaSource.mediaApp);
-            mediaSource.videoDriver.Start();
+            mediaSource.videoDriverPtr->SetFramerate(frames_per_second);
+            mediaSource.videoDriverPtr->SetCaptureMode(FIFO); // todo get input come command line
+            mediaSource.videoDriverPtr->RequestBuffer(V4L2_BUF_TYPE_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
+            mediaSource.videoDriverPtr->AllocateLocalBuffers();    
+            // mediaSource.videoDriverPtr->RegisterCallback(&mediaSource.mediaApp);
+            mediaSource.videoDriverPtr->Start();
             boost::this_thread::sleep_for(boost::chrono::milliseconds(1000));
         } else {
             LOG_INFO(subprocess) << "started with no video driver";
@@ -234,7 +234,7 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
         LOG_INFO(subprocess) << "MediaSource up and running";
         
         
-        while (running && m_runningFromSigHandler && mediaSource.mediaApp.should_close==false) {
+        while (running && m_runningFromSigHandler && mediaSource.mediaAppPtr->should_close==false) {
             if (durationSeconds) {
                 if ((!startedTimer) && mediaSource.m_allOutductsReady) {
                     startedTimer = true;
@@ -254,31 +254,31 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
                     mediaSource.saveFileFullFilename = ("file_");
                     mediaSource.saveFileFullFilename.append(std::to_string(mediaSource.file_number));
                     mediaSource.saveFileFullFilename.append(".jpeg");
-                    mediaSource.videoDriver.WriteBufferToFile(mediaSource.saveFileFullFilename, DEFAULT_CHUNK_WRITE_SIZE);
+                    mediaSource.videoDriverPtr->WriteBufferToFile(mediaSource.saveFileFullFilename, DEFAULT_CHUNK_WRITE_SIZE);
                     mediaSource.file_number++;
                 }
             }
 
             // GUI
             if (gui_enabled) {
-                mediaSource.mediaApp.LoadTextureFromVideoDevice(mediaSource.mediaApp.rawFrameBuffer.location, mediaSource.mediaApp.rawFrameBuffer.size);
+                mediaSource.mediaAppPtr->LoadTextureFromVideoDevice(mediaSource.rawFrameBuffer.start, mediaSource.rawFrameBuffer.length);
 
-                mediaSource.mediaApp.NewFrame();
-                mediaSource.mediaApp.DisplayImage();
-                mediaSource.mediaApp.ExitButton();
+                mediaSource.mediaAppPtr->NewFrame();
+                mediaSource.mediaAppPtr->DisplayImage();
+                mediaSource.mediaAppPtr->ExitButton();
 
-                mediaSource.mediaApp.Render();
+                mediaSource.mediaAppPtr->Render();
             }
 
             
         }
 
         LOG_INFO(subprocess) << "VideoDriver exiting cleanly..";
-        mediaSource.videoDriver.Stop();
+        mediaSource.videoDriverPtr->Stop();
         LOG_INFO(subprocess) << "VideoDriver exited cleanly..";
         
         LOG_INFO(subprocess) << "MediaApp exiting cleanly..";
-        mediaSource.mediaApp.Close();
+        mediaSource.mediaAppPtr->Close();
         LOG_INFO(subprocess) << "MediaApp exited cleanly..";
 
         

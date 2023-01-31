@@ -3,6 +3,7 @@
 // std
 #include <set>
 #include <map>
+#include <memory>
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -13,8 +14,8 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
- 
 
+ #include "common.h"
 
 class MediaApp {
 private:
@@ -39,8 +40,6 @@ public:
     void DataToOpenGLTexture(void * image_data, int image_width, int image_height); // converts raw memory into open GL viewable texture
     void ExitButton();
 
-    void CopyFrame(void * location, uint64_t length);
-
     bool should_close = false;
     volatile bool should_update_image = false;
     bool copying = false;
@@ -54,8 +53,4 @@ public:
 
     } imageData;
 
-    struct buffer {
-        void * location = nullptr;
-        int size;
-    } rawFrameBuffer;
 };

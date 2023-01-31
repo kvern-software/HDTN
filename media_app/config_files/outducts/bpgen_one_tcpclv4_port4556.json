@@ -21,7 +21,8 @@
             "useTlsVersion1_3": false,
             "doX509CertificateVerification": false,
             "verifySubjectAltNameInX509Certificate": false,
-            "certificationAuthorityPemFileForVerification": ""
+            "certificationAuthorityPemFileForVerification": "",
+            "maxNumberOfBundlesInPipeline":100
         }
     ]
 }

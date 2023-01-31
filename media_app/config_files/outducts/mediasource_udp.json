@@ -2,19 +2,17 @@
     "outductConfigName": "myconfig",
     "outductVector": [
         {
-            "name": "bpgen",
-            "convergenceLayer": "udp",
-            "nextHopNodeId": 1,
+            "name": "to hdtn local",
+            "convergenceLayer": "stcp",
+            "nextHopNodeId": 10,
             "remoteHostname": "localhost",
-            "remotePort": 4000,
-            "maxNumberOfBundlesInPipeline": 5,
+            "remotePort": 5000,
+            "maxNumberOfBundlesInPipeline": 1000,
             "maxSumOfBundleBytesInPipeline": 50000000,
             "finalDestinationEidUris": [
-                "ipn:1.*",
-                "ipn:2.*",
-                "ipn:3.*"
+                "ipn:2.*"
             ],
-            "udpRateBps": 500000
+            "keepAliveIntervalSeconds": 17
         }
     ]
 }

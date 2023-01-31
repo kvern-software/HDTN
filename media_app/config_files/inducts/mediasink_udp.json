@@ -1,12 +1,12 @@
 {
-    "inductConfigName": "MediaAppFileSink",
+    "inductConfigName": "myconfig",
     "inductVector": [
         {
-            "name": "media_app_file_sink",
-            "convergenceLayer": "udp",
-            "boundPort": 4000,
+            "name": "localhost bpsink",
+            "convergenceLayer": "stcp",
+            "boundPort": 5002,
             "numRxCircularBufferElements": 200,
-            "numRxCircularBufferBytesPerElement": 65535
+            "keepAliveIntervalSeconds": 15
         }
     ]
 }

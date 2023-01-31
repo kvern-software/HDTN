@@ -172,9 +172,3 @@ void MediaApp::UpdateImage(boost::filesystem::path filePath) {
             should_update_image = false;
     }
 }
-
-void MediaApp::CopyFrame(void * location, uint64_t length) {
-    rawFrameBuffer.location = malloc(length);
-    rawFrameBuffer.size = length;
-    memcpy(rawFrameBuffer.location, location, rawFrameBuffer.size);
-}

@@ -4,9 +4,10 @@
 #include <boost/thread/thread.hpp> 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
-VideoDriver::VideoDriver()
+VideoDriver::VideoDriver(const ExportFrameCallback_t & exportFrameCallback)
 {
-
+    // m_exportFrameCallback = ;
+    m_exportFrameCallback = exportFrameCallback;
 }
 
 VideoDriver::~VideoDriver()
@@ -340,8 +341,8 @@ int VideoDriver::CaptureFrames() {
     QueueBuffers();
     DequeueBuffers();
     
-    m_mediaApp->CopyFrame(image_buffers[0].start, image_buffers[0].length);
-
+    // m_exportFrameCallback(CopyFrame(image_buffers[0].start, image_buffers[0].length);
+    // m_exportFrameCallback()
     return 0;
 }
 
@@ -351,8 +352,8 @@ int VideoDriver::CaptureFramesFIFO() {
 
         QueueBuffer(i);
         DequeueBuffer(i);
-      
-        m_mediaApp->CopyFrame(image_buffers[i].start, image_buffers[i].length);
+        m_exportFrameCallback(&image_buffers[i]);
+        // m_mediaApp->CopyFrame(image_buffers[i].start, image_buffers[i].length);
 
     }
 
@@ -374,6 +375,6 @@ void VideoDriver::BufferFillerThreadFunc() {
 }
 
 
-void VideoDriver::RegisterCallback(MediaApp* mediaApp) {
-    m_mediaApp = mediaApp; 
-}
+// void VideoDriver::RegisterCallback(MediaApp* mediaApp) {
+//     m_mediaApp = mediaApp; 
+// }

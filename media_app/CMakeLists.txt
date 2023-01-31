@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.12) #HDTN min version
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_VERBOSE_MAKEFILE FALSE)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wformat -std=c++11 -Werror")
-set(CMAKE_BUILD_TYPE RELEASE)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wformat -std=c++11 -Werror -g")
+set(CMAKE_BUILD_TYPE Debug)
 
 project(media_app)
 
@@ -35,9 +35,13 @@ find_package(UdpLib REQUIRED)
 find_package(UdpDelaySimLib REQUIRED)
 find_package(Boost "1.67.0" REQUIRED timer unit_test_framework)
 
+find_package(ZLIB) #for compression
+
 add_executable(media_sink
     src/VideoDriver.cpp
 	src/MediaApp.cpp
+	src/Fragmenter.cpp
+	src/Compressor.cpp
 	
 	MediaSink/src/MediaSinkMain.cpp
 	MediaSink/src/MediaSinkRunner.cpp
@@ -93,13 +97,17 @@ target_link_libraries(media_sink
     Boost::program_options 
 	Boost::thread
 	Boost::log
+
+	ZLIB::ZLIB
 ) 
 
 
 add_executable(media_source 
 	src/VideoDriver.cpp
 	src/MediaApp.cpp
-
+	src/Fragmenter.cpp
+	src/Compressor.cpp
+	
 	MediaSource/src/MediaSourceMain.cpp
 	MediaSource/src/MediaSourceRunner.cpp
 	MediaSource/src/MediaSource.cpp
@@ -154,4 +162,6 @@ target_link_libraries(media_source
     Boost::program_options 
 	Boost::thread
 	Boost::log
+
+	ZLIB::ZLIB
 ) 
