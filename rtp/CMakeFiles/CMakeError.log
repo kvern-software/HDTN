@@ -1,0 +1,117 @@
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_d9065/fast && /usr/bin/make -f CMakeFiles/cmTC_d9065.dir/build.make CMakeFiles/cmTC_d9065.dir/build
+make[1]: Entering directory '/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_d9065.dir/src.c.o
+/usr/bin/cc   -DCMAKE_HAVE_LIBC_PTHREAD -std=c++17   -o CMakeFiles/cmTC_d9065.dir/src.c.o   -c /home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp/src.c
+cc1: warning: command line option ‘-std=c++17’ is valid for C++/ObjC++ but not for C
+Linking C executable cmTC_d9065
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_d9065.dir/link.txt --verbose=1
+/usr/bin/cc  -DCMAKE_HAVE_LIBC_PTHREAD -std=c++17    CMakeFiles/cmTC_d9065.dir/src.c.o  -o cmTC_d9065 
+/usr/bin/ld: CMakeFiles/cmTC_d9065.dir/src.c.o: in function `main':
+src.c:(.text+0x46): undefined reference to `pthread_create'
+/usr/bin/ld: src.c:(.text+0x52): undefined reference to `pthread_detach'
+/usr/bin/ld: src.c:(.text+0x63): undefined reference to `pthread_join'
+collect2: error: ld returned 1 exit status
+make[1]: *** [CMakeFiles/cmTC_d9065.dir/build.make:87: cmTC_d9065] Error 1
+make[1]: Leaving directory '/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_d9065/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_join(thread, NULL);
+  pthread_atfork(NULL, NULL, NULL);
+  pthread_exit(NULL);
+
+  return 0;
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_f5bb2/fast && /usr/bin/make -f CMakeFiles/cmTC_f5bb2.dir/build.make CMakeFiles/cmTC_f5bb2.dir/build
+make[1]: Entering directory '/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_f5bb2.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -DCHECK_FUNCTION_EXISTS=pthread_create -std=c++17   -o CMakeFiles/cmTC_f5bb2.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.16/Modules/CheckFunctionExists.c
+cc1: warning: command line option ‘-std=c++17’ is valid for C++/ObjC++ but not for C
+Linking C executable cmTC_f5bb2
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_f5bb2.dir/link.txt --verbose=1
+/usr/bin/cc  -DCHECK_FUNCTION_EXISTS=pthread_create -std=c++17    CMakeFiles/cmTC_f5bb2.dir/CheckFunctionExists.c.o  -o cmTC_f5bb2  -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+make[1]: *** [CMakeFiles/cmTC_f5bb2.dir/build.make:87: cmTC_f5bb2] Error 1
+make[1]: Leaving directory '/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_f5bb2/fast] Error 2
+
+
+
+Determining if the include file intrin.h exists failed with the following output:
+Change Dir: /home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_fc0fc/fast && /usr/bin/make -f CMakeFiles/cmTC_fc0fc.dir/build.make CMakeFiles/cmTC_fc0fc.dir/build
+make[1]: Entering directory '/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_fc0fc.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -std=c++17   -o CMakeFiles/cmTC_fc0fc.dir/CheckIncludeFile.c.o   -c /home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc1: warning: command line option ‘-std=c++17’ is valid for C++/ObjC++ but not for C
+/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:10: fatal error: intrin.h: No such file or directory
+    1 | #include <intrin.h>
+      |          ^~~~~~~~~~
+compilation terminated.
+make[1]: *** [CMakeFiles/cmTC_fc0fc.dir/build.make:66: CMakeFiles/cmTC_fc0fc.dir/CheckIncludeFile.c.o] Error 1
+make[1]: Leaving directory '/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_fc0fc/fast] Error 2
+
+
+
+Performing C++ SOURCE FILE Test USE_BITTEST failed with the following output:
+Change Dir: /home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_0b33f/fast && /usr/bin/make -f CMakeFiles/cmTC_0b33f.dir/build.make CMakeFiles/cmTC_0b33f.dir/build
+make[1]: Entering directory '/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_0b33f.dir/src.cxx.o
+/usr/bin/c++  -DHAVE_X86INTRIN_H  -DUSE_BITTEST   -std=gnu++17 -o CMakeFiles/cmTC_0b33f.dir/src.cxx.o -c /home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp/src.cxx
+/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp/src.cxx: In function ‘int main()’:
+/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp/src.cxx:12:4: error: ‘_bittestandreset64’ was not declared in this scope
+   12 |    _bittestandreset64((int64_t*)&bits, 1);
+      |    ^~~~~~~~~~~~~~~~~~
+/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp/src.cxx:13:15: error: ‘_bittest64’ was not declared in this scope
+   13 |    char set = _bittest64((int64_t*)&bits, 2);
+      |               ^~~~~~~~~~
+/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp/src.cxx:14:34: error: ‘_bittestandset64’ was not declared in this scope
+   14 |    const bool bitWasAlreadyOne = _bittestandset64((int64_t*)&bits, 1);
+      |                                  ^~~~~~~~~~~~~~~~
+make[1]: *** [CMakeFiles/cmTC_0b33f.dir/build.make:66: CMakeFiles/cmTC_0b33f.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/kyle/nasa/dev/HDTN/rtp/CMakeFiles/CMakeTmp'
+make: *** [Makefile:121: cmTC_0b33f/fast] Error 2
+
+
+Source file was:
+
+		#include <immintrin.h>
+		#ifdef HAVE_INTRIN_H
+		#include <intrin.h>
+		#endif
+		#ifdef HAVE_X86INTRIN_H
+		#include <x86intrin.h>
+		#endif
+		#include <cstdint>
+		int main() {
+			uint64_t bits = 0xff;
+			_bittestandreset64((int64_t*)&bits, 1);
+			char set = _bittest64((int64_t*)&bits, 2);
+			const bool bitWasAlreadyOne = _bittestandset64((int64_t*)&bits, 1);
+			return 0;
+		}

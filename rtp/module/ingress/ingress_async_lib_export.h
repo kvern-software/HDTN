@@ -1,0 +1,42 @@
+
+#ifndef INGRESS_ASYNC_LIB_EXPORT_H
+#define INGRESS_ASYNC_LIB_EXPORT_H
+
+#ifdef INGRESS_ASYNC_LIB_STATIC_DEFINE
+#  define INGRESS_ASYNC_LIB_EXPORT
+#  define INGRESS_ASYNC_LIB_NO_EXPORT
+#else
+#  ifndef INGRESS_ASYNC_LIB_EXPORT
+#    ifdef ingress_async_lib_EXPORTS
+        /* We are building this library */
+#      define INGRESS_ASYNC_LIB_EXPORT 
+#    else
+        /* We are using this library */
+#      define INGRESS_ASYNC_LIB_EXPORT 
+#    endif
+#  endif
+
+#  ifndef INGRESS_ASYNC_LIB_NO_EXPORT
+#    define INGRESS_ASYNC_LIB_NO_EXPORT 
+#  endif
+#endif
+
+#ifndef INGRESS_ASYNC_LIB_DEPRECATED
+#  define INGRESS_ASYNC_LIB_DEPRECATED __attribute__ ((__deprecated__))
+#endif
+
+#ifndef INGRESS_ASYNC_LIB_DEPRECATED_EXPORT
+#  define INGRESS_ASYNC_LIB_DEPRECATED_EXPORT INGRESS_ASYNC_LIB_EXPORT INGRESS_ASYNC_LIB_DEPRECATED
+#endif
+
+#ifndef INGRESS_ASYNC_LIB_DEPRECATED_NO_EXPORT
+#  define INGRESS_ASYNC_LIB_DEPRECATED_NO_EXPORT INGRESS_ASYNC_LIB_NO_EXPORT INGRESS_ASYNC_LIB_DEPRECATED
+#endif
+
+#if 0 /* DEFINE_NO_DEPRECATED */
+#  ifndef INGRESS_ASYNC_LIB_NO_DEPRECATED
+#    define INGRESS_ASYNC_LIB_NO_DEPRECATED
+#  endif
+#endif
+
+#endif /* INGRESS_ASYNC_LIB_EXPORT_H */

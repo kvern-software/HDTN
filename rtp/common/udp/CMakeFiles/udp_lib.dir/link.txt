@@ -1,0 +1,2 @@
+/usr/bin/ar qc libudp_lib.a  CMakeFiles/udp_lib.dir/src/UdpBundleSink.cpp.o CMakeFiles/udp_lib.dir/src/UdpBundleSource.cpp.o
+/usr/bin/ranlib libudp_lib.a

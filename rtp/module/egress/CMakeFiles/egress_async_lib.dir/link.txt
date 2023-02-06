@@ -1,0 +1,2 @@
+/usr/bin/ar qc libegress_async_lib.a  CMakeFiles/egress_async_lib.dir/src/EgressAsync.cpp.o CMakeFiles/egress_async_lib.dir/src/EgressAsyncRunner.cpp.o
+/usr/bin/ranlib libegress_async_lib.a

@@ -1,0 +1,2 @@
+/usr/bin/ar qc libudp_delay_sim_lib.a  CMakeFiles/udp_delay_sim_lib.dir/src/UdpDelaySim.cpp.o CMakeFiles/udp_delay_sim_lib.dir/src/UdpDelaySimRunner.cpp.o
+/usr/bin/ranlib libudp_delay_sim_lib.a

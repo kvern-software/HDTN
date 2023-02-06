@@ -1,0 +1,2 @@
+/usr/bin/ar qc libtelemetry_definitions.a  CMakeFiles/telemetry_definitions.dir/src/TelemetryDefinitions.cpp.o
+/usr/bin/ranlib libtelemetry_definitions.a

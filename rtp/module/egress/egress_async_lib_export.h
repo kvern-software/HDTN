@@ -1,0 +1,42 @@
+
+#ifndef EGRESS_ASYNC_LIB_EXPORT_H
+#define EGRESS_ASYNC_LIB_EXPORT_H
+
+#ifdef EGRESS_ASYNC_LIB_STATIC_DEFINE
+#  define EGRESS_ASYNC_LIB_EXPORT
+#  define EGRESS_ASYNC_LIB_NO_EXPORT
+#else
+#  ifndef EGRESS_ASYNC_LIB_EXPORT
+#    ifdef egress_async_lib_EXPORTS
+        /* We are building this library */
+#      define EGRESS_ASYNC_LIB_EXPORT 
+#    else
+        /* We are using this library */
+#      define EGRESS_ASYNC_LIB_EXPORT 
+#    endif
+#  endif
+
+#  ifndef EGRESS_ASYNC_LIB_NO_EXPORT
+#    define EGRESS_ASYNC_LIB_NO_EXPORT 
+#  endif
+#endif
+
+#ifndef EGRESS_ASYNC_LIB_DEPRECATED
+#  define EGRESS_ASYNC_LIB_DEPRECATED __attribute__ ((__deprecated__))
+#endif
+
+#ifndef EGRESS_ASYNC_LIB_DEPRECATED_EXPORT
+#  define EGRESS_ASYNC_LIB_DEPRECATED_EXPORT EGRESS_ASYNC_LIB_EXPORT EGRESS_ASYNC_LIB_DEPRECATED
+#endif
+
+#ifndef EGRESS_ASYNC_LIB_DEPRECATED_NO_EXPORT
+#  define EGRESS_ASYNC_LIB_DEPRECATED_NO_EXPORT EGRESS_ASYNC_LIB_NO_EXPORT EGRESS_ASYNC_LIB_DEPRECATED
+#endif
+
+#if 0 /* DEFINE_NO_DEPRECATED */
+#  ifndef EGRESS_ASYNC_LIB_NO_DEPRECATED
+#    define EGRESS_ASYNC_LIB_NO_DEPRECATED
+#  endif
+#endif
+
+#endif /* EGRESS_ASYNC_LIB_EXPORT_H */

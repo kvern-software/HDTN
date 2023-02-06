@@ -1,0 +1,2 @@
+/usr/bin/ar qc libstats_lib.a  CMakeFiles/stats_lib.dir/src/StatsLogger.cpp.o
+/usr/bin/ranlib libstats_lib.a
