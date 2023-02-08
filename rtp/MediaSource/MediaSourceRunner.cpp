@@ -1,32 +1,25 @@
-/**
- * @file BpGenAsyncRunner.cpp
- * @author  Brian Tomko <brian.j.tomko@nasa.gov>
- *
- * @copyright Copyright � 2021 United States Government as represented by
- * the National Aeronautics and Space Administration.
- * No copyright is claimed in the United States under Title 17, U.S.Code.
- * All Other Rights Reserved.
- *
- * @section LICENSE
- * Released under the NASA Open Source Agreement (NOSA)
- * See LICENSE.md in the source root directory for more information.
- */
+#include "MediaSource.h"
 
-#include "BpGenAsyncRunner.h"
 #include "SignalHandler.h"
+#include "Logger.h"
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <boost/lexical_cast.hpp>
 #include "Uri.h"
-#include "Logger.h"
+#include "OutductsConfig.h"
+
+#include "MediaSourceRunner.h"
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
-void BpGenAsyncRunner::MonitorExitKeypressThreadFunction() {
+MediaSourceRunner::MediaSourceRunner() {}
+MediaSourceRunner::~MediaSourceRunner() {}
+
+
+void MediaSourceRunner::MonitorExitKeypressThreadFunction() {
     LOG_INFO(subprocess) << "Keyboard Interrupt.. exiting";
     m_runningFromSigHandler = false; //do this first
 }
-
 
 
 static void DurationEndedThreadFunction(const boost::system::error_code& e, volatile bool * running) {
@@ -40,16 +33,12 @@ static void DurationEndedThreadFunction(const boost::system::error_code& e, vola
     *running = false;
 }
 
-BpGenAsyncRunner::BpGenAsyncRunner() {}
-BpGenAsyncRunner::~BpGenAsyncRunner() {}
-
-
-bool BpGenAsyncRunner::Run(int argc, const char* const argv[], volatile bool & running, bool useSignalHandler) {
+bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & running, bool useSignalHandler) {
     //scope to ensure clean exit before return 0
     {
         running = true;
         m_runningFromSigHandler = true;
-        SignalHandler sigHandler(boost::bind(&BpGenAsyncRunner::MonitorExitKeypressThreadFunction, this));
+        SignalHandler sigHandler(boost::bind(&MediaSourceRunner::MonitorExitKeypressThreadFunction, this));
         uint32_t bundleSizeBytes;
         uint32_t bundleRate;
         //uint32_t tcpclFragmentSize;
@@ -65,6 +54,9 @@ bool BpGenAsyncRunner::Run(int argc, const char* const argv[], volatile bool & r
         unsigned int bundleSendTimeoutSeconds;
         uint64_t bundleLifetimeMilliseconds;
         uint64_t bundlePriority;
+        boost::filesystem::path video_device;
+        uint64_t frame_width, frame_height = 0;
+        uint64_t frames_per_second = 0;
 
         boost::program_options::options_description desc("Allowed options");
         try {
@@ -84,6 +76,10 @@ bool BpGenAsyncRunner::Run(int argc, const char* const argv[], volatile bool & r
                     ("bundle-send-timeout-seconds", boost::program_options::value<unsigned int>()->default_value(3), "Max time to send a bundle and get acknowledgement.")
                     ("bundle-lifetime-milliseconds", boost::program_options::value<uint64_t>()->default_value(1000000), "Bundle lifetime in milliseconds.")
                     ("bundle-priority", boost::program_options::value<uint64_t>()->default_value(2), "Bundle priority. 0 = Bulk 1 = Normal 2 = Expedited")
+                    ("video-device",  boost::program_options::value<boost::filesystem::path>()->default_value(""), "Path to camera device Empty=>No Camera")
+                    ("frame-width", boost::program_options::value<uint64_t>()->default_value(1920), "Camera resolution in X axis")
+                    ("frame-height", boost::program_options::value<uint64_t>()->default_value(1080), "Camera resolation in Y axis")
+                    ("frames-per-second", boost::program_options::value<uint64_t>()->default_value(60), "Number of buffered frames kept in memory")
                     ;
 
                 boost::program_options::variables_map vm;
@@ -113,6 +109,7 @@ bool BpGenAsyncRunner::Run(int argc, const char* const argv[], volatile bool & r
 
                 if (!outductsConfigFileName.empty()) {
                     outductsConfigPtr = OutductsConfig::CreateFromJsonFilePath(outductsConfigFileName);
+                    // OutductsConfig::CreateFromJsonFilePath();
                     if (!outductsConfigPtr) {
                         LOG_ERROR(subprocess) << "error loading outducts config file: " << outductsConfigFileName;
                         return false;
@@ -153,6 +150,10 @@ bool BpGenAsyncRunner::Run(int argc, const char* const argv[], volatile bool & r
                 myCustodianServiceId = vm["my-custodian-service-id"].as<uint64_t>();
                 bundleSendTimeoutSeconds = vm["bundle-send-timeout-seconds"].as<unsigned int>();
                 bundleLifetimeMilliseconds = vm["bundle-lifetime-milliseconds"].as<uint64_t>();
+                video_device = vm["video-device"].as<boost::filesystem::path>();
+                frame_width = vm["frame-width"].as<uint64_t>();
+                frame_height = vm["frame-height"].as<uint64_t>();
+                frames_per_second = vm["frames-per-second"].as<uint64_t>();
         }
         catch (boost::bad_any_cast & e) {
                 LOG_ERROR(subprocess) << "invalid data error: " << e.what();
@@ -169,10 +170,37 @@ bool BpGenAsyncRunner::Run(int argc, const char* const argv[], volatile bool & r
         }
 
 
-        LOG_INFO(subprocess) << "starting BpGenAsync..";
-        LOG_INFO(subprocess) << "Sending Bundles from BPGen Node " << myEid.nodeId << " to final Destination Node " << finalDestEid.nodeId; 
-        BpGenAsync bpGen(bundleSizeBytes);
-        bpGen.Start(
+        LOG_INFO(subprocess) << "starting MediaSource..";
+        LOG_INFO(subprocess) << "Sending Bundles from MediaSource Node " << myEid.nodeId << " to final Destination Node " << finalDestEid.nodeId; 
+
+        // END BOILER PLATE CODE ////////////////////////////////////////////////////////////
+        // END BOILER PLATE CODE ////////////////////////////////////////////////////////////
+        // END BOILER PLATE CODE ////////////////////////////////////////////////////////////
+        // END BOILER PLATE CODE ////////////////////////////////////////////////////////////
+        // END BOILER PLATE CODE ////////////////////////////////////////////////////////////
+        // END BOILER PLATE CODE ////////////////////////////////////////////////////////////
+
+        // start our bundler first
+        MediaSource mediaSource(bundleSizeBytes); 
+        
+        // Start media context
+        DtnContext dtnContext(bundleSizeBytes - 1000); // TODO figure out rtp overhead 
+
+        // context can have multiple sessions
+        std::shared_ptr<DtnSession> dtnSession = dtnContext.CreateDtnSession();
+        
+        // spawn a stream in the session. a session can have receiving stream, sending stream, or both
+        std::shared_ptr<DtnMediaStream> dtnMediaStream = dtnSession->CreateDtnMediaStream(RTP_FORMAT_H265, 0);
+
+        // configure the stream // TODO pass in from command line
+        dtnMediaStream->Init(RTP_FORMAT_H265, frames_per_second, 1, 30, "127.0.0.1", "192.168.1.100", 55000, 55001); // TODO pass in parameters from command line
+
+        // create a video driver to provide frames to a stream. hook the stream push frame into the video driver as a means of delivering data (uses FIFO queue)
+        std::shared_ptr<VideoDriver> videoDriver = std::make_shared<VideoDriver>(boost::bind(&DtnMediaStream::PushFrame, dtnMediaStream.get(), boost::placeholders::_1));
+        videoDriver->Init("/dev/video0", frame_width, frame_height, 30); // initial camera parameters and ensure we have valid camera // TODO pass in from command line 
+        videoDriver->Start(); // create and start buffer filling thread
+
+        mediaSource.Start(
             outductsConfigPtr,
             inductsConfigPtr,
             custodyTransferUseAcs,
@@ -190,39 +218,46 @@ bool BpGenAsyncRunner::Run(int argc, const char* const argv[], volatile bool & r
 
         boost::asio::io_service ioService;
         boost::asio::deadline_timer deadlineTimer(ioService);
-        LOG_INFO(subprocess) << "running bpgen for " << durationSeconds << " seconds";
-        
+        LOG_INFO(subprocess) << "running MediaSource for " << durationSeconds << " seconds";
         bool startedTimer = false;
-        
-
         if (useSignalHandler) {
             sigHandler.Start(false);
         }
-        LOG_INFO(subprocess) << "BpGenAsync up and running";
+
+        LOG_INFO(subprocess) << "MediaSource up and running";
+        
+        // MAIN LOOP //////////////////////////////////////////
         while (running && m_runningFromSigHandler) {
-            boost::this_thread::sleep(boost::posix_time::millisec(250));
             if (durationSeconds) {
-                if ((!startedTimer) && bpGen.m_allOutductsReady) {
+                if ((!startedTimer) && mediaSource.m_allOutductsReady) {
                     startedTimer = true;
                     deadlineTimer.expires_from_now(boost::posix_time::seconds(durationSeconds));
-                    deadlineTimer.async_wait(boost::bind(&DurationEndaedThreadFunction, boost::asio::placeholders::error, &running));
+                    deadlineTimer.async_wait(boost::bind(&DurationEndedThreadFunction, boost::asio::placeholders::error, &running));
                 }
-                else if (startedTimer && running) { //don't call poll_one until there is work
+                else {
                     ioService.poll_one();
                 }
             }
             if (useSignalHandler) {
                 sigHandler.PollOnce();
             }
+
+            // LOOP CODE HERE
+
+            // sleep?
+
+            
         }
 
-
-        LOG_INFO(subprocess) << "BpGenAsyncRunner::Run: exiting cleanly..";
-        bpGen.Stop();
-        m_bundleCount = bpGen.m_bundleCount;
-        m_outductFinalStats = bpGen.m_outductFinalStats;
+    
+        
+        LOG_INFO(subprocess) << "MediaSourceRunner::Run: exiting cleanly..";
+        mediaSource.Stop();
+        m_bundleCount = mediaSource.m_bundleCount;
+        m_outductFinalStats = mediaSource.m_outductFinalStats;
     }
-    LOG_INFO(subprocess) << "BpGenAsyncRunner::Run: exited cleanly";
+    LOG_INFO(subprocess) << "MediaSourceRunner::Run: exited cleanly";
     return true;
 
 }
+
