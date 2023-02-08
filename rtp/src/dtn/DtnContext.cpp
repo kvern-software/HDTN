@@ -75,16 +75,6 @@ std::shared_ptr<DtnSession> DtnContext::CreateDtnSession()
     return std::make_shared<DtnSession>(m_cname);
 }
 
-rtp_error_t DtnContext::DestroyDtnSession(std::shared_ptr<DtnSession> session)
-{
-    if (!session)
-        return RTP_INVALID_VALUE;
-
-    // delete session;
-    
-    return RTP_OK;
-}
-
 
 std::string DtnContext::generate_cname() const
 {

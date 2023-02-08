@@ -13,11 +13,8 @@ private:
     boost::mutex m_queueMutex;
     boost::condition_variable m_queueCv;
 public:
-    DtnFrameQueue(size_t queueSize) : m_queueSize(queueSize) 
-    {
-    };
-
-    ~DtnFrameQueue(){};
+    DtnFrameQueue(size_t queueSize);
+    ~DtnFrameQueue();
 
     buffer& GetNextFrame();
     void PopFrame();

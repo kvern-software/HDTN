@@ -1,5 +1,4 @@
 #pragma once
-#include <uvgrtp/lib.hh>
 #include "VideoDriver.h"
 #include "DtnContext.h"
 

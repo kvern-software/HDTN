@@ -1,11 +1,11 @@
 // enables DTN functionality for uvgRTP sessions
 
 #pragma once
-#include <uvgrtp/session.hh>
 
 #include "DtnMediaStream.h"
+#include "DtnUtil.h"
 
-class DtnMediaStreamSource;
+class DtnMediaStream;
 
 /**
  * A DtnSession handles multiple DtnMediaStreams. 
@@ -18,14 +18,13 @@ class DtnSession
 private:
 
     std::string m_cname;
+    std::vector<uint32_t> m_ssrcList;
 
 public:
     DtnSession(std::string cname) : m_cname(cname){}
 
 
-    std::shared_ptr<DtnMediaStreamSource> CreateDtnMediaStreamSource(rtp_format_t fmt, int rce_flags);
-    rtp_error_t DestroyDtnMediaStreamSource(DtnMediaStreamSource * stream);
-
+    std::shared_ptr<DtnMediaStream> CreateDtnMediaStream(rtp_format_t fmt, int rce_flags);
 };
 
 

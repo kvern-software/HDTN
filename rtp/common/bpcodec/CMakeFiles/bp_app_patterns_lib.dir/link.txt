@@ -1,2 +1,0 @@
-/usr/bin/ar qc libbp_app_patterns_lib.a  CMakeFiles/bp_app_patterns_lib.dir/src/app_patterns/BpSourcePattern.cpp.o CMakeFiles/bp_app_patterns_lib.dir/src/app_patterns/BpSinkPattern.cpp.o
-/usr/bin/ranlib libbp_app_patterns_lib.a

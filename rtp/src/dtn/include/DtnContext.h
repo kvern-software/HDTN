@@ -1,8 +1,7 @@
 // Enables DTN compatibility with the uvgRTP context class
 #pragma once
-// uvgRTP
-#include <uvgrtp/context.hh>
-#include <uvgrtp/lib.hh>
+
+
 
 // DTN
 #include "DtnSession.h"
@@ -32,19 +31,7 @@ public:
 
     ~DtnContext(){};
 
-    /**
-     * \brief Create a DTN RTP session
-     * 
-     * \param address IPv4 address of the remote participant           *
-     * \return RTP session object
-     *
-     * \retval DtnSession      On success
-    *  \retval nullptr          If "address" is empty or memory allocation failed
-    */
     std::shared_ptr<DtnSession> CreateDtnSession();
-
-    rtp_error_t DestroyDtnSession(std::shared_ptr<DtnSession> session);
-
 
     size_t GetMTU();
 

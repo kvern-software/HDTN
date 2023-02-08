@@ -2,54 +2,75 @@
 
 #pragma once
 
-#include "app_patterns/BpSourcePattern.h"
 
 #include "VideoDriver.h"
-#include "DtnMedia.h"
+
 #include "DtnEncoder.h"
+#include "DtnMedia.h"
+#include  "DtnUtil.h"
+#include "DtnRtp.h"
+#include "DtnFrameQueue.h"
+
+#include <memory>
+
+
 /**
  * A DtnMediaStream is an RTP stream over a DTN using HDTN.
- * The DtnMediaStream is currently only one directional as it 
- * inherits from BpSourcePattern which is inherently one directional.
+ * The DtnMediaStream realizes the functionality provided by
+ * the Real Time Protocol. It can 
+ *  - receive information about the stream (RTCP)
+ *  - send data to be streamed (to bundler) via an autmatically exported frame_queue
+ *  - receive streamed data (unbundled) and queue for playback
+ * 
  * 
  * 
  * 
 */
-class DtnMediaStreamSource : BpSourcePattern
+class DtnMediaStream
 {
 private:
     std::string m_cname;
     rtp_format_t m_fmt;
-    int m_rceFlags;
+
+    int m_fpsNumerator, m_fpsDenominator;
+
     // std::unique_ptr<DtnMedia> m_media; // media type (H264, H265, ...)
     bool m_initialized;
-    int m_fpsNumerator, m_fpsDenominator;
-    
-    size_t m_frameQueueSize;
 
-    bool m_runningFromSigHandler;
-    uint32_t m_bundleSizeBytes;
+    // networking
+    std::string m_remoteAddress; // this is the ip address we want to send to
+    std::string m_localAddress; // we get information from rtcp from this address. note, the information is provided by a HDTN component, not by binding to a socket
+    uint16_t m_remotePort; // destination port
+    uint16_t m_sourcePort; // not sending from this socket, handled by HDTN
 
-    void CreateVideoDriverPtr();
+
+
+    // These objects handle the background tasks of the media stream such as receiving stream information, receiving unbundled frames, tracking the rtp variables
+    std::shared_ptr<DtnRtp> m_DtnRtp; // this keeps track of all the pertinent information provided in an rtp frame
+
+    // frame queues
+    size_t m_frameQueueSize; // this is the max number of frames in queue, enforced by this object
+    std::shared_ptr<DtnFrameQueue> m_outgoingFrameQueue = nullptr;
+    std::shared_ptr<DtnFrameQueue> m_IncomingFrameQueue = nullptr;
+
+    std::shared_ptr<std::atomic<uint32_t>> m_ssrc;
+
 public:
-    DtnMediaStreamSource(std::string cname, rtp_format_t fmt, int rce_flags, int fps_numerator, int fps_denominator, size_t frameQueueSize) :
-        BpSourcePattern(),
-        m_cname(cname), m_fmt(fmt), m_rceFlags(rce_flags), m_fpsNumerator(fps_numerator), m_fpsDenominator(fps_denominator), m_frameQueueSize(frameQueueSize) {};
+    DtnMediaStream(std::string cname);
 
-    ~DtnMediaStreamSource(){};
+    ~DtnMediaStream();
 
-    void StartComponents(); // starts frame queue, video driver, encoder
-    int Run(int argc, const char* argv[], volatile bool & running, bool useSignalHandler);
-    
-    std::shared_ptr<DtnFrameQueue> m_dtnFrameQueuePtr;
-    std::shared_ptr<VideoDriver> m_videoDriverPtr;
-    std::shared_ptr<DtnEncoder> m_dtnEncoderPtr;
+    // void RtcpRunner(uint8_t *buffer, size_t size); 
 
+    // configure the stream 
+    int Init(rtp_format_t fmt, int fps_numerator, int fps_denominator, 
+            size_t frameQueueSize, std::string localAddress, std::string remoteAddress, uint16_t srcPort, uint16_t remotePort);
+
+    void PushFrame(buffer * img_buffer); // push video data to be queued. register this as callback for and video drivers. makes copy out
 
 
-protected:
-    virtual uint64_t GetNextPayloadLength_Step1() override;
-    virtual bool CopyPayload_Step2(uint8_t * destinationBuffer) override;
-    virtual bool TryWaitForDataAvailable(const boost::posix_time::time_duration& timeout) override;
-    virtual bool ProcessNonAdminRecordBundlePayload(const uint8_t * data, const uint64_t size) override;
+    std::shared_ptr<DtnFrameQueue> GetOutgoingFrameQueuePtr();
+    std::shared_ptr<DtnFrameQueue> GetIncomingFrameQueuePtr();
+    size_t GetFrameQueueSize();
+
 };

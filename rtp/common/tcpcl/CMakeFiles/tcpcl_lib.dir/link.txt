@@ -1,2 +1,0 @@
-/usr/bin/ar qc libtcpcl_lib.a  CMakeFiles/tcpcl_lib.dir/src/Tcpcl.cpp.o CMakeFiles/tcpcl_lib.dir/src/TcpclV4.cpp.o CMakeFiles/tcpcl_lib.dir/src/TcpclBundleSink.cpp.o CMakeFiles/tcpcl_lib.dir/src/TcpclBundleSource.cpp.o CMakeFiles/tcpcl_lib.dir/src/TcpclV3BidirectionalLink.cpp.o CMakeFiles/tcpcl_lib.dir/src/TcpclV4BundleSource.cpp.o CMakeFiles/tcpcl_lib.dir/src/TcpclV4BundleSink.cpp.o CMakeFiles/tcpcl_lib.dir/src/TcpclV4BidirectionalLink.cpp.o
-/usr/bin/ranlib libtcpcl_lib.a

@@ -1,2 +1,0 @@
-/usr/bin/ar qc libconfig_lib.a  CMakeFiles/config_lib.dir/src/InductsConfig.cpp.o CMakeFiles/config_lib.dir/src/OutductsConfig.cpp.o CMakeFiles/config_lib.dir/src/StorageConfig.cpp.o CMakeFiles/config_lib.dir/src/HdtnConfig.cpp.o
-/usr/bin/ranlib libconfig_lib.a

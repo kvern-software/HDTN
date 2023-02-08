@@ -1,2 +1,0 @@
-/usr/bin/ar qc libinduct_manager_lib.a  CMakeFiles/induct_manager_lib.dir/src/Induct.cpp.o CMakeFiles/induct_manager_lib.dir/src/TcpclInduct.cpp.o CMakeFiles/induct_manager_lib.dir/src/TcpclV4Induct.cpp.o CMakeFiles/induct_manager_lib.dir/src/StcpInduct.cpp.o CMakeFiles/induct_manager_lib.dir/src/UdpInduct.cpp.o CMakeFiles/induct_manager_lib.dir/src/LtpOverUdpInduct.cpp.o CMakeFiles/induct_manager_lib.dir/src/InductManager.cpp.o
-/usr/bin/ranlib libinduct_manager_lib.a

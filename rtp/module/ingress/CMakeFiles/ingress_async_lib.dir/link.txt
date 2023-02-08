@@ -1,2 +1,0 @@
-/usr/bin/ar qc libingress_async_lib.a  CMakeFiles/ingress_async_lib.dir/src/receive.cpp.o CMakeFiles/ingress_async_lib.dir/src/IngressAsyncRunner.cpp.o
-/usr/bin/ranlib libingress_async_lib.a

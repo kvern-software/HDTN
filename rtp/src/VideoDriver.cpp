@@ -15,6 +15,23 @@ VideoDriver::~VideoDriver()
 
 }
 
+// initialize video driver to be ready to start capturing frames
+int VideoDriver::Init(std::string device, uint16_t frame_width, uint16_t frame_height, uint64_t buffer_queue_size)
+{
+    m_device = device;
+    OpenFD();
+    CheckDeviceCapability();
+    SetImageFormat(DEFAULT_VIDEO_CAPTURE, frame_width, frame_height, 
+            DEFAULT_PIXEL_FORMAT, DEFAULT_FIELD);
+    SetBufferQueueSize(buffer_queue_size);
+//    SetFramerate(frames_per_second);
+//    SetCaptureMode(FIFO); // todo get input come command line
+   RequestBuffer(V4L2_BUF_TYPE_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
+   AllocateLocalBuffers();   
+
+   return 0; 
+}
+
 void VideoDriver::Start() {
     if (!m_running) {
         m_running = true;
@@ -40,7 +57,7 @@ void VideoDriver::Stop() {
     by the device member. Return 0 on success.
 */
 int VideoDriver::OpenFD() {
-    fd = open(device.c_str(), O_RDWR);
+    fd = open(m_device.c_str(), O_RDWR);
     if(fd < 0) {
         LOG_ERROR(subprocess) << "Failed to open device, OPEN";
         return 1;
@@ -170,6 +187,8 @@ void VideoDriver::MapMemory() {
             exit(EXIT_FAILURE);
         }
     }
+
+    LOG_INFO(subprocess) << "video kernel memory mapped";
 }
 
 /*
@@ -328,7 +347,7 @@ int VideoDriver::CaptureFramesFIFO() {
     for (uint64_t i=0; i < m_bufferQueueSize; i++) {
         QueueBuffer(i);
         DequeueBuffer(i);
-        std::cout << "size of image buf: " << image_buffers[i].length << std::endl;
+        // LOG_INFO(subprocess) << "size of image buf: " << image_buffers[i].length;
         m_exportFrameCallback(&image_buffers[i]);
     }
 

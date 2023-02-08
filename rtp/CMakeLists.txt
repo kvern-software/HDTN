@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.12)  # CMake version check
 project(dtn_rtp_streaming)          
 set(CMAKE_CXX_STANDARD 11)   
 set(CMAKE_VERBOSE_MAKEFILE FALSE)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wformat -std=c++2a -Werror -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wformat -std=c++2a  -g") # -Werror
 
 set(MIN_BOOST_VERSION 1.66.0)
 find_package(Boost ${MIN_BOOST_VERSION} REQUIRED system date_time filesystem timer thread regex filesystem unit_test_framework program_options iostreams random log log_setup)
@@ -34,26 +34,34 @@ find_package(Boost "1.67.0" REQUIRED timer unit_test_framework)
 # add_subdirectory(libsdptransform)
 # add_subdirectory(uvgRTP)
 
-add_executable(dtn_rtp_streaming   
-    src/DtnStreamSourceMain.cpp
-    src/dtn/DtnContext.cpp
-    src/dtn/DtnSession.cpp
-    src/dtn/DtnMediaStream.cpp
-	src/dtn/DtnMedia.cpp
-	src/dtn/DtnFrameQueue.cpp
+add_executable(dtn_rtp_stream_source   
+	# rtp related items
+	
+	# dtn related items such as streams 
+	MediaSource/MediaSource.cpp
+	MediaSource/MediaSourceMain.cpp
+    MediaSource/MediaSourceRunner.cpp
+	
+	src/dtn/DtnContext.cpp
 	src/dtn/DtnEncoder.cpp
+	src/dtn/DtnFrameQueue.cpp
+	src/dtn/DtnMedia.cpp
+    src/dtn/DtnMediaStream.cpp
+	src/dtn/DtnRtp.cpp
+    src/dtn/DtnSession.cpp
 	
 	src/VideoDriver.cpp
     )
 
-target_include_directories(dtn_rtp_streaming PUBLIC
+target_include_directories(dtn_rtp_stream_source PUBLIC
 	src/dtn/include
+	src/include
     libsdptransform/include
-    uvgRTP/include
+    # uvgRTP/include
     )
 
 
-target_link_libraries(dtn_rtp_streaming   
+target_link_libraries(dtn_rtp_stream_source   
 	#HDTN
 	HDTN::HDTNUtil
 	HDTN::TelemetryDefinitions

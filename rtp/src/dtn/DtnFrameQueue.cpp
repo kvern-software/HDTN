@@ -1,4 +1,15 @@
 #include "DtnFrameQueue.h"
+#include "Logger.h"
+
+static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
+
+DtnFrameQueue::DtnFrameQueue(size_t queueSize) : m_queueSize(queueSize) 
+{
+};
+
+DtnFrameQueue::~DtnFrameQueue()
+{
+};
 
 // get reference to first element in frame queue
 buffer& DtnFrameQueue::GetNextFrame() 
@@ -17,10 +28,8 @@ void DtnFrameQueue::PopFrame()
 void DtnFrameQueue::PushFrame(buffer * image_buffer) 
 {
     if (m_frameQueue.size() >= m_queueSize)
-    {
         PopFrame();
-    }
-
+    
     m_frameQueue.push(*image_buffer);
     m_totalBytesInQueue += m_frameQueue.back().length;
 }   

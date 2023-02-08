@@ -1,2 +1,0 @@
-/usr/bin/ar qc libcgr_lib.a  CMakeFiles/cgr_lib.dir/src/libcgr.cpp.o
-/usr/bin/ranlib libcgr_lib.a

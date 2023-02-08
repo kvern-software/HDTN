@@ -1,2 +1,0 @@
-/usr/bin/ar qc libstcp_lib.a  CMakeFiles/stcp_lib.dir/src/StcpBundleSink.cpp.o CMakeFiles/stcp_lib.dir/src/StcpBundleSource.cpp.o
-/usr/bin/ranlib libstcp_lib.a
