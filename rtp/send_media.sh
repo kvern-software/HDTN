@@ -13,7 +13,7 @@ cd $HDTN_RTP_DIR
 # sleep 5
 
 # media source
-./build/dtn_rtp_stream_source  --frame-width=1920 --frame-height=1080 --frames-per-second=30  --local-frame-queue-size=5 --video-device=/dev/video0 --bundle-size=200000 --bundle-rate=0 --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --duration=400 --outducts-config-file=$source_config &
+./build/dtn_rtp_stream_source  --frame-width=1920 --frame-height=1080 --frames-per-second=30  --local-frame-queue-size=2 --video-device=/dev/video0 --bundle-size=200000 --bundle-rate=0 --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --duration=400 --outducts-config-file=$source_config &
 media_source_process=$!
 sleep 8
 # # # HDTN one process

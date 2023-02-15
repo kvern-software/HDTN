@@ -176,7 +176,7 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
             LOG_INFO(subprocess) << "Frame queue size of zero entered, using a local frame queue size of 1 frame";
             local_frame_queue_size = 1;
         }
-        local_frame_queue_size = 10;
+  
 
         LOG_INFO(subprocess) << "starting MediaSource..";
         LOG_INFO(subprocess) << "Sending Bundles from MediaSource Node " << myEid.nodeId << " to final Destination Node " << finalDestEid.nodeId; 
