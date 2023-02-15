@@ -11,7 +11,20 @@
 
 // }
 
-std::shared_ptr<DtnMediaStream> DtnSession::CreateDtnMediaStream(rtp_format_t fmt, int rce_flags)
+DtnSession::DtnSession(std::string cname, rtp_modes_t operating_mode) :
+    m_cname(cname),
+    m_operating_mode(operating_mode)
+{
+
+}
+
+DtnSession::~DtnSession()
+{
+
+}
+
+
+std::shared_ptr<DtnMediaStream> DtnSession::CreateDtnMediaStream(rtp_format_t fmt)
 {
     // // not currently supported
     // if (rce_flags & RCE_RECEIVE_ONLY)
@@ -29,5 +42,5 @@ std::shared_ptr<DtnMediaStream> DtnSession::CreateDtnMediaStream(rtp_format_t fm
     // }
 
 
-    return std::make_shared<DtnMediaStream>(m_cname); // todo make this configurable
+    return std::make_shared<DtnMediaStream>(m_cname, m_operating_mode); // todo make this configurable
 }

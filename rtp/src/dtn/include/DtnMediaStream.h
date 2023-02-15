@@ -3,12 +3,12 @@
 #pragma once
 
 
-#include "VideoDriver.h"
+#include "../include/VideoDriver.h"
 
 #include "DtnEncoder.h"
 #include "DtnMedia.h"
-#include  "DtnUtil.h"
-#include "DtnRtp.h"
+#include "DtnUtil.h"
+#include "Rtp.h"
 #include "DtnFrameQueue.h"
 
 #include <memory>
@@ -30,9 +30,10 @@ class DtnMediaStream
 {
 private:
     std::string m_cname;
+    size_t m_rtpMTU; // max transmission unit of the RTP packets themselves. Determines concatenation of frames
     rtp_format_t m_fmt;
 
-    int m_fpsNumerator, m_fpsDenominator;
+    // int m_fpsNumerator, m_fpsDenominator;
 
     // std::unique_ptr<DtnMedia> m_media; // media type (H264, H265, ...)
     bool m_initialized;
@@ -55,22 +56,36 @@ private:
 
     std::shared_ptr<std::atomic<uint32_t>> m_ssrc;
 
+    boost::mutex m_queueMutex;
+
+    rtp_modes_t m_operating_mode;
+
+    std::unique_ptr<boost::thread> m_ProcessingPayloadThread;
+
+
+
 public:
-    DtnMediaStream(std::string cname);
+    DtnMediaStream(std::string cname, rtp_modes_t operating_mode);
 
     ~DtnMediaStream();
+    boost::mutex * GetMutex();
 
     // void RtcpRunner(uint8_t *buffer, size_t size); 
 
     // configure the stream 
-    int Init(rtp_format_t fmt, int fps_numerator, int fps_denominator, 
-            size_t frameQueueSize, std::string localAddress, std::string remoteAddress, uint16_t srcPort, uint16_t remotePort);
+    int Init(rtp_format_t fmt, // int fps_numerator, int fps_denominator, 
+            size_t frameQueueSize, std::string localAddress, std::string remoteAddress, uint16_t srcPort, uint16_t remotePort,
+            size_t rtp_mtu);
+        
+    
 
     void PushFrame(buffer * img_buffer); // push video data to be queued. register this as callback for and video drivers. makes copy out
-
+    void ReceivePayload(const uint8_t * data, const uint64_t size);
+    void PayloadProcessor();
 
     std::shared_ptr<DtnFrameQueue> GetOutgoingFrameQueuePtr();
     std::shared_ptr<DtnFrameQueue> GetIncomingFrameQueuePtr();
+    std::shared_ptr<DtnRtp> GetDtnRtpPtr();
     size_t GetFrameQueueSize();
 
 };

@@ -55,8 +55,9 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
         uint64_t bundleLifetimeMilliseconds;
         uint64_t bundlePriority;
         boost::filesystem::path video_device;
-        uint64_t frame_width, frame_height = 0;
-        uint64_t frames_per_second = 0;
+        uint64_t frame_width, frame_height;
+        uint64_t frames_per_second;
+        uint64_t local_frame_queue_size;
 
         boost::program_options::options_description desc("Allowed options");
         try {
@@ -79,7 +80,8 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
                     ("video-device",  boost::program_options::value<boost::filesystem::path>()->default_value(""), "Path to camera device Empty=>No Camera")
                     ("frame-width", boost::program_options::value<uint64_t>()->default_value(1920), "Camera resolution in X axis")
                     ("frame-height", boost::program_options::value<uint64_t>()->default_value(1080), "Camera resolation in Y axis")
-                    ("frames-per-second", boost::program_options::value<uint64_t>()->default_value(60), "Number of buffered frames kept in memory")
+                    ("frames-per-second", boost::program_options::value<uint64_t>()->default_value(60), "Number of frames to request per second from the video driver")
+                    ("local-frame-queue-size", boost::program_options::value<uint64_t>()->default_value(0), "Number of frames to keep in queue before sending a packet")
                     ;
 
                 boost::program_options::variables_map vm;
@@ -154,6 +156,7 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
                 frame_width = vm["frame-width"].as<uint64_t>();
                 frame_height = vm["frame-height"].as<uint64_t>();
                 frames_per_second = vm["frames-per-second"].as<uint64_t>();
+                local_frame_queue_size = vm["local-frame-queue-size"].as<uint64_t>();
         }
         catch (boost::bad_any_cast & e) {
                 LOG_ERROR(subprocess) << "invalid data error: " << e.what();
@@ -169,6 +172,11 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
                 return false;
         }
 
+        if (local_frame_queue_size == 0) {
+            LOG_INFO(subprocess) << "Frame queue size of zero entered, using a local frame queue size of 1 frame";
+            local_frame_queue_size = 1;
+        }
+        local_frame_queue_size = 10;
 
         LOG_INFO(subprocess) << "starting MediaSource..";
         LOG_INFO(subprocess) << "Sending Bundles from MediaSource Node " << myEid.nodeId << " to final Destination Node " << finalDestEid.nodeId; 
@@ -180,26 +188,21 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
         // END BOILER PLATE CODE ////////////////////////////////////////////////////////////
         // END BOILER PLATE CODE ////////////////////////////////////////////////////////////
 
-        // start our bundler first
-        MediaSource mediaSource(bundleSizeBytes); 
         
         // Start media context
-        DtnContext dtnContext(bundleSizeBytes - 1000); // TODO figure out rtp overhead 
+        DtnContext dtnContext; // TODO figure out rtp overhead 
 
         // context can have multiple sessions
-        std::shared_ptr<DtnSession> dtnSession = dtnContext.CreateDtnSession();
+        std::shared_ptr<DtnSession> dtnSession = dtnContext.CreateDtnSession(RTP_SEND_ONLY);
         
         // spawn a stream in the session. a session can have receiving stream, sending stream, or both
-        std::shared_ptr<DtnMediaStream> dtnMediaStream = dtnSession->CreateDtnMediaStream(RTP_FORMAT_H265, 0);
+        std::shared_ptr<DtnMediaStream> dtnMediaStream = dtnSession->CreateDtnMediaStream(RTP_FORMAT_H265);
 
         // configure the stream // TODO pass in from command line
-        dtnMediaStream->Init(RTP_FORMAT_H265, frames_per_second, 1, 30, "127.0.0.1", "192.168.1.100", 55000, 55001); // TODO pass in parameters from command line
-
-        // create a video driver to provide frames to a stream. hook the stream push frame into the video driver as a means of delivering data (uses FIFO queue)
-        std::shared_ptr<VideoDriver> videoDriver = std::make_shared<VideoDriver>(boost::bind(&DtnMediaStream::PushFrame, dtnMediaStream.get(), boost::placeholders::_1));
-        videoDriver->Init("/dev/video0", frame_width, frame_height, 30); // initial camera parameters and ensure we have valid camera // TODO pass in from command line 
-        videoDriver->Start(); // create and start buffer filling thread
-
+        dtnMediaStream->Init(RTP_FORMAT_H265, local_frame_queue_size, "127.0.0.1", "192.168.1.132", 55000, 55001, 5000000); // TODO pass in parameters from command line
+        
+        // start our bundler first
+        MediaSource mediaSource(bundleSizeBytes, dtnMediaStream); 
         mediaSource.Start(
             outductsConfigPtr,
             inductsConfigPtr,
@@ -215,6 +218,11 @@ bool MediaSourceRunner::Run(int argc, const char* const argv[], volatile bool & 
             forceDisableCustody,
             useBpVersion7
         );
+      
+        // create a video driver to provide frames to a stream. hook the stream push frame into the video driver as a means of delivering data (uses FIFO queue)
+        std::shared_ptr<VideoDriver> videoDriver = std::make_shared<VideoDriver>(boost::bind(&DtnMediaStream::PushFrame, dtnMediaStream.get(), boost::placeholders::_1));
+        videoDriver->Init("/dev/video0", frame_width, frame_height, 1, 30); // initial camera parameters and ensure we have valid camera // TODO pass in from command line 
+        videoDriver->Start(); // create and start buffer filling thread
 
         boost::asio::io_service ioService;
         boost::asio::deadline_timer deadlineTimer(ioService);

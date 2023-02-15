@@ -205,7 +205,7 @@ bool BpGenAsyncRunner::Run(int argc, const char* const argv[], volatile bool & r
                 if ((!startedTimer) && bpGen.m_allOutductsReady) {
                     startedTimer = true;
                     deadlineTimer.expires_from_now(boost::posix_time::seconds(durationSeconds));
-                    deadlineTimer.async_wait(boost::bind(&DurationEndaedThreadFunction, boost::asio::placeholders::error, &running));
+                    deadlineTimer.async_wait(boost::bind(&DurationEndedThreadFunction, boost::asio::placeholders::error, &running));
                 }
                 else if (startedTimer && running) { //don't call poll_one until there is work
                     ioService.poll_one();

@@ -7,6 +7,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wformat -std=c++2a  -g")
 
 set(MIN_BOOST_VERSION 1.66.0)
 find_package(Boost ${MIN_BOOST_VERSION} REQUIRED system date_time filesystem timer thread regex filesystem unit_test_framework program_options iostreams random log log_setup)
+find_package(glfw3 REQUIRED)
+find_package(OpenGL REQUIRED)
+find_package(ZLIB) #for compression
 
 SET(CMAKE_PREFIX_PATH $ENV{HDTN_INSTALL_ROOT} CACHE PATH "Path for find_package to import installed hdtn libraries")
 
@@ -34,6 +37,34 @@ find_package(Boost "1.67.0" REQUIRED timer unit_test_framework)
 # add_subdirectory(libsdptransform)
 # add_subdirectory(uvgRTP)
 
+add_executable(dtn_rtp_stream_sink   
+	#gui
+	MediaGui/MediaGui.cpp
+	# gui library backend files
+	MediaGui/include/imgui/imgui.cpp
+	MediaGui/include/imgui/imgui_demo.cpp
+	MediaGui/include/imgui/imgui_draw.cpp
+	MediaGui/include/imgui/imgui_widgets.cpp
+	MediaGui/include/imgui/imgui_tables.cpp
+	MediaGui/include/imgui/backends/imgui_impl_glfw.cpp
+	MediaGui/include/imgui/backends/imgui_impl_opengl3.cpp
+
+	# dtn related items such as streams 
+	MediaSink/MediaSink.cpp
+	MediaSink/MediaSinkMain.cpp
+	MediaSink/MediaSinkRunner.cpp
+
+	src/dtn/DtnContext.cpp
+	src/dtn/DtnEncoder.cpp
+	src/dtn/DtnFrameQueue.cpp
+	src/dtn/DtnMedia.cpp
+    src/dtn/DtnMediaStream.cpp
+    src/dtn/DtnSession.cpp
+	src/dtn/DtnUtil.cpp
+
+	src/Rtp.cpp
+)
+
 add_executable(dtn_rtp_stream_source   
 	# rtp related items
 	
@@ -47,21 +78,67 @@ add_executable(dtn_rtp_stream_source
 	src/dtn/DtnFrameQueue.cpp
 	src/dtn/DtnMedia.cpp
     src/dtn/DtnMediaStream.cpp
-	src/dtn/DtnRtp.cpp
     src/dtn/DtnSession.cpp
+	src/dtn/DtnUtil.cpp
+	src/Rtp.cpp
 	
 	src/VideoDriver.cpp
     )
 
+target_include_directories(dtn_rtp_stream_sink PUBLIC
+	src/dtn/include
+	src/include
+	# libsdptransform/include
+
+	MediaGui/
+	MediaGui/include/imgui
+	MediaGui/include/imgui/backends #gui
+	MediaGui/include/stb #quick file loader
+
+	# uvgRTP/include
+)
+
 target_include_directories(dtn_rtp_stream_source PUBLIC
 	src/dtn/include
 	src/include
-    libsdptransform/include
+    # libsdptransform/include
     # uvgRTP/include
-    )
+)
+
 
 
 target_link_libraries(dtn_rtp_stream_source   
+	#HDTN
+	HDTN::HDTNUtil
+	HDTN::TelemetryDefinitions
+	HDTN::LtpLib
+	HDTN::BpAppPatternsLib
+	HDTN::Bpcodec
+	HDTN::EgressLib
+	HDTN::HDTNConfigLib
+	HDTN::HDTNCgrLib
+	HDTN::InductManagerLib
+	HDTN::IngressLib
+	HDTN::LoggerLib
+	HDTN::OutductManagerLib
+	HDTN::StcpLib
+	HDTN::StorageLib
+	HDTN::TcpclLib
+	HDTN::UdpLib
+	HDTN::UdpDelaySimLib
+
+	Boost::unit_test_framework
+	Boost::timer
+    Boost::program_options 
+	Boost::thread
+	Boost::log
+) 
+target_link_libraries(dtn_rtp_stream_sink
+	#gui
+	glfw 
+	OpenGL::GL 
+	${CMAKE_DL_LIBS}	
+	
 	#HDTN
 	HDTN::HDTNUtil
 	HDTN::TelemetryDefinitions

@@ -7,6 +7,17 @@
 
 #define NAME_MAXLEN 512
 
+
+DtnContext::DtnContext() 
+{
+    m_cname = get_cname();
+};
+
+DtnContext::~DtnContext()
+{
+
+};
+
 std::string get_hostname()
 {
 #ifdef _WIN32
@@ -70,9 +81,9 @@ static inline std::string generate_string(size_t length)
 }
 
 
-std::shared_ptr<DtnSession> DtnContext::CreateDtnSession() 
+std::shared_ptr<DtnSession> DtnContext::CreateDtnSession(rtp_modes_t operating_mode) 
 {
-    return std::make_shared<DtnSession>(m_cname);
+    return std::make_shared<DtnSession>(m_cname, operating_mode);
 }
 
 
@@ -95,7 +106,7 @@ std::string DtnContext::get_cname()
     return m_cname;
 }
 
-size_t DtnContext::GetMTU()
-{
-    return m_MTU;
-}
+
+
+
+

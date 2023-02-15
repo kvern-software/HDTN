@@ -1,0 +1,12 @@
+#hdtn one process for node one
+./hdtn_build_files/hdtn-one-process  --hdtn-config-file=/home/kyle/nasa/dev/HDTN/media_app/config_files/hdtn/hdtn_node1.json &
+
+#hdtn one process for node two
+./hdtn_build_files/hdtn-one-process  --hdtn-config-file=/home/kyle/nasa/dev/HDTN/media_app/config_files/hdtn/hdtn_node2.json &
+
+#media source process for node one
+./build/media_source  --frames-per-second=30 --video-device=/dev/video0 --bundle-size=200000 --bundle-rate=0 --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --duration=400 --outducts-config-file=/home/kyle/nasa/dev/HDTN/media_app/config_files/outducts/mediasource_udp.json
+
+#media sink process for node two
+./build/media_sink --save-directory=testdir --my-uri-eid=ipn:2.1 --inducts-config-file=/home/kyle/nasa/dev/HDTN/media_app/config_files/inducts/mediasink_udp.json  &
+

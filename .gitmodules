@@ -1,9 +1,0 @@
-[submodule "rtp/uvgRTP"]
-	path = rtp/uvgRTP
-	url = git@github.com:ultravideo/uvgRTP.git
-[submodule "rtp/libsdptransform"]
-	path = rtp/libsdptransform
-	url = https://github.com/ibc/libsdptransform.git
-[submodule "media_app/include/imgui"]
-	path = media_app/include/imgui
-	url = git@github.com:ocornut/imgui.git
