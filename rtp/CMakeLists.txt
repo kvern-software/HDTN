@@ -10,6 +10,7 @@ find_package(Boost ${MIN_BOOST_VERSION} REQUIRED system date_time filesystem tim
 find_package(glfw3 REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(ZLIB) #for compression
+find_library(AVCODEC_LIBRARY avcodec)
 
 SET(CMAKE_PREFIX_PATH $ENV{HDTN_INSTALL_ROOT} CACHE PATH "Path for find_package to import installed hdtn libraries")
 
@@ -132,6 +133,7 @@ target_link_libraries(dtn_rtp_stream_source
     Boost::program_options 
 	Boost::thread
 	Boost::log
+	${AVCODEC_LIBRARY}
 ) 
 target_link_libraries(dtn_rtp_stream_sink
 	#gui
@@ -163,4 +165,5 @@ target_link_libraries(dtn_rtp_stream_sink
     Boost::program_options 
 	Boost::thread
 	Boost::log
+	${AVCODEC_LIBRARY}
 ) 
