@@ -18,6 +18,7 @@ add_executable(unit-tests
 	../../common/util/test/TestUtf8Paths.cpp
 	../../common/util/test/TestEnumAsFlagsMacro.cpp
 	../../common/util/test/TestPaddedVectorUint8.cpp
+	../../common/util/test/TestFreeListAllocator.cpp
 	../../common/util/test/TestCpuFlagDetection.cpp
 	../../common/util/test/TestTokenRateLimiter.cpp
 	../../common/util/test/TestUdpBatchSender.cpp
@@ -25,6 +26,7 @@ add_executable(unit-tests
 	../../common/util/test/TestDirectoryScanner.cpp
 	../../common/util/test/TestMemoryInFiles.cpp
 	../../common/util/test/TestForwardListQueue.cpp
+	../../common/util/test/TestUserDataRecycler.cpp
 	../../common/util/test/TestDeadlineTimer.cpp
 	../../common/util/test/dir_monitor/test_async.cpp
 	../../common/util/test/dir_monitor/test_sync.cpp
@@ -41,6 +43,7 @@ add_executable(unit-tests
 	../../common/config/test/TestOutductsConfig.cpp
 	../../common/config/test/TestStorageConfig.cpp
 	../../common/config/test/TestHdtnConfig.cpp
+	../../common/config/test/TestHdtnDistributedConfig.cpp
 	../../common/cgr/test/TestDijkstra.cpp
 	../../common/logger/unit_tests/LoggerTests.cpp
 	../../common/stats_logger/unit_tests/StatsLoggerTests.cpp

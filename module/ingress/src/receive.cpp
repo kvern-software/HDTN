@@ -51,7 +51,7 @@ struct Ingress::Impl : private boost::noncopyable {
     Impl();
     ~Impl();
     void Stop();
-    bool Init(const HdtnConfig& hdtnConfig, zmq::context_t* hdtnOneProcessZmqInprocContextPtr);
+    bool Init(const HdtnConfig& hdtnConfig, const HdtnDistributedConfig& hdtnDistributedConfig, zmq::context_t* hdtnOneProcessZmqInprocContextPtr);
 
 private:
     void ReadZmqAcksThreadFunc();
@@ -123,6 +123,7 @@ private:
     HdtnConfig m_hdtnConfig;
     cbhe_eid_t M_HDTN_EID_CUSTODY;
     cbhe_eid_t M_HDTN_EID_ECHO;
+    cbhe_eid_t M_HDTN_EID_TO_SCHEDULER_BUNDLES;
     boost::posix_time::time_duration M_MAX_INGRESS_BUNDLE_WAIT_ON_EGRESS_TIME_DURATION;
 
     std::unique_ptr<boost::thread> m_threadZmqAckReaderPtr;
@@ -271,7 +272,8 @@ Ingress::Impl::Impl() :
     m_eventsTooManyInAllCutThroughQueues(0),
     m_running(false),
     m_egressFullyInitialized(false),
-    m_nextBundleUniqueIdAtomic(0) {}
+    m_nextBundleUniqueIdAtomic(0),
+    m_workerThreadStartupInProgress(false) {}
 
 Ingress::Ingress() :
     m_pimpl(boost::make_unique<Ingress::Impl>()),
@@ -302,12 +304,22 @@ void Ingress::Impl::Stop() {
     m_running = false; //thread stopping criteria
 
     if (m_threadZmqAckReaderPtr) {
-        m_threadZmqAckReaderPtr->join();
-        m_threadZmqAckReaderPtr.reset(); //delete it
+        try {
+            m_threadZmqAckReaderPtr->join();
+            m_threadZmqAckReaderPtr.reset(); //delete it
+        }
+        catch (boost::thread_resource_error& e) {
+            LOG_ERROR(subprocess) << "unable to stop ingress threadZmqAckReaderPtr: " << e.what();
+        }
     }
     if (m_threadTcpclOpportunisticBundlesFromEgressReaderPtr) {
-        m_threadTcpclOpportunisticBundlesFromEgressReaderPtr->join();
-        m_threadTcpclOpportunisticBundlesFromEgressReaderPtr.reset(); //delete it
+        try {
+            m_threadTcpclOpportunisticBundlesFromEgressReaderPtr->join();
+            m_threadTcpclOpportunisticBundlesFromEgressReaderPtr.reset(); //delete it
+        }
+        catch (boost::thread_resource_error& e) {
+            LOG_ERROR(subprocess) << "unable to stop ingress threadTcpclOpportunisticBundlesFromEgressReaderPtr: " << e.what();
+        }
     }
 
 
@@ -316,10 +328,10 @@ void Ingress::Impl::Stop() {
     LOG_DEBUG(subprocess) << "m_eventsTooManyInAllCutThroughQueues: " << m_eventsTooManyInAllCutThroughQueues;
 }
 
-bool Ingress::Init(const HdtnConfig& hdtnConfig, zmq::context_t* hdtnOneProcessZmqInprocContextPtr) {
-    return m_pimpl->Init(hdtnConfig, hdtnOneProcessZmqInprocContextPtr);
+bool Ingress::Init(const HdtnConfig& hdtnConfig, const HdtnDistributedConfig& hdtnDistributedConfig, zmq::context_t* hdtnOneProcessZmqInprocContextPtr) {
+    return m_pimpl->Init(hdtnConfig, hdtnDistributedConfig, hdtnOneProcessZmqInprocContextPtr);
 }
-bool Ingress::Impl::Init(const HdtnConfig & hdtnConfig, zmq::context_t * hdtnOneProcessZmqInprocContextPtr) {
+bool Ingress::Impl::Init(const HdtnConfig& hdtnConfig, const HdtnDistributedConfig& hdtnDistributedConfig, zmq::context_t * hdtnOneProcessZmqInprocContextPtr) {
 
     if (m_running) {
         LOG_ERROR(subprocess) << "Ingress::Init called while Ingress is already running";
@@ -334,6 +346,8 @@ bool Ingress::Impl::Init(const HdtnConfig & hdtnConfig, zmq::context_t * hdtnOne
     M_HDTN_EID_CUSTODY.Set(m_hdtnConfig.m_myNodeId, m_hdtnConfig.m_myCustodialServiceId);
 
     M_HDTN_EID_ECHO.Set(m_hdtnConfig.m_myNodeId, m_hdtnConfig.m_myBpEchoServiceId);
+
+    M_HDTN_EID_TO_SCHEDULER_BUNDLES.Set(m_hdtnConfig.m_myNodeId, m_hdtnConfig.m_mySchedulerServiceId);
 
     M_MAX_INGRESS_BUNDLE_WAIT_ON_EGRESS_TIME_DURATION = boost::posix_time::milliseconds(m_hdtnConfig.m_maxIngressBundleWaitOnEgressMilliseconds);
 
@@ -367,32 +381,33 @@ bool Ingress::Impl::Init(const HdtnConfig & hdtnConfig, zmq::context_t * hdtnOne
             // socket for cut-through mode straight to egress
             m_zmqPushSock_boundIngressToConnectingEgressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::push);
             const std::string bind_boundIngressToConnectingEgressPath(
-                std::string("tcp://*:") + boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqBoundIngressToConnectingEgressPortPath));
+                std::string("tcp://*:") + boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqBoundIngressToConnectingEgressPortPath));
             m_zmqPushSock_boundIngressToConnectingEgressPtr->bind(bind_boundIngressToConnectingEgressPath);
             // socket for sending bundles to storage
             m_zmqPushSock_boundIngressToConnectingStoragePtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::push);
             const std::string bind_boundIngressToConnectingStoragePath(
-                std::string("tcp://*:") + boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqBoundIngressToConnectingStoragePortPath));
+                std::string("tcp://*:") + boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqBoundIngressToConnectingStoragePortPath));
             m_zmqPushSock_boundIngressToConnectingStoragePtr->bind(bind_boundIngressToConnectingStoragePath);
             // socket for receiving acks from storage
             m_zmqPullSock_connectingStorageToBoundIngressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::pull);
             const std::string bind_connectingStorageToBoundIngressPath(
-                std::string("tcp://*:") + boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqConnectingStorageToBoundIngressPortPath));
+                std::string("tcp://*:") + boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqConnectingStorageToBoundIngressPortPath));
             m_zmqPullSock_connectingStorageToBoundIngressPtr->bind(bind_connectingStorageToBoundIngressPath);
             // socket for receiving acks from egress
             m_zmqPullSock_connectingEgressToBoundIngressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::pull);
             const std::string bind_connectingEgressToBoundIngressPath(
-                std::string("tcp://*:") + boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqConnectingEgressToBoundIngressPortPath));
+                std::string("tcp://*:") + boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqConnectingEgressToBoundIngressPortPath));
             m_zmqPullSock_connectingEgressToBoundIngressPtr->bind(bind_connectingEgressToBoundIngressPath);
             // socket for receiving bundles from egress via tcpcl outduct opportunistic link (because tcpcl can be bidirectional)
             m_zmqPullSock_connectingEgressBundlesOnlyToBoundIngressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::pull);
             const std::string bind_connectingEgressBundlesOnlyToBoundIngressPath(
-                std::string("tcp://*:") + boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqConnectingEgressBundlesOnlyToBoundIngressPortPath));
+                std::string("tcp://*:") + boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqConnectingEgressBundlesOnlyToBoundIngressPortPath));
             m_zmqPullSock_connectingEgressBundlesOnlyToBoundIngressPtr->bind(bind_connectingEgressBundlesOnlyToBoundIngressPath);
 
             //from telemetry socket
             m_zmqRepSock_connectingTelemToFromBoundIngressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::rep);
-            const std::string bind_connectingTelemToFromBoundIngressPath("tcp://*:10301");
+            const std::string bind_connectingTelemToFromBoundIngressPath(
+                std::string("tcp://*:") + boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqConnectingTelemToFromBoundIngressPortPath));
             m_zmqRepSock_connectingTelemToFromBoundIngressPtr->bind(bind_connectingTelemToFromBoundIngressPath);
                 
         }
@@ -417,16 +432,17 @@ bool Ingress::Impl::Init(const HdtnConfig & hdtnConfig, zmq::context_t * hdtnOne
     // socket for receiving events from scheduler
     m_zmqSubSock_boundSchedulerToConnectingIngressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::sub);
     const std::string connect_boundSchedulerPubSubPath(
-    std::string("tcp://") +
-    m_hdtnConfig.m_zmqSchedulerAddress +
-    std::string(":") +
-    boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqBoundSchedulerPubSubPortPath));
+        std::string("tcp://") +
+        ((hdtnOneProcessZmqInprocContextPtr == NULL) ? hdtnDistributedConfig.m_zmqSchedulerAddress : std::string("localhost")) +
+        std::string(":") +
+        boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqBoundSchedulerPubSubPortPath));
         
     try {
         m_zmqSubSock_boundSchedulerToConnectingIngressPtr->connect(connect_boundSchedulerPubSubPath);
         m_zmqSubSock_boundSchedulerToConnectingIngressPtr->set(zmq::sockopt::linger, 0); //prevent hang when deleting the zmqCtxPtr
         LOG_INFO(subprocess) << "Connected to scheduler at " << connect_boundSchedulerPubSubPath << " , subscribing...";
-    } catch (const zmq::error_t & ex) {
+    }
+    catch (const zmq::error_t & ex) {
         LOG_ERROR(subprocess) << "Cannot connect to scheduler socket at " << connect_boundSchedulerPubSubPath << " : " << ex.what();
         return false;
     }
@@ -818,6 +834,18 @@ void Ingress::Impl::SchedulerEventHandler() {
             LOG_ERROR(subprocess) << "link down message received with out of bounds outductArrayIndex " << releaseChangeHdr.outductArrayIndex;
         }
     }
+    else if (releaseChangeHdr.base.type == HDTN_MSGTYPE_BUNDLES_FROM_SCHEDULER) {
+        std::unique_ptr<zmq::message_t> zmqMessageBundleFromSchedulerPtr = boost::make_unique<zmq::message_t>();
+        //message guaranteed to be there due to the zmq::send_flags::sndmore
+        if (!m_zmqSubSock_boundSchedulerToConnectingIngressPtr->recv(*zmqMessageBundleFromSchedulerPtr, zmq::recv_flags::none)) {
+            LOG_ERROR(subprocess) << "error receiving zmqMessageBundleToScheduler";
+        }
+        else {
+            static padded_vector_uint8_t unusedPaddedVecMessage;
+            ProcessPaddedData((uint8_t*)zmqMessageBundleFromSchedulerPtr->data(), zmqMessageBundleFromSchedulerPtr->size(),
+                zmqMessageBundleFromSchedulerPtr, unusedPaddedVecMessage, true, false); //last param => does not need processing because it came from scheduler
+        }
+    }
     else {
         LOG_ERROR(subprocess) << "unknown IreleaseChangeHdr message type " << releaseChangeHdr.base.type;
     }
@@ -836,6 +864,7 @@ bool Ingress::Impl::ProcessPaddedData(uint8_t * bundleDataBegin, std::size_t bun
     cbhe_eid_t finalDestEid;
     bool requestsCustody = false;
     bool isAdminRecordForHdtnStorage = false;
+    bool isBundleForHdtnScheduler = false;
     const uint8_t firstByte = bundleDataBegin[0];
     const bool isBpVersion6 = (firstByte == 6);
     const bool isBpVersion7 = (firstByte == ((4U << 5) | 31U));  //CBOR major type 4, additional information 31 (Indefinite-Length Array)
@@ -853,6 +882,7 @@ bool Ingress::Impl::ProcessPaddedData(uint8_t * bundleDataBegin, std::size_t bun
             //admin records pertaining to this hdtn node must go to storage.. they signal a deletion from disk
             static const BPV6_BUNDLEFLAG requiredPrimaryFlagsForAdminRecord = BPV6_BUNDLEFLAG::SINGLETON | BPV6_BUNDLEFLAG::ADMINRECORD;
             isAdminRecordForHdtnStorage = (((primary.m_bundleProcessingControlFlags & requiredPrimaryFlagsForAdminRecord) == requiredPrimaryFlagsForAdminRecord) && (finalDestEid == M_HDTN_EID_CUSTODY));
+            isBundleForHdtnScheduler = (finalDestEid == M_HDTN_EID_TO_SCHEDULER_BUNDLES);
             static const BPV6_BUNDLEFLAG requiredPrimaryFlagsForEcho = BPV6_BUNDLEFLAG::NO_FLAGS_SET;
             //BPV6_BUNDLEFLAG::SINGLETON | BPV6_BUNDLEFLAG::NOFRAGMENT;
             const bool isEcho = (((primary.m_bundleProcessingControlFlags & requiredPrimaryFlagsForEcho) == requiredPrimaryFlagsForEcho) && (finalDestEid == M_HDTN_EID_ECHO));
@@ -893,6 +923,7 @@ bool Ingress::Impl::ProcessPaddedData(uint8_t * bundleDataBegin, std::size_t bun
             //admin records pertaining to this hdtn node must go to storage.. they signal a deletion from disk
             static constexpr BPV7_BUNDLEFLAG requiredPrimaryFlagsForAdminRecord = BPV7_BUNDLEFLAG::ADMINRECORD;
             isAdminRecordForHdtnStorage = (((primary.m_bundleProcessingControlFlags & requiredPrimaryFlagsForAdminRecord) == requiredPrimaryFlagsForAdminRecord) && (finalDestEid == M_HDTN_EID_CUSTODY));
+            isBundleForHdtnScheduler = (finalDestEid == M_HDTN_EID_TO_SCHEDULER_BUNDLES);
             static constexpr BPV7_BUNDLEFLAG requiredPrimaryFlagsForEcho = BPV7_BUNDLEFLAG::NO_FLAGS_SET;
             const bool isEcho = (((primary.m_bundleProcessingControlFlags & requiredPrimaryFlagsForEcho) == requiredPrimaryFlagsForEcho) && (finalDestEid == M_HDTN_EID_ECHO));
             if (!isAdminRecordForHdtnStorage) {
@@ -980,6 +1011,26 @@ bool Ingress::Impl::ProcessPaddedData(uint8_t * bundleDataBegin, std::size_t bun
         return false;
     }
 
+
+    if (isBundleForHdtnScheduler) { //forward to egress which will forward to scheduler
+        //force natural/64-bit alignment
+        hdtn::ToEgressHdr* toEgressHdr = new hdtn::ToEgressHdr();
+        zmq::message_t zmqMessageToEgressHdrWithDataStolen(toEgressHdr, sizeof(hdtn::ToEgressHdr), CustomCleanupToEgressHdr, toEgressHdr);
+        toEgressHdr->base.type = HDTN_MSGTYPE_BUNDLES_TO_SCHEDULER;
+        {
+            boost::mutex::scoped_lock lock(m_ingressToEgressZmqSocketMutex);
+            if (!m_zmqPushSock_boundIngressToConnectingEgressPtr->send(std::move(zmqMessageToEgressHdrWithDataStolen), zmq::send_flags::sndmore | zmq::send_flags::dontwait)) {
+                LOG_ERROR(subprocess) << "can't send toEgressHdr to egress";
+            }
+            else {
+                if (!m_zmqPushSock_boundIngressToConnectingEgressPtr->send(std::move(*zmqMessageToSendUniquePtr), zmq::send_flags::dontwait)) {
+                    LOG_ERROR(subprocess) << "can't send bundle intended for scheduler to egress";
+                }
+                //else success
+            }
+        }
+        return true;
+    }
     /*
     Config file changes:
     remove: zmqMaxMessagesPerPath, zmqMaxMessageSizeBytes, zmqRegistrationServerAddress, and zmqRegistrationServerPortPath from hdtn global configs

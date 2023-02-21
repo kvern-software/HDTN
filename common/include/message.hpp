@@ -37,6 +37,8 @@
 #define HDTN_MSGTYPE_EGRESS_REMOVE_OPPORTUNISTIC_LINK (0x0007)
 #define HDTN_MSGTYPE_STORAGE_ADD_OPPORTUNISTIC_LINK (0x0008)
 #define HDTN_MSGTYPE_STORAGE_REMOVE_OPPORTUNISTIC_LINK (0x0009)
+#define HDTN_MSGTYPE_BUNDLES_TO_SCHEDULER (0x000A)
+#define HDTN_MSGTYPE_BUNDLES_FROM_SCHEDULER (0x000B)
 
 // Egress Messages range is 0xE000 to 0xEAFF
 #define HDTN_MSGTYPE_ENOTIMPL (0xE000)  // convergence layer type not  // implemented
@@ -157,10 +159,10 @@ struct IreleaseChangeHdr {
     uint8_t unused1;
     uint8_t unused2;
     uint8_t unused3;
-    uint8_t unused4;
+    uint8_t isPhysical; // whether the link status change is due to physical (link disruption) or a contact change
     uint64_t outductArrayIndex; //outductUuid
     uint64_t rateBps; // (start events only)
-    uint64_t duration;  // msec (start events only)
+    uint64_t duration;  // the duration of the contact (s) (link up events only)
     uint64_t prevHopNodeId;
     uint64_t nextHopNodeId;
     uint64_t time;
@@ -170,12 +172,18 @@ struct IreleaseChangeHdr {
     //Router unique subscription shall be "a" (gets all messages that start with "a") (e.g "aaa", "ab", etc.)
     //Ingress unique subscription shall be "aa"
     //Storage unique subscription shall be "aaa"
+    //UIS unique subscription shall be "aaaaaaaa"
+    //Egress unique subscription shall be "b"
     void SetSubscribeAll() {
         subscriptionBytes = 0x6161616161616161; //"aaaaaaaa"
     }
     void SetSubscribeRouterOnly() {
         SetSubscribeAll();
         ((char*)&subscriptionBytes)[1] = 'b'; //"abaaaaaa"
+    }
+    void SetSubscribeRouterAndIngressOnly() {
+        SetSubscribeAll();
+        ((char*)&subscriptionBytes)[2] = 'b'; //"aabaaaaa"
     }
     void SetSubscribeEgressOnly() {
         SetSubscribeAll();
