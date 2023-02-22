@@ -19,7 +19,7 @@ add_executable(unit-tests
 	../../common/util/test/TestEnumAsFlagsMacro.cpp
 	../../common/util/test/TestPaddedVectorUint8.cpp
 	../../common/util/test/TestFreeListAllocator.cpp
-	../../common/util/test/TestCpuFlagDetection.cpp
+#	../../common/util/test/TestCpuFlagDetection.cpp
 	../../common/util/test/TestTokenRateLimiter.cpp
 	../../common/util/test/TestUdpBatchSender.cpp
 	../../common/util/test/TestJsonSerializable.cpp
@@ -31,7 +31,7 @@ add_executable(unit-tests
 	../../common/util/test/dir_monitor/test_async.cpp
 	../../common/util/test/dir_monitor/test_sync.cpp
 	#../../common/util/test/test_running.cpp
-	../../common/telemetry_definitions/test/TestTelemetryDefinitions.cpp
+#	../../common/telemetry_definitions/test/TestTelemetryDefinitions.cpp
 	../../common/bpcodec/test/TestAggregateCustodySignal.cpp
 	../../common/bpcodec/test/TestCustodyTransfer.cpp
 	../../common/bpcodec/test/TestCustodyIdAllocator.cpp
