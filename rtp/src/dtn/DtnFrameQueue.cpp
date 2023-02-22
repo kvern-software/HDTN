@@ -50,7 +50,6 @@ void DtnFrameQueue::PushFrame(buffer * img_buffer, rtp_frame * frame)
 // for pushing frames that already have all the payload filled (usually an incoming frame)
 void DtnFrameQueue::PushFrame(const rtp_frame& frame) 
 {
-    LOG_INFO(subprocess) << "pushed frame into queue";
 
     if (m_frameQueue.size() >= m_queueSize)
         PopFrame();
@@ -63,6 +62,8 @@ void DtnFrameQueue::PushFrame(const rtp_frame& frame)
 
     m_totalBytesInQueue += m_frameQueue.front().payload.length;
     m_totalBytesInQueue += sizeof(rtp_header);
+    LOG_INFO(subprocess) << "pushed frame into queue";
+
 }   
 
 

@@ -207,14 +207,14 @@ int DtnRtp::PacketHandler(ssize_t size, void *packet, int rce_flags,  std::share
     // ptr += sizeof(rtp_header);
 
     if (tmp_frame.header.cc > 0) {
-        LOG_INFO(subprocess) << "frame contains csrc entries";
+       // LOG_INFO(subprocess) << "frame contains csrc entries";
 
-        if ((ssize_t) (tmp_frame.payload.length- tmp_frame.header.cc * sizeof(uint32_t) ) < 0) {
-            LOG_ERROR(subprocess) << "Invalid frame length, " << tmp_frame.header.cc << "CSRC entries, total length " << tmp_frame.payload.length;
-            return -1;
-        }
+ //       if ((ssize_t) (tmp_frame.payload.length- tmp_frame.header.cc * sizeof(uint32_t) ) < 0) {
+   //         LOG_ERROR(subprocess) << "Invalid frame length, " << tmp_frame.header.cc << "CSRC entries, total length " << tmp_frame.payload.length;
+     //       return -1;
+       // }
 
-        LOG_INFO(subprocess) << "Allocating"  << tmp_frame.header.cc << "CSRC entries";
+       // LOG_INFO(subprocess) << "Allocating"  << tmp_frame.header.cc << "CSRC entries";
 
         // (*out)->csrc         = new uint32_t[(*out)->header.cc];
         // (*out)->payload_len -= (*out)->header.cc * sizeof(uint32_t);

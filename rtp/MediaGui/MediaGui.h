@@ -32,7 +32,7 @@ public:
     void NewFrame();
     void Render();
     void Close();
-    void glfw_error_callback(int error, const char* description);
+    //void glfw_error_callback(int error, const char* description);
     
     void DisplayImage(); // loads image from local video device into imgui buffer
     void UpdateImage(boost::filesystem::path filePath); // if a new image has been delivered, load it

@@ -131,7 +131,7 @@ bool MediaSinkRunner::Run(int argc, const char* const argv[], volatile bool & ru
         std::shared_ptr<DtnMediaStream> dtnMediaStream = dtnSession->CreateDtnMediaStream(RTP_FORMAT_H265);
 
         // configure the stream // TODO pass in from command line
-        dtnMediaStream->Init(RTP_FORMAT_H265, local_frame_queue_size,  "192.168.1.132", "127.0.0.1", 55001, 55000, 5000000); // TODO pass in parameters from command line
+        dtnMediaStream->Init(RTP_FORMAT_H265,  1,  "192.168.1.132", "127.0.0.1", 55001, 55000, 5000000); // TODO pass in parameters from command line
 
         MediaSink mediaSink(dtnMediaStream);
         mediaSink.Init(inductsConfigPtr, outductsConfigPtr, isAcsAware, myEid, processingLagMs, maxBundleSizeBytes);

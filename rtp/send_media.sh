@@ -13,7 +13,7 @@ cd $HDTN_RTP_DIR
 # sleep 5
 
 # media source
-./build/dtn_rtp_stream_source  --frame-width=1920 --frame-height=1080 --frames-per-second=30  --local-frame-queue-size=1 --video-device=/dev/video0 --bundle-size=200000 --bundle-rate=0 --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --duration=400 --outducts-config-file=$source_config &
+./build/dtn_rtp_stream_source  --frame-width=1280 --frame-height=960 --frames-per-second=30  --local-frame-queue-size=1 --video-device=/dev/video0 --bundle-size=200000 --bundle-rate=0 --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --duration=400 --outducts-config-file=$source_config &
 media_source_process=$!
 sleep 8
 # # # HDTN one process
@@ -22,7 +22,7 @@ sleep 8
 # sleep 6
 
 
-sleep 30
+sleep 400
 
 echo "\nkilling HDTN one process ..." && kill -2 $one_process_PID
 sleep 2

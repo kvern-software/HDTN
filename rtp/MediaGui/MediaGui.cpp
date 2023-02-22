@@ -12,6 +12,9 @@
 #include "stb_image.h"
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
+void glfw_error_callback(int error, const char* description) {
+     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
+}
 
 
 MediaGui::MediaGui()
@@ -24,7 +27,7 @@ MediaGui::~MediaGui(){
 
 void MediaGui::Init()
 {
-     // glfwSetErrorCallback((void *) glfw_error_callback);
+    glfwSetErrorCallback(glfw_error_callback);
     glfwInit();
 
     // GL 3.0 + GLSL 130
@@ -96,9 +99,7 @@ void MediaGui::Close() {
     LOG_INFO(subprocess) << "Successfully closed GUI";
 }
 
-// void MediaGui::glfw_error_callback(int error, const char* description) {
-//     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
-// }
+
 
 bool MediaGui::LoadTextureFromVideoDevice(void* img_location, int size ) {
     if (!img_location)
@@ -106,22 +107,23 @@ bool MediaGui::LoadTextureFromVideoDevice(void* img_location, int size ) {
     
     int image_width = 0;
     int image_height = 0;
-    // LOG_INFO(subprocess) << "LOADING IMAGE OF SIZE " << size;
+    LOG_INFO(subprocess) << "LOADING IMAGE OF SIZE " << size;
 
     copying = true;
-    char * image_data = (char *) stbi_load_from_memory(
+    //unsigned char * image_data = stbi_load("test.jpeg", &image_width, &image_height, NULL,4);
+    unsigned char * image_data = (unsigned char *) stbi_load_from_memory(
         reinterpret_cast<unsigned char *>(img_location), size, &image_width, &image_height, NULL, 4);
     copying = false;
 
     if (image_data == NULL) {
-        LOG_ERROR(subprocess) << "Null image data, failed to get data from VideoDriver";
-        return false;
-    }
+    LOG_ERROR(subprocess) << "Null image data, failed to get data from VideoDriver";
+    return false;
+  }
 
-    // LOG_INFO(subprocess) << "LOADED IMAGE OF DIMENSION " << image_width << " X " << image_height;
-
+    LOG_INFO(subprocess) << "LOADED IMAGE OF DIMENSION " << image_width << " X " << image_height;
+    //DataToOpenGLTexture(img_location, 1280, 960);
     DataToOpenGLTexture(image_data, image_width, image_height);
-    // LOG_INFO(subprocess) << "IMG TO TEXTURE";
+     LOG_INFO(subprocess) << "IMG TO TEXTURE";
 
     stbi_image_free(image_data);
 
