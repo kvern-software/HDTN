@@ -1,10 +1,11 @@
 #include "MediaSource.h"
+#include <Logger.h>
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
-MediaSource::MediaSource(uint64_t bundleSizeBytes) : BpSourcePattern(), m_bundleSizeBytes(bundleSizeBytes)
+MediaSource::MediaSource(uint64_t bundleSizeBytes, std::shared_ptr<DtnMediaStream> dtnMediaStreamPtr) : BpSourcePattern(), m_bundleSizeBytes(bundleSizeBytes)
 {
-
+    m_DtnMediaStreamPtr = dtnMediaStreamPtr;
 }
 
 MediaSource::~MediaSource() 
@@ -12,20 +13,59 @@ MediaSource::~MediaSource()
 
 }
 
+
 uint64_t MediaSource::GetNextPayloadLength_Step1() 
 {
-    LOG_INFO(subprocess) << "payload length step one: " << m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetCurrentQueueSizeBytes() << std::endl;
-    return (uint64_t) m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetCurrentQueueSizeBytes();
+    // lock frame queue mutex (GETS UNLOCKED AFTER COPY)
+    LOG_INFO(subprocess) << "Copy Lock";
+    m_DtnMediaStreamPtr->GetMutex()->lock();
+
+
+    if (m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetCurrentQueueSize() != m_DtnMediaStreamPtr->GetFrameQueueSize())
+    {
+        LOG_INFO(subprocess) << "WAIT FOR PAYLOAD, UNLOCKED";
+        m_DtnMediaStreamPtr->GetMutex()->unlock();
+        return UINT64_MAX;
+    } 
+    else 
+    {
+        LOG_INFO(subprocess) << "payload length step one: " << m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetCurrentQueueSizeBytes() << std::endl;
+        return (uint64_t) m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetCurrentQueueSizeBytes();
+
+    }
 }
 
 bool MediaSource::CopyPayload_Step2(uint8_t * destinationBuffer) 
 {
-    memcpy(destinationBuffer, &m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetQueue(),
-            m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetCurrentQueueSizeBytes());
-    LOG_INFO(subprocess) << "copied out";
+    LOG_INFO(subprocess) << "COPYING OUT";
+    uint64_t offset = 0;
 
-    // clear queue
-    m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->ClearQueue();
+    for (size_t i=0; i<m_DtnMediaStreamPtr->GetFrameQueueSize(); i++)
+    {
+        // LOG_INFO(subprocess) << m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetCurrentQueueSize();
+
+        // since we are actually about to send these rtp frames, we need to increase their sequence number
+        m_DtnMediaStreamPtr->GetDtnRtpPtr()->UpdateSequence(&m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetQueue().front());
+        
+        // m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetQueue().front().print_header();
+
+        uint64_t numBytesToCopy =  sizeof(rtp_header) + m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetQueue().front().payload.length;
+
+        // make copy of each element
+        memcpy(destinationBuffer + offset, &m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetQueue().front().header, sizeof(rtp_header)); // get header
+        
+        memcpy(destinationBuffer + sizeof(rtp_header) + offset ,  // get payload
+                m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetQueue().front().payload.start,   
+                m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetQueue().front().payload.length);
+
+        offset += numBytesToCopy;
+
+        m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->PopFrame();
+        LOG_INFO(subprocess) << "copied out img size " << numBytesToCopy - sizeof(rtp_header) << " TOTAL SIZE " << numBytesToCopy;
+
+    }
+    // unlock mutex
+    m_DtnMediaStreamPtr->GetMutex()->unlock();
     return true;
 }
 
@@ -34,10 +74,14 @@ bool MediaSource::TryWaitForDataAvailable(const boost::posix_time::time_duration
     if (m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetCurrentQueueSize() != m_DtnMediaStreamPtr->GetFrameQueueSize())
     {
         // wait for full queue
+        LOG_INFO(subprocess) << "waiting for data";
+
         return m_DtnMediaStreamPtr->GetOutgoingFrameQueuePtr()->GetNextQueueTimeout(timeout);
     } 
     
     // send data, queue is full
+    LOG_INFO(subprocess) << "try wait success";
+
     return true;
 }
 

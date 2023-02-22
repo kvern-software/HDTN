@@ -39,7 +39,7 @@ struct Egress::Impl : private boost::noncopyable {
     Impl();
     ~Impl();
     void Stop();
-    bool Init(const HdtnConfig& hdtnConfig, zmq::context_t* hdtnOneProcessZmqInprocContextPtr);
+    bool Init(const HdtnConfig& hdtnConfig, const HdtnDistributedConfig& hdtnDistributedConfig, zmq::context_t* hdtnOneProcessZmqInprocContextPtr);
 
 private:
     void RouterEventHandler();
@@ -119,16 +119,17 @@ void Egress::Impl::Stop() {
         try {
             m_threadZmqReaderPtr->join();
             m_threadZmqReaderPtr.reset(); //delete it
-        } catch (boost::thread_resource_error &) {
-            LOG_ERROR(subprocess) << "error stopping Egress thread";
+        }
+        catch (boost::thread_resource_error &e) {
+            LOG_ERROR(subprocess) << "error stopping Egress thread: " << e.what();
         }
     }
 }
 
-bool Egress::Init(const HdtnConfig& hdtnConfig, zmq::context_t* hdtnOneProcessZmqInprocContextPtr) {
-    return m_pimpl->Init(hdtnConfig, hdtnOneProcessZmqInprocContextPtr);
+bool Egress::Init(const HdtnConfig& hdtnConfig, const HdtnDistributedConfig& hdtnDistributedConfig, zmq::context_t* hdtnOneProcessZmqInprocContextPtr) {
+    return m_pimpl->Init(hdtnConfig, hdtnDistributedConfig, hdtnOneProcessZmqInprocContextPtr);
 }
-bool Egress::Impl::Init(const HdtnConfig & hdtnConfig, zmq::context_t * hdtnOneProcessZmqInprocContextPtr) {
+bool Egress::Impl::Init(const HdtnConfig & hdtnConfig, const HdtnDistributedConfig& hdtnDistributedConfig, zmq::context_t * hdtnOneProcessZmqInprocContextPtr) {
     
     if (m_running) {
         LOG_ERROR(subprocess) << "Egress::Init called while Egress is already running";
@@ -180,67 +181,69 @@ bool Egress::Impl::Init(const HdtnConfig & hdtnConfig, zmq::context_t * hdtnOneP
             m_zmqPullSock_boundIngressToConnectingEgressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::pull);
             const std::string connect_boundIngressToConnectingEgressPath(
                 std::string("tcp://") +
-                m_hdtnConfig.m_zmqIngressAddress +
+                hdtnDistributedConfig.m_zmqIngressAddress +
                 std::string(":") +
-                boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqBoundIngressToConnectingEgressPortPath));
+                boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqBoundIngressToConnectingEgressPortPath));
             m_zmqPullSock_boundIngressToConnectingEgressPtr->connect(connect_boundIngressToConnectingEgressPath);
             
             m_zmqPushSock_connectingEgressToBoundIngressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::push);
             const std::string connect_connectingEgressToBoundIngressPath(
                 std::string("tcp://") +
-                m_hdtnConfig.m_zmqIngressAddress +
+                hdtnDistributedConfig.m_zmqIngressAddress +
                 std::string(":") +
-                boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqConnectingEgressToBoundIngressPortPath));
+                boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqConnectingEgressToBoundIngressPortPath));
             m_zmqPushSock_connectingEgressToBoundIngressPtr->connect(connect_connectingEgressToBoundIngressPath);
             // socket for sending bundles from egress via tcpcl outduct opportunistic link (because tcpcl can be bidirectional)
             m_zmqPushSock_connectingEgressBundlesOnlyToBoundIngressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::push);
             const std::string connect_connectingEgressBundlesOnlyToBoundIngressPath(
                 std::string("tcp://") +
-                m_hdtnConfig.m_zmqIngressAddress +
+                hdtnDistributedConfig.m_zmqIngressAddress +
                 std::string(":") +
-                boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqConnectingEgressBundlesOnlyToBoundIngressPortPath));
+                boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqConnectingEgressBundlesOnlyToBoundIngressPortPath));
             m_zmqPushSock_connectingEgressBundlesOnlyToBoundIngressPtr->connect(connect_connectingEgressBundlesOnlyToBoundIngressPath);
             // socket for bundles from storage
             m_zmqPullSock_connectingStorageToBoundEgressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::pull);
             const std::string bind_connectingStorageToBoundEgressPath(
-                std::string("tcp://*:") + boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqConnectingStorageToBoundEgressPortPath));
+                std::string("tcp://*:") + boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqConnectingStorageToBoundEgressPortPath));
             m_zmqPullSock_connectingStorageToBoundEgressPtr->bind(bind_connectingStorageToBoundEgressPath);
             m_zmqPushSock_boundEgressToConnectingStoragePtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::push);
             const std::string bind_boundEgressToConnectingStoragePath(
-                std::string("tcp://*:") + boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqBoundEgressToConnectingStoragePortPath));
+                std::string("tcp://*:") + boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqBoundEgressToConnectingStoragePortPath));
             m_zmqPushSock_boundEgressToConnectingStoragePtr->bind(bind_boundEgressToConnectingStoragePath);
 
             //from telemetry socket
             m_zmqRepSock_connectingTelemToFromBoundEgressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::rep);
-            const std::string bind_connectingTelemToFromBoundEgressPath("tcp://*:10302");
+            const std::string bind_connectingTelemToFromBoundEgressPath(
+                std::string("tcp://*:") + boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqConnectingTelemToFromBoundEgressPortPath));
             m_zmqRepSock_connectingTelemToFromBoundEgressPtr->bind(bind_connectingTelemToFromBoundEgressPath);
 
             //socket for sending LinkStatus events from Egress to Scheduler
             m_zmqPushSock_boundEgressToConnectingSchedulerPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::push);
             const std::string bind_boundEgressToConnectingSchedulerPath(
-                std::string("tcp://*:") + boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqConnectingEgressToBoundSchedulerPortPath));
+                std::string("tcp://*:") + boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqBoundEgressToConnectingSchedulerPortPath));
             m_zmqPushSock_boundEgressToConnectingSchedulerPtr->bind(bind_boundEgressToConnectingSchedulerPath);
 
             //socket for getting Route Update events from Router to Egress
             m_zmqPullSock_connectingRouterToBoundEgressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::pull);
             const std::string bind_connectingRouterToBoundEgressPath(
-                std::string("tcp://*:") + boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqBoundRouterPubSubPortPath));
+                std::string("tcp://*:") + boost::lexical_cast<std::string>(hdtnDistributedConfig.m_zmqConnectingRouterToBoundEgressPortPath));
             m_zmqPullSock_connectingRouterToBoundEgressPtr->bind(bind_connectingRouterToBoundEgressPath);
         }
 
         // socket for receiving events from scheduler
         m_zmqSubSock_boundSchedulerToConnectingEgressPtr = boost::make_unique<zmq::socket_t>(*m_zmqCtxPtr, zmq::socket_type::sub);
         const std::string connect_boundSchedulerPubSubPath(
-        std::string("tcp://") +
-        m_hdtnConfig.m_zmqSchedulerAddress +
-        std::string(":") +
-        boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqBoundSchedulerPubSubPortPath));
+            std::string("tcp://") +
+            ((hdtnOneProcessZmqInprocContextPtr == NULL) ? hdtnDistributedConfig.m_zmqSchedulerAddress : std::string("localhost")) +
+            std::string(":") +
+            boost::lexical_cast<std::string>(m_hdtnConfig.m_zmqBoundSchedulerPubSubPortPath));
 
         try {
             m_zmqSubSock_boundSchedulerToConnectingEgressPtr->connect(connect_boundSchedulerPubSubPath);
             m_zmqSubSock_boundSchedulerToConnectingEgressPtr->set(zmq::sockopt::linger, 0); //prevent hang when deleting the zmqCtxPtr
             LOG_INFO(subprocess) << "Connected to scheduler at " << connect_boundSchedulerPubSubPath << " , subscribing...";
-        } catch (const zmq::error_t & ex) {
+        }
+        catch (const zmq::error_t & ex) {
             LOG_ERROR(subprocess) << "Cannot connect to scheduler socket at " << connect_boundSchedulerPubSubPath << " : " << ex.what();
             return false;
         }
@@ -458,6 +461,29 @@ void Egress::Impl::ReadZmqThreadFunc() {
                 else if ((itemIndex == 0) && (toEgressHeader.base.type == HDTN_MSGTYPE_EGRESS_REMOVE_OPPORTUNISTIC_LINK)) {
                     LOG_INFO(subprocess) << "removing opportunistic link " << toEgressHeader.finalDestEid.nodeId;
                     availableDestOpportunisticNodeIdsSet.erase(toEgressHeader.finalDestEid.nodeId);
+                    continue;
+                }
+                else if ((itemIndex == 0) && (toEgressHeader.base.type == HDTN_MSGTYPE_BUNDLES_TO_SCHEDULER)) {
+                    LOG_INFO(subprocess) << "forwarding bundle to scheduler";
+                    zmq::message_t zmqMessageBundleToScheduler;
+                    //message guaranteed to be there due to the zmq::send_flags::sndmore
+                    if (!firstTwoSockets[itemIndex]->recv(zmqMessageBundleToScheduler, zmq::recv_flags::none)) {
+                        LOG_ERROR(subprocess) << "error receiving zmqMessageBundleToScheduler";
+                    }
+                    else {
+                        hdtn::LinkStatusHdr linkStatusMsg;
+                        linkStatusMsg.base.type = HDTN_MSGTYPE_BUNDLES_TO_SCHEDULER;
+                        while (m_running && !m_zmqPushSock_boundEgressToConnectingSchedulerPtr->send(
+                            zmq::const_buffer(&linkStatusMsg, sizeof(linkStatusMsg)), zmq::send_flags::sndmore | zmq::send_flags::dontwait))
+                        {
+                            LOG_INFO(subprocess) << "waiting for scheduler to become available to send HDTN_MSGTYPE_BUNDLES_TO_SCHEDULER header";
+                            boost::this_thread::sleep(boost::posix_time::seconds(1));
+                        }
+                        while (m_running && !m_zmqPushSock_boundEgressToConnectingSchedulerPtr->send(zmqMessageBundleToScheduler, zmq::send_flags::dontwait)) {
+                            LOG_INFO(subprocess) << "waiting for scheduler to become available to send it a scheduler-only bundle received by ingress";
+                            boost::this_thread::sleep(boost::posix_time::seconds(1));
+                        }
+                    }
                     continue;
                 }
                 else if (toEgressHeader.base.type != HDTN_MSGTYPE_EGRESS) {

@@ -167,6 +167,7 @@ add_subdirectory(common/ltp)
 add_subdirectory(common/stcp)
 add_subdirectory(common/udp)
 add_subdirectory(common/stats_logger)
+
 if(RUN_TELEMETRY)
 	add_subdirectory(module/telem_cmd_interface)
 endif()
@@ -180,3 +181,4 @@ add_subdirectory(module/udp_delay_sim)
 add_subdirectory(tests/unit_tests)
 add_subdirectory(tests/integrated_tests)
 
+#add_subdirectory(media_app)

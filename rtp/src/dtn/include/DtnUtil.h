@@ -18,47 +18,26 @@ typedef SSIZE_T ssize_t;
 
 #include <stdint.h>
 
-/// \endcond
+#include <random>
 
-/**
- * \enum RTP_ERROR
- *
- * \brief RTP error codes
- *
- * \details These error valus are returned from various uvgRTP functions. Functions that return a pointer set rtp_errno global value that should be checked if a function call failed
- */
-typedef enum RTP_ERROR {
-    /// \cond DO_NOT_DOCUMENT
-    RTP_MULTIPLE_PKTS_READY = 6,
-    RTP_PKT_READY           = 5,
-    RTP_PKT_MODIFIED        = 4,
-    RTP_PKT_NOT_HANDLED     = 3,
-    RTP_INTERRUPTED         = 2,
-    RTP_NOT_READY           = 1,
-    /// \endcond
+uint32_t GenRandom();
 
-    RTP_OK                  = 0,    ///< Success
-    RTP_GENERIC_ERROR       = -1,   ///< Generic error condition
-    RTP_SOCKET_ERROR        = -2,   ///< Failed to create socket
-    RTP_BIND_ERROR          = -3,   ///< Failed to bind to interface
-    RTP_INVALID_VALUE       = -4,   ///< Invalid value
-    RTP_SEND_ERROR          = -5,   ///< System call send(2) or one of its derivatives failed
-    RTP_MEMORY_ERROR        = -6,   ///< Memory allocation failed
-    RTP_SSRC_COLLISION      = -7,   ///< SSRC collision detected
-    RTP_INITIALIZED         = -8,   ///< Object already initialized
-    RTP_NOT_INITIALIZED     = -9,   ///< Object has not been initialized
-    RTP_NOT_SUPPORTED       = -10,  ///< Method/version/extension not supported
-    RTP_RECV_ERROR          = -11,  ///< System call recv(2) or one of its derivatives failed
-    RTP_TIMEOUT             = -12,  ///< Operation timed out
-    RTP_NOT_FOUND           = -13,  ///< Object not found
-    RTP_AUTH_TAG_MISMATCH   = -14,  ///< Authentication tag does not match the RTP packet contents
-} rtp_error_t;
 
-/**
- * \enum RTP_FORMAT
- *
- * \brief These flags are given to uvgrtp::session::create_stream()
- */
+typedef enum RTP_MODES {
+    RTP_RECV_ONLY = 1,
+    RTP_SEND_ONLY = 2,
+    RTP_SEND_RECV = 3
+} rtp_modes_t;
+
+
+
+
+
+
+
+
+
+
 typedef enum RTP_FORMAT {
     // See RFC 3551 for more details
 

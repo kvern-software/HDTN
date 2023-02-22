@@ -27,7 +27,7 @@
 struct buffer {
         void   *start;
         size_t  length;
-        int id = 0;
+        
         void allocate(size_t new_length)
         {
             start = malloc(new_length);
@@ -39,22 +39,30 @@ struct buffer {
             free(start);
         }
 
+        void copy(void * src)
+        {
+            if (!start)
+                return;
+
+            memcpy(start, src, length);
+        }
+
 };
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 #define DEFAULT_CHUNK_WRITE_SIZE 8192*4
 
 #define DEFAULT_VIDEO_CAPTURE V4L2_BUF_TYPE_VIDEO_CAPTURE
-#define DEFAULT_PIXEL_FORMAT  V4L2_PIX_FMT_HEVC //V4L2_PIX_FMT_MJPEG 
+#define DEFAULT_PIXEL_FORMAT  V4L2_PIX_FMT_MJPEG //V4L2_PIX_FMT_YUV444  //V4L2_PIX_FMT_HEVC //  
 #define DEFAULT_FIELD V4L2_FIELD_NONE
 #define DEFAULT_MEMORY_MAP V4L2_MEMORY_MMAP
+
+typedef boost::function<void(buffer * buf)> ExportFrameCallback_t;
 
 class VideoDriver
 {
 
 private:
-    typedef boost::function<void(buffer * image_buffer)> ExportFrameCallback_t;
-    
     std::unique_ptr<boost::thread> m_VideoDriverBufferFillerThreadPtr;
     volatile bool m_running = false;
 
@@ -65,7 +73,7 @@ public:
     VideoDriver(const ExportFrameCallback_t & exportFrameCallback);
     ~VideoDriver();
 
-    int Init(std::string device, uint16_t frame_width, uint16_t frame_height, uint64_t buffer_queue_size);
+    int Init(std::string device, uint16_t frame_width, uint16_t frame_height, uint64_t buffer_queue_size, uint8_t framerate);
     void Start();
     void Stop();
 
@@ -75,6 +83,7 @@ public:
     int SetImageFormat(unsigned int type, unsigned int width, unsigned int height, 
             unsigned int pixelformat, unsigned int field);
     int SetImageFormat(v4l2_format imageFormat); 
+    int SetFramerate(uint32_t framerate);
     int SetBufferQueueSize(uint64_t bufferQueueSize);
 
     // Repeatedly called members for collecting data

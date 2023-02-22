@@ -19,7 +19,6 @@
 #ifndef LTP_ENGINE_H
 #define LTP_ENGINE_H 1
 
-#include <boost/random/random_device.hpp>
 #include <boost/thread.hpp>
 #include "LtpFragmentSet.h"
 #include "Ltp.h"
@@ -33,6 +32,7 @@
 #include "TokenRateLimiter.h"
 #include "BundleCallbackFunctionDefines.h"
 #include "MemoryInFiles.h"
+#include "FreeListAllocator.h"
 #include <unordered_map>
 #include <queue>
 #include <memory>
@@ -918,6 +918,8 @@ private:
     boost::posix_time::time_duration m_delaySendingOfDataSegmentsTime;
     /// Housekeeping timer interval
     const boost::posix_time::time_duration M_HOUSEKEEPING_INTERVAL;
+    /// Now time (updated periodically from housekeeping) so timestamp need not make system calls to get the time
+    boost::posix_time::ptime m_nowTimeRef;
     /// Stagnated reception session duration, when (last received segment timestamp <= (now() - m_stagnantRxSessionTime) AND no active pending timers)
     /// indicates the reception session has stagnated and should be queued for deletion.
     boost::posix_time::time_duration m_stagnantRxSessionTime;
@@ -940,8 +942,6 @@ private:
     /// Session recreation preventer maximum number of session numbers to remember, if 0 this feature is disabled
     /// (see docs for LtpEngineConfig::rxDataSegmentSessionNumberRecreationPreventerHistorySizeOrZeroToDisable).
     const uint64_t M_MAX_RX_DATA_SEGMENT_HISTORY_OR_ZERO_DISABLE;
-    /// Random device
-    boost::random_device m_randomDevice;
 
     //session receiver functions to be passed in AS REFERENCES (note declared before m_mapSessionIdToSessionReceiver so destroyed after map)
     /// This receiver should be queued for deletion notice function
@@ -960,9 +960,15 @@ private:
     InitialTransmissionCompletedCallback_t m_initialTransmissionCompletedCallbackCalledBySender;
 
     /// Type of map holding transmission sessions, mapped by session number
-    typedef std::unordered_map<uint64_t, LtpSessionSender> map_session_number_to_session_sender_t;
+    typedef std::unordered_map<uint64_t, LtpSessionSender,
+        std::hash<uint64_t>,
+        std::equal_to<uint64_t>,
+        FreeListAllocatorDynamic<std::pair<const uint64_t, LtpSessionSender> > > map_session_number_to_session_sender_t;
     /// Type of map holding reception sessions, mapped by session ID, hashed by session ID
-    typedef std::unordered_map<Ltp::session_id_t, LtpSessionReceiver, Ltp::hash_session_id_t > map_session_id_to_session_receiver_t;
+    typedef std::unordered_map<Ltp::session_id_t, LtpSessionReceiver,
+        Ltp::hash_session_id_t,
+        std::equal_to<Ltp::session_id_t>,
+        FreeListAllocatorDynamic<std::pair<const Ltp::session_id_t, LtpSessionReceiver> > > map_session_id_to_session_receiver_t;
     /// Active transmission sessions, mapped by session number
     map_session_number_to_session_sender_t m_mapSessionNumberToSessionSender;
     /// Active reception sessions, mapped by session ID, hashed by session ID
@@ -1135,8 +1141,10 @@ private:
 
     //reference structs common to all sessions
     /// Session sender common data
+    LtpSessionSender::LtpSessionSenderRecycler m_ltpSessionSenderRecycler;
     LtpSessionSender::LtpSessionSenderCommonData m_ltpSessionSenderCommonData;
     /// Session receiver common data
+    LtpSessionReceiver::LtpSessionReceiverRecycler m_ltpSessionReceiverRecycler;
     LtpSessionReceiver::LtpSessionReceiverCommonData m_ltpSessionReceiverCommonData;
 
 public:

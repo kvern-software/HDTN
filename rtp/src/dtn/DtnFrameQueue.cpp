@@ -5,6 +5,7 @@ static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess:
 
 DtnFrameQueue::DtnFrameQueue(size_t queueSize) : m_queueSize(queueSize) 
 {
+    LOG_INFO(subprocess) << "Created queue of size" << m_queueSize;
 };
 
 DtnFrameQueue::~DtnFrameQueue()
@@ -12,7 +13,7 @@ DtnFrameQueue::~DtnFrameQueue()
 };
 
 // get reference to first element in frame queue
-buffer& DtnFrameQueue::GetNextFrame() 
+rtp_frame& DtnFrameQueue::GetNextFrame() 
 {
     return m_frameQueue.front();
 }
@@ -20,19 +21,51 @@ buffer& DtnFrameQueue::GetNextFrame()
 // pops oldest frame in queue
 void DtnFrameQueue::PopFrame()
 {
-    m_totalBytesInQueue -= m_frameQueue.front().length; 
-    m_frameQueue.pop();
+    // std::cout << "POP" <<std::endl;
+    if (m_frameQueue.size() > 0) {
+        m_totalBytesInQueue -= m_frameQueue.front().payload.length; 
+        m_totalBytesInQueue -= sizeof(rtp_header);
+        m_frameQueue.pop();
+    }
 }
 
 // adds new frame to end of queue
-void DtnFrameQueue::PushFrame(buffer * image_buffer) 
+void DtnFrameQueue::PushFrame(buffer * img_buffer, rtp_frame * frame) 
 {
     if (m_frameQueue.size() >= m_queueSize)
         PopFrame();
-    
-    m_frameQueue.push(*image_buffer);
-    m_totalBytesInQueue += m_frameQueue.back().length;
+
+    m_frameQueue.push(*frame); // adds frame to back of queue
+
+    m_frameQueue.back().payload.allocate(img_buffer->length); // allocate memory in frame that is at back of queue
+
+    memcpy(m_frameQueue.back().payload.start , img_buffer->start, img_buffer->length); // copy once into the frame that is in back of queue
+
+    m_totalBytesInQueue += m_frameQueue.back().payload.length;
+    m_totalBytesInQueue += sizeof(rtp_header);
+    // LOG_INFO(subprocess) << "total bytes in queue" << m_totalBytesInQueue;
+
 }   
+
+// for pushing frames that already have all the payload filled (usually an incoming frame)
+void DtnFrameQueue::PushFrame(const rtp_frame& frame) 
+{
+
+    if (m_frameQueue.size() >= m_queueSize)
+        PopFrame();
+
+    m_frameQueue.push(frame);
+
+    m_frameQueue.front().payload.allocate(frame.payload.length);
+
+    memcpy(m_frameQueue.front().payload.start , frame.payload.start, frame.payload.length); // copy once
+
+    m_totalBytesInQueue += m_frameQueue.front().payload.length;
+    m_totalBytesInQueue += sizeof(rtp_header);
+    LOG_INFO(subprocess) << "pushed frame into queue";
+
+}   
+
 
 size_t DtnFrameQueue::GetCurrentQueueSize()
 {
@@ -44,14 +77,14 @@ size_t DtnFrameQueue::GetCurrentQueueSizeBytes()
     return m_totalBytesInQueue;
 }
 
-std::queue<buffer>& DtnFrameQueue::GetQueue() 
+std::queue<rtp_frame>& DtnFrameQueue::GetQueue() 
 {
     return m_frameQueue;
 }
 
 void DtnFrameQueue::ClearQueue()
 {
-    m_frameQueue = std::queue<buffer>();
+    m_frameQueue = std::queue<rtp_frame>();
 }
 
 bool DtnFrameQueue::GetNextQueueReady()

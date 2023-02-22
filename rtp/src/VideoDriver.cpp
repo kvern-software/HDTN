@@ -2,6 +2,7 @@
 #include "Logger.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/thread.hpp> 
+
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
 VideoDriver::VideoDriver(const ExportFrameCallback_t & exportFrameCallback)
@@ -16,15 +17,15 @@ VideoDriver::~VideoDriver()
 }
 
 // initialize video driver to be ready to start capturing frames
-int VideoDriver::Init(std::string device, uint16_t frame_width, uint16_t frame_height, uint64_t buffer_queue_size)
+int VideoDriver::Init(std::string device, uint16_t frame_width, uint16_t frame_height, uint64_t buffer_queue_size, uint8_t framerate)
 {
     m_device = device;
     OpenFD();
     CheckDeviceCapability();
     SetImageFormat(DEFAULT_VIDEO_CAPTURE, frame_width, frame_height, 
             DEFAULT_PIXEL_FORMAT, DEFAULT_FIELD);
+    SetFramerate(framerate);
     SetBufferQueueSize(buffer_queue_size);
-//    SetFramerate(frames_per_second);
 //    SetCaptureMode(FIFO); // todo get input come command line
    RequestBuffer(V4L2_BUF_TYPE_VIDEO_CAPTURE, V4L2_MEMORY_MMAP);
    AllocateLocalBuffers();   
@@ -342,6 +343,29 @@ int VideoDriver::DequeueBuffer(int buffer_idx) {
 
     // return 0;
 // }
+int VideoDriver::SetFramerate(uint32_t framerate)
+{
+    struct v4l2_streamparm streamparm;
+    memset(&streamparm, 0, sizeof(streamparm));
+    streamparm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+    if (ioctl(fd, VIDIOC_G_PARM, &streamparm) != 0)
+    {
+        std::cout<< "Failed to set frame rate "<< std::endl;
+
+    // Error
+    }
+
+    streamparm.parm.capture.capturemode |= V4L2_CAP_TIMEPERFRAME;
+    streamparm.parm.capture.timeperframe.numerator = 1;
+    streamparm.parm.capture.timeperframe.denominator = framerate;
+    if(ioctl(fd, VIDIOC_G_PARM, &streamparm) !=0) 
+    {
+        std::cout<< "Failed to set frame rate "<< std::endl;
+    }
+
+    return 0;
+}
 
 int VideoDriver::CaptureFramesFIFO() {
     for (uint64_t i=0; i < m_bufferQueueSize; i++) {
@@ -350,15 +374,20 @@ int VideoDriver::CaptureFramesFIFO() {
         // LOG_INFO(subprocess) << "size of image buf: " << image_buffers[i].length;
         m_exportFrameCallback(&image_buffers[i]);
     }
-
     return 0;
 }
 
 void VideoDriver::BufferFillerThreadFunc() {
     MapMemory();
     StartVideoStream();
+    // LOG_INFO(subprocess) << "start filling";
     while (m_running) {
-        CaptureFramesFIFO();
+        // CaptureFramesFIFO();
+        for (uint64_t i=0; i < m_bufferQueueSize; i++) {
+            QueueBuffer(i);
+            DequeueBuffer(i);
+            // LOG_INFO(subprocess) << "size of image buf: " << image_buffers[i].length;
+            m_exportFrameCallback(&image_buffers[i]);
+        }
     }
-        // boost::this_thread::sleep(boost::posix_time::milliseconds(20));
 }

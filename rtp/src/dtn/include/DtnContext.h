@@ -5,7 +5,7 @@
 
 // DTN
 #include "DtnSession.h"
-
+#include "DtnUtil.h"
 
 class DtnSession;
 
@@ -24,14 +24,11 @@ private:
 
     size_t m_MTU;
 public:
-    DtnContext(size_t maxTransmissionUnit) : m_MTU(maxTransmissionUnit) 
-    {
-        m_cname = get_cname();
-    };
+    DtnContext();
+    ~DtnContext();
 
-    ~DtnContext(){};
 
-    std::shared_ptr<DtnSession> CreateDtnSession();
+    std::shared_ptr<DtnSession> CreateDtnSession(rtp_modes_t operating_mode);
 
     size_t GetMTU();
 

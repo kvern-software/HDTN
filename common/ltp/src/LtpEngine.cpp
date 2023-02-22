@@ -51,6 +51,7 @@ LtpEngine::LtpEngine(const LtpEngineConfig& ltpRxOrTxCfg, const uint8_t engineIn
         boost::posix_time::milliseconds(ltpRxOrTxCfg.delaySendingOfDataSegmentsTimeMsOrZeroToDisable) :
         boost::posix_time::time_duration(boost::posix_time::special_values::not_a_date_time)),
     M_HOUSEKEEPING_INTERVAL(boost::posix_time::milliseconds(1000)),
+    m_nowTimeRef(boost::posix_time::microsec_clock::universal_time()),
     m_stagnantRxSessionTime((m_transmissionToAckReceivedTime* static_cast<int>(ltpRxOrTxCfg.maxRetriesPerSerialNumber + 1)) + (M_HOUSEKEEPING_INTERVAL * 2)),
     M_FORCE_32_BIT_RANDOM_NUMBERS(ltpRxOrTxCfg.force32BitRandomNumbers),
     M_SENDER_PING_SECONDS_OR_ZERO_TO_DISABLE(ltpRxOrTxCfg.senderPingSecondsOrZeroToDisable),
@@ -62,6 +63,7 @@ LtpEngine::LtpEngine(const LtpEngineConfig& ltpRxOrTxCfg, const uint8_t engineIn
         std::min(M_MAX_SIMULTANEOUS_SESSIONS, diskPipelineLimit) : M_MAX_SIMULTANEOUS_SESSIONS),
     M_DISK_BUNDLE_ACK_CALLBACK_LIMIT(M_MAX_SIMULTANEOUS_SESSIONS - M_MAX_SESSIONS_IN_PIPELINE),
     M_MAX_RX_DATA_SEGMENT_HISTORY_OR_ZERO_DISABLE(ltpRxOrTxCfg.rxDataSegmentSessionNumberRecreationPreventerHistorySizeOrZeroToDisable),
+    m_userAssignedUuid(UINT64_MAX), //manually set later
     m_maxRetriesPerSerialNumber(ltpRxOrTxCfg.maxRetriesPerSerialNumber),
     m_workLtpEnginePtr(boost::make_unique<boost::asio::io_service::work>(m_ioServiceLtpEngine)),
     m_deadlineTimerForTimeManagerOfReportSerialNumbers(m_ioServiceLtpEngine),
@@ -79,6 +81,7 @@ LtpEngine::LtpEngine(const LtpEngineConfig& ltpRxOrTxCfg, const uint8_t engineIn
     m_maxSendRateBitsPerSecOrZeroToDisable(ltpRxOrTxCfg.maxSendRateBitsPerSecOrZeroToDisable),
     m_tokenRefreshTimerIsRunning(false),
     m_lastTimeTokensWereRefreshed(boost::posix_time::special_values::neg_infin),
+    m_ltpSessionSenderRecycler(M_MAX_SIMULTANEOUS_SESSIONS + 1),
     m_ltpSessionSenderCommonData(
         ltpRxOrTxCfg.mtuClientServiceData,
         ltpRxOrTxCfg.checkpointEveryNthDataPacketSender,
@@ -89,7 +92,9 @@ LtpEngine::LtpEngine(const LtpEngineConfig& ltpRxOrTxCfg, const uint8_t engineIn
         m_delayedDataSegmentsTimerExpiredCallback,
         m_notifyEngineThatThisSenderNeedsDeletedCallback,
         m_notifyEngineThatThisSenderHasProducibleDataFunction,
-        m_initialTransmissionCompletedCallbackCalledBySender),
+        m_initialTransmissionCompletedCallbackCalledBySender,
+        m_ltpSessionSenderRecycler), //reference
+    m_ltpSessionReceiverRecycler(M_MAX_SIMULTANEOUS_SESSIONS + 1),
     m_ltpSessionReceiverCommonData(
         ltpRxOrTxCfg.clientServiceId,
         0, //maxReceptionClaims will be immediately set by SetMtuReportSegment below
@@ -105,7 +110,9 @@ LtpEngine::LtpEngine(const LtpEngineConfig& ltpRxOrTxCfg, const uint8_t engineIn
         m_notifyEngineThatThisReceiverCompletedDeferredOperationFunction,
         m_redPartReceptionCallback,
         m_greenPartSegmentArrivalCallback,
-        m_memoryInFilesPtr), //reference
+        m_memoryInFilesPtr, //reference
+        m_ltpSessionReceiverRecycler, //reference
+        m_nowTimeRef), //reference
     m_numCheckpointTimerExpiredCallbacksRef(m_ltpSessionSenderCommonData.m_numCheckpointTimerExpiredCallbacks),
     m_numDiscretionaryCheckpointsNotResentRef(m_ltpSessionSenderCommonData.m_numDiscretionaryCheckpointsNotResent),
     m_numDeletedFullyClaimedPendingReportsRef(m_ltpSessionSenderCommonData.m_numDeletedFullyClaimedPendingReports),
@@ -248,11 +255,21 @@ LtpEngine::~LtpEngine() {
         << " numEventsTxRequestDiskWritesTooSlow=" << m_numEventsTransmissionRequestDiskWritesTooSlow;
 
     if (m_ioServiceLtpEngineThreadPtr) {
-        m_housekeepingTimer.cancel(); //keep here instead of Reset() so unit test can call Reset()
+        try {
+            m_housekeepingTimer.cancel(); //keep here instead of Reset() so unit test can call Reset()
+        }
+        catch (boost::system::system_error& e) {
+            LOG_ERROR(subprocess) << "unable to cancel housekeeping timer: " << e.what();
+        }
         boost::asio::post(m_ioServiceLtpEngine, boost::bind(&LtpEngine::Reset, this));
-        m_workLtpEnginePtr.reset(); //erase the work object (destructor is thread safe) so that io_service thread will exit when it runs out of work 
-        m_ioServiceLtpEngineThreadPtr->join();
-        m_ioServiceLtpEngineThreadPtr.reset(); //delete it
+        m_workLtpEnginePtr.reset(); //erase the work object (destructor is thread safe) so that io_service thread will exit when it runs out of work
+        try {
+            m_ioServiceLtpEngineThreadPtr->join();
+            m_ioServiceLtpEngineThreadPtr.reset(); //delete it
+        }
+        catch (boost::thread_resource_error& e) {
+            LOG_ERROR(subprocess) << "unable to stop ioServiceLtpEngineThread: " << e.what();
+        }
     }
 }
 
@@ -263,6 +280,13 @@ void LtpEngine::Reset() {
     //By default, unordered_map containers have a max_load_factor of 1.0.
     m_mapSessionNumberToSessionSender.reserve(M_MAX_SIMULTANEOUS_SESSIONS << 1);
     m_mapSessionIdToSessionReceiver.reserve(M_MAX_SIMULTANEOUS_SESSIONS << 1);
+
+    //set max number of recyclable allocated max elements for the map
+    // - once M_MAX_SIMULTANEOUS_SESSIONS has been reached, operater new ops will cease
+    // - if M_MAX_SIMULTANEOUS_SESSIONS is never exceeded, operator delete will never occur
+    // + 2 => to add slight buffer
+    m_mapSessionNumberToSessionSender.get_allocator().SetMaxListSizeFromGetAllocatorCopy(M_MAX_SIMULTANEOUS_SESSIONS + 2);
+    m_mapSessionIdToSessionReceiver.get_allocator().SetMaxListSizeFromGetAllocatorCopy(M_MAX_SIMULTANEOUS_SESSIONS + 2);
 
     m_ltpRxStateMachine.InitRx();
     m_queueClosedSessionDataToSend = std::queue<std::pair<uint64_t, std::vector<uint8_t> > >();
@@ -686,7 +710,10 @@ bool LtpEngine::GetNextPacketToSend(UdpSendPacketInfo& udpSendPacketInfo) {
         udpSendPacketInfo.sessionOriginatorEngineId = info.sessionId.sessionOriginatorEngineId;
 
         const uint8_t * const infoPtr = (uint8_t*)&info;
-        m_timeManagerOfCancelSegments.StartTimer(NULL, info.sessionId, &m_cancelSegmentTimerExpiredCallback, std::vector<uint8_t>(infoPtr, infoPtr + sizeof(info)));
+        std::vector<uint8_t> userData;
+        m_timeManagerOfCancelSegments.m_userDataRecycler.GetRecycledOrCreateNewUserData(userData);
+        userData.assign(infoPtr, infoPtr + sizeof(info));
+        m_timeManagerOfCancelSegments.StartTimer(NULL, info.sessionId, &m_cancelSegmentTimerExpiredCallback, std::move(userData));
         m_queueCancelSegmentTimerInfo.pop();
         return true;
     }
@@ -851,12 +878,12 @@ void LtpEngine::DoTransmissionRequest(uint64_t destinationClientServiceId, uint6
     uint64_t randomSessionNumberGeneratedBySender;
     uint64_t randomInitialSenderCheckpointSerialNumber; //incremented by 1 for new
     if(M_FORCE_32_BIT_RANDOM_NUMBERS) {
-        randomSessionNumberGeneratedBySender = m_rng.GetRandomSession32(m_randomDevice);
-        randomInitialSenderCheckpointSerialNumber = m_rng.GetRandomSerialNumber32(m_randomDevice);
+        randomSessionNumberGeneratedBySender = m_rng.GetRandomSession32();
+        randomInitialSenderCheckpointSerialNumber = m_rng.GetRandomSerialNumber32();
     }
     else {
-        randomSessionNumberGeneratedBySender = m_rng.GetRandomSession64(m_randomDevice);
-        randomInitialSenderCheckpointSerialNumber = m_rng.GetRandomSerialNumber64(m_randomDevice);
+        randomSessionNumberGeneratedBySender = m_rng.GetRandomSession64();
+        randomInitialSenderCheckpointSerialNumber = m_rng.GetRandomSerialNumber64();
     }
     Ltp::session_id_t senderSessionId(M_THIS_ENGINE_ID, randomSessionNumberGeneratedBySender);
     std::pair<map_session_number_to_session_sender_t::iterator, bool> res = m_mapSessionNumberToSessionSender.emplace(
@@ -1129,6 +1156,8 @@ void LtpEngine::CancelAcknowledgementSegmentReceivedCallback(const Ltp::session_
                     LOG_INFO(subprocess) << "Received CAx for unreachable (due to wrong client service id)";
                 }
             }
+            //this overload of DeleteTimer does not auto-recycle user data and must be manually invoked
+            m_timeManagerOfCancelSegments.m_userDataRecycler.ReturnUserData(std::move(userDataReturned));
         }
     }
 }
@@ -1160,6 +1189,7 @@ void LtpEngine::CancelSegmentTimerExpiredCallback(Ltp::session_id_t cancelSegmen
             LOG_INFO(subprocess) << "Cancel segment unable to send!";
         }
     }
+    //userData shall be recycled automatically after this callback completes
 }
 
 void LtpEngine::NotifyEngineThatThisSenderNeedsDeletedCallback(const Ltp::session_id_t & sessionId, bool wasCancelled, CANCEL_SEGMENT_REASON_CODES reasonCode, std::shared_ptr<LtpTransmissionRequestUserData> & userDataPtr) {
@@ -1373,7 +1403,7 @@ bool LtpEngine::DataSegmentReceivedCallback(uint8_t segmentTypeFlags, const Ltp:
                 return operationIsOngoing;
             }
         }
-        const uint64_t randomNextReportSegmentReportSerialNumber = (M_FORCE_32_BIT_RANDOM_NUMBERS) ? m_rng.GetRandomSerialNumber32(m_randomDevice) : m_rng.GetRandomSerialNumber64(m_randomDevice); //incremented by 1 for new
+        const uint64_t randomNextReportSegmentReportSerialNumber = (M_FORCE_32_BIT_RANDOM_NUMBERS) ? m_rng.GetRandomSerialNumber32() : m_rng.GetRandomSerialNumber64(); //incremented by 1 for new
         std::pair<map_session_id_to_session_receiver_t::iterator, bool> res = m_mapSessionIdToSessionReceiver.emplace(
             std::piecewise_construct,
             std::forward_as_tuple(sessionId),
@@ -1509,8 +1539,8 @@ void LtpEngine::OnTokenRefresh_TimerExpired(const boost::system::error_code& e) 
 }
 
 void LtpEngine::OnHousekeeping_TimerExpired(const boost::system::error_code& e) {
-    const boost::posix_time::ptime nowPtime = boost::posix_time::microsec_clock::universal_time();
-    const boost::posix_time::ptime stagnantRxSessionTimeThreshold = nowPtime - m_stagnantRxSessionTime;
+    m_nowTimeRef = boost::posix_time::microsec_clock::universal_time(); //will be used by LtpSessionReceiver to update m_lastSegmentReceivedTimestamp
+    const boost::posix_time::ptime stagnantRxSessionTimeThreshold = m_nowTimeRef - m_stagnantRxSessionTime;
     if (e != boost::asio::error::operation_aborted) {
         // Timer was not cancelled, take necessary action.
 
@@ -1584,9 +1614,9 @@ void LtpEngine::OnHousekeeping_TimerExpired(const boost::system::error_code& e) 
         // in which the receiver shall respond with a cancel ack in order to determine if the link is active.
         // A link down callback will be called if a cancel ack is not received after (RTT * maxRetriesPerSerialNumber).
         // This parameter should be set to zero for a receiver as there is currently no use case for a receiver to detect link-up.
-        if (M_SENDER_PING_SECONDS_OR_ZERO_TO_DISABLE && (nowPtime >= M_NEXT_PING_START_EXPIRY)) {
+        if (M_SENDER_PING_SECONDS_OR_ZERO_TO_DISABLE && (m_nowTimeRef >= M_NEXT_PING_START_EXPIRY)) {
             if (m_transmissionRequestServedAsPing) { //skip this ping
-                M_NEXT_PING_START_EXPIRY = nowPtime + M_SENDER_PING_TIME;
+                M_NEXT_PING_START_EXPIRY = m_nowTimeRef + M_SENDER_PING_TIME;
                 m_transmissionRequestServedAsPing = false;
             }
             else {
@@ -1605,7 +1635,7 @@ void LtpEngine::OnHousekeeping_TimerExpired(const boost::system::error_code& e) 
         }
         
         //restart housekeeping timer
-        m_housekeepingTimer.expires_at(nowPtime + M_HOUSEKEEPING_INTERVAL);
+        m_housekeepingTimer.expires_at(m_nowTimeRef + M_HOUSEKEEPING_INTERVAL);
         m_housekeepingTimer.async_wait(boost::bind(&LtpEngine::OnHousekeeping_TimerExpired, this, boost::asio::placeholders::error));
     }
 }
