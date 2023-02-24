@@ -34,3 +34,4 @@ module/telem_cmd_interface/root/*
 *.bin
 
 rtp/build/*
+.cache/*
