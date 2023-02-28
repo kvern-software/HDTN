@@ -1,59 +1,63 @@
 #include "BpSendStream.h"
+#include "Logger.h"
+#include "ThreadNamer.h"
 
-BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, uint64_t numCircularBufferVectors, size_t maxOutgoingUdpPacketSize) : BpSourcePattern(),
+static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
+
+BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, uint64_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes) : BpSourcePattern(),
     m_running(true),
     m_incomingRtpStreamPort(incomingRtpStreamPort),
-    m_maxIncomingUdpPacketSizeBytes(maxIncomingUdpPacketSizeBytes)
+    m_maxIncomingUdpPacketSizeBytes(maxIncomingUdpPacketSizeBytes),
+    m_maxOutgoingBundleSizeBytes(maxOutgoingBundleSizeBytes)
 {
-    InitializeUdpSink(&m_ioService, 
-            m_incomingRtpStreamPort, 
-            boost::bind(&BpSendStream::WholeBundleReadyCallback, this, boost::placeholders::_1),
-            numCircularBufferVectors,
-            maxIncomingUdpPacketSizeBytes,
-            boost::bind(&BpSendStream::DeleteCallback, this));
+    /**
+     * DtnRtp objects keep track of the RTP related paremeters such as sequence number and stream identifiers. 
+     * The information in the header can be used to enhance audio/video (AV) playback.
+     * Here, we have a queue for the incoming and outgoing RTP streams. 
+     * BpSendStream has the ability to reduce RTP related overhead by concatenating RTP 
+     * packets. The concatenation of these packets follows the guidelines presented in the CCSDS 
+     * red book "SPECIFICATION FOR RTP AS TRANSPORT FOR AUDIO AND VIDEO OVER DTN CCSDS 766.3-R-1"
+    */
+    m_incomingDtnRtpPtr = std::make_shared<DtnRtp>();
+    m_outgoingDtnRtpPtr = std::make_shared<DtnRtp>();
 
+    m_processingThread = boost::make_unique<boost::thread>(boost::bind(boost::bind(&BpSendStream::ProcessIncomingBundlesThread, this))); 
+    
+    // processing will begin almost immediately, so call this when our callback and rtp session objects are already initialized
+    m_bundleSinkPtr = std::make_shared<UdpBundleSink>(m_ioService, m_incomingRtpStreamPort, 
+        boost::bind(&BpSendStream::WholeBundleReadyCallback, this, boost::placeholders::_1),
+        numCircularBufferVectors, 
+        maxIncomingUdpPacketSizeBytes, 
+        boost::bind(&BpSendStream::DeleteCallback, this));
+    m_ioServiceThreadPtr = boost::make_unique<boost::thread>(boost::bind(&boost::asio::io_service::run, &m_ioService));
+    ThreadNamer::SetIoServiceThreadName(m_ioService, "ioServiceBpUdpSink");
 }
 
 BpSendStream::~BpSendStream()
 {
-}
+    m_running = false;
 
-int BpSendStream::InitializeUdpSink(boost::asio::io_service  * ioService, uint16_t udpPort, 
-        const WholeBundleReadyCallbackUdp_t &wholeBundleReadyCallback,
-        const unsigned int numCircularBufferVectors, const unsigned int maxUdpPacketSizeBytes, 
-        const NotifyReadyToDeleteCallback_t &notifyReadyToDeleteCallback)
-{
-    // processing will begin almost immediately, so call this when our callback and rtp session objects are already initialized
-    m_bundleSink = std::make_shared<UdpBundleSink>(*ioService, udpPort, wholeBundleReadyCallback,
-        numCircularBufferVectors, 
-        maxUdpPacketSizeBytes, notifyReadyToDeleteCallback);
-
-    if (m_bundleSink == nullptr)
-        return -1;
+    m_bundleSinkPtr.reset();
     
-    return 0;
+    if (m_ioServiceThreadPtr) {
+        m_ioServiceThreadPtr->join();
+        m_ioServiceThreadPtr.reset(); //delete it
+    }
+
+    LOG_INFO(subprocess) << "Number of elements left in incoming queue: " << m_incomingPacketQueue.size();
+
+    Stop();
 }
 
-/**
- * DtnRtp objects keep track of the RTP related paremeters such as sequence number and stream identifiers. 
- * The information in the header can be used to enhance audio/video (AV) playback.
- * Here, we have a queue for the incoming and outgoing RTP streams. 
- * BpSendStream has the ability to reduce RTP related overhead by concatenating RTP 
- * packets. The concatenation of these packets follows the guidelines presented in the CCSDS 
- * red book "SPECIFICATION FOR RTP AS TRANSPORT FOR AUDIO AND VIDEO OVER DTN CCSDS 766.3-R-1"
-*/
-void BpSendStream::InitializeDtnRtp(rtp_format_t fmt, std::shared_ptr<std::atomic<std::uint32_t>> ssrc, size_t rtp_mtu)
-{
-    m_incomingDtnRtp = std::make_shared<DtnRtp>(fmt, ssrc, UINT64_MAX);
-    m_outgoingDtnRtp = std::make_shared<DtnRtp>(fmt, ssrc, UINT64_MAX);
-}
+
+
 
 
 void BpSendStream::WholeBundleReadyCallback(padded_vector_uint8_t &wholeBundleVec)
 {
+    // LOG_INFO(subprocess) << "Got bundle size " << wholeBundleVec.size();
     // copy out bundle to local vector for processing
-    // std::move(m_incomingPacketQueue.)
-    m_incomingPacketQueue.emplace_back(5);
+    m_incomingPacketQueue.emplace(std::move(wholeBundleVec));
 }
 
 /**
@@ -70,13 +74,36 @@ void BpSendStream::WholeBundleReadyCallback(padded_vector_uint8_t &wholeBundleVe
 */
 void BpSendStream::ProcessIncomingBundlesThread()
 {
-    while (m_running)
-    {
+    // LOG_INFO(subprocess) << "Entered processing thread";
 
+    while (m_running) {
+        if (m_incomingPacketQueue.size() > 0) {
+            // process incoming data
+            m_incomingDtnRtpPtr->PacketHandler(m_incomingPacketQueue.front());
+            
 
-
+            m_incomingPacketQueue.pop();
+        } else {
+            // boost::this_thread::sleep_for(boost::chrono::microseconds(1));
+        }
     }
 
     
-    Stop(); // stop BpSourcePattern
+}
+
+void BpSendStream::DeleteCallback()
+{
+    
+}
+
+
+uint64_t BpSendStream::GetNextPayloadLength_Step1() 
+{
+    // if (m_outgoin)
+    return UINT64_MAX;
+}
+
+bool BpSendStream::CopyPayload_Step2(uint8_t * destinationBuffer) 
+{
+    return false;
 }

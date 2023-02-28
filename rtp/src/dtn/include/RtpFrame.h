@@ -1,7 +1,7 @@
 #pragma once
 // This file borrows the packet definitions provided by uvgRTP
 
-#include "VideoDriver.h"
+#include "../../video_driver/VideoDriver.h"
 
 
 #ifdef _WIN32

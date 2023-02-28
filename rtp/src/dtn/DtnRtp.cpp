@@ -1,14 +1,16 @@
-#include "Rtp.h"
+#include "DtnRtp.h"
 #include "RtpFrame.h"
 #include "DtnUtil.h"
 #include <random>
-#include "VideoDriver.h"
 #include <cstring>
 #include "Logger.h"
 
 
 #define INVALID_TS UINT32_MAX
+#define INVALID_SEQ (-1)
+
 #define DEFAULT_MAX_PAYLOAD 1440
+
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
@@ -23,31 +25,21 @@ static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess:
     // video frames.  (The sequence numbers of the packets as transmitted
     // will still be monotonic.)
 
-/**
- * All concatenated packets must have the same rtp timestamp PER CCSDS
- * Timestamps should only increase if they do not belong to the same instant in time per RFC
- * A packet only gets concatenated iff rtpMTU < packet_length
- * Therefore, one rtp header per frame, regaurdless of concatenation or not.
-*/
 
 
 
-DtnRtp::DtnRtp(rtp_format_t fmt, std::shared_ptr<std::atomic<std::uint32_t>> ssrc, size_t rtp_mtu):
-    m_fmt(fmt),
-    m_ssrc(ssrc),
-    m_rtpMTU(rtp_mtu - sizeof(rtp_header)), // automatically take off bandwidth for the rtp header
-    m_timestamp(INVALID_TS),
-    m_sequence(GenRandom()),
+DtnRtp::DtnRtp(size_t maximumTransmissionUnit):
     m_clockRate(0),
-    m_sentPackets(0)
+    m_sentPackets(0),
+    m_maximumTransmissionUnit(maximumTransmissionUnit)
 {
-    SetClockRate(fmt);
+    m_prevHeader.timestamp = INVALID_TS;
+    m_prevHeader.seq = INVALID_SEQ;
 }
 
 DtnRtp::~DtnRtp()
 {
 }
-
 
 // some helpful getters
 uint32_t DtnRtp::GetSsrc()  const
@@ -58,7 +50,7 @@ uint32_t DtnRtp::GetSsrc()  const
 
 uint16_t DtnRtp::GetSequence()      const
 {
-    return m_sequence;
+    return m_prevHeader.seq;
 }
 
 
@@ -69,7 +61,7 @@ uint32_t DtnRtp::GetClockRate()     const
 
 size_t DtnRtp::GetPayloadSize()   const
 {
-    return m_rtpMTU - sizeof(rtp_header);
+    // return m_rtpMTU - sizeof(rtp_header);
 }
 
 size_t DtnRtp::GetPktMaxDelay()   const
@@ -85,11 +77,26 @@ void DtnRtp::IncSentPkts()
 }
 void DtnRtp::IncSequence()
 {
-    if (m_sequence != UINT16_MAX) {
-        m_sequence++;
-    } else {
-        m_sequence = 0;
-    }
+    // if (m_sequence != UINT16_MAX) {
+    //     m_sequence++;
+    // } else {
+    //     m_sequence = 0;
+    // }
+}
+
+void DtnRtp::SetSequence(uint16_t host_sequence)
+{
+    m_prevHeader.seq = htons(host_sequence);
+}
+
+void DtnRtp::SetMarkerBit(uint8_t marker_bit)
+{
+    m_prevHeader.marker = marker_bit;
+}
+
+void DtnRtp::SetFormat(rtp_format_t fmt)
+{
+    m_fmt = fmt;
 }
 
 // setters for the rtp packet configuration
@@ -110,60 +117,50 @@ void DtnRtp::SetClockRate(rtp_format_t fmt)
 // void DtnRtp::SetDynamicPayload(uint8_t payload);
 void DtnRtp::SetTimestamp(uint32_t timestamp)
 {
-    m_timestamp = timestamp;
+    m_prevHeader.timestamp = timestamp;
 }
-
-// void DtnRtp::SetPayloadSize(size_t payload_size)
-// {
-//     m_maxPayloadSize = payload_size;
-// }
-
-// void DtnRtp::SetPktMaxDelay(size_t delay)
-// {
-     // not implemented
-// }
 
 void DtnRtp::FillHeader(rtp_frame * frame)
 {
-    if (!frame)
-        return;
+    // if (!frame)
+    //     return;
 
-    /* This is the first RTP message, get wall clock reading (t = 0)
-     * and generate random RTP timestamp for this reading */
-    if (m_timestamp == INVALID_TS) {
-        m_timestamp        = GenRandom();
-        m_wallClockStart = std::chrono::high_resolution_clock::now();
-    }
+    // /* This is the first RTP message, get wall clock reading (t = 0)
+    //  * and generate random RTP timestamp for this reading */
+    // if (m_timestamp == INVALID_TS) {
+    //     m_timestamp        = GenRandom();
+    //     m_wallClockStart = std::chrono::high_resolution_clock::now();
+    // }
 
-    frame->header.version = 2;
-    frame->header.padding = 0;
-    frame->header.ext = 0;
-    frame->header.cc = 0; // not implemented
-    frame->header.marker = 0;
-    frame->header.payload = (m_fmt & 0x7f) | (0 << 7);
-    // frame->header.seq =  htons(m_sequence);
-
-
-    auto now = std::chrono::high_resolution_clock::now();
-    std::chrono::microseconds wall_time_since_start = 
-        std::chrono::duration_cast<std::chrono::microseconds>(now - m_wallClockStart); // wall time total
-
-    uint64_t u_seconds_elapsed = wall_time_since_start.count() * m_clockRate; // time elapsed using our media clock rate
-    uint32_t rtp_timestamp = m_timestamp + uint32_t(u_seconds_elapsed / 1000000); // convert from micro seconds to seconds
+    // frame->header.version = 2;
+    // frame->header.padding = 0;
+    // frame->header.ext = 0;
+    // frame->header.cc = 0; // not implemented
+    // frame->header.marker = 0;
+    // frame->header.payload = (m_fmt & 0x7f) | (0 << 7);
+    // // frame->header.seq =  htons(m_sequence);
 
 
-    frame->header.timestamp = htonl((u_long)rtp_timestamp);
-    frame->header.ssrc = htonl(*m_ssrc.get());
+    // auto now = std::chrono::high_resolution_clock::now();
+    // std::chrono::microseconds wall_time_since_start = 
+    //     std::chrono::duration_cast<std::chrono::microseconds>(now - m_wallClockStart); // wall time total
+
+    // uint64_t u_seconds_elapsed = wall_time_since_start.count() * m_clockRate; // time elapsed using our media clock rate
+    // uint32_t rtp_timestamp = m_timestamp + uint32_t(u_seconds_elapsed / 1000000); // convert from micro seconds to seconds
+
+
+    // frame->header.timestamp = htonl((u_long)rtp_timestamp);
+    // frame->header.ssrc = htonl(*m_ssrc.get());
 }
 
 void DtnRtp::UpdateSequence(rtp_frame * frame)
 {
-    if (!frame)
-        return;
+    // if (!frame)
+    //     return;
 
-    frame->header.seq = htons(m_sequence); //network byte order
+    // frame->header.seq = htons(m_sequence); //network byte order
 
-    IncSequence();
+    // IncSequence();
 }
 
 
@@ -265,6 +262,97 @@ int DtnRtp::PacketHandler(ssize_t size, void *packet, int rce_flags,  std::share
 }
 
 
+rtp_error_codes_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec)
+{
+    static signed int previous_seq = -1;
+    
+    if (wholeBundleVec.size() < 12) {       
+        LOG_ERROR(subprocess) << "Received UDP packet is too small to contain RTP header, discarding...";
+        return RTP_INVALID_HEADER;
+    }
+
+    rtp_frame * frame_ptr = (rtp_frame *) wholeBundleVec.data();
+
+    if (frame_ptr->header.version < 1) {
+        LOG_ERROR(subprocess) << "Unsupported RTP version. Use RTP Version > 1";
+        return RTP_INVALID_VERSION;
+    }
+
+    // This is indicitive that we have received the first message, handle correspondingly
+    if ((previous_seq == INVALID_SEQ)) {
+        SetSequence(ntohs(frame_ptr->header.seq)); // assign initial sequence number
+        m_ssrc = std::make_shared<std::atomic<uint32_t>>(frame_ptr->header.ssrc); // assign ssrc 
+        SetFormat((rtp_format_t ) frame_ptr->header.payload); // assign our payload type
+        SetClockRate((rtp_format_t ) frame_ptr->header.payload); // assign our payloads' clock rate
+        SetTimestamp(ntohl(frame_ptr->header.timestamp)); // assign initial timestamp
+        SetMarkerBit((bool) frame_ptr->header.marker);
+    }
+    
+
+    /**
+     * Use the same SSRC for incoming and going, assume we only have 1 BpSendStream per media source per CCSDS standard.
+     * SSRC is assigned when the first UDP packet arrives to the UdpHandler. If prevHeader.ssrc is unassigned, it gets assigned. 
+     * the incoming SSRC != assigned SSRC, then the packet is discarded. 
+    */
+    if (frame_ptr->header.ssrc != GetSsrc()) { // CCSDS 3.3.7  & 3.3.8
+        LOG_ERROR(subprocess) << "Received mismatched SSRC! Original SSRC: " <<   GetSsrc() << " New SSRC: " << frame_ptr->header.ssrc;
+        LOG_ERROR(subprocess) << "Discarding new mismatched SSRC!";
+        return RTP_MISMATCH_SSRC;
+    }
+
+    if (ntohs(frame_ptr->header.seq) != (ntohs(m_prevHeader.seq) + 1)) {
+        std::cout << "sequence out of order" << ntohs(frame_ptr->header.seq) << std::endl;
+        // TODO : handle sequence out of order
+        // return RTP_OUT_OF_SEQ;
+    }
+
+    memcpy(&m_prevHeader, frame_ptr, sizeof(rtp_header)); // update previous header to current header
+
+    // This is where we start to apply the CCSDS rules 
+    
+    // Do not concatenate if the padding bit is set
+    if (frame_ptr->header.padding) {  // CCSDS 3.3.2
+        // Notify that we need to send any packets we have in queue
+
+        // add this packet to a new queue
+    }
+
+    if (m_prevHeader.marker != frame_ptr->header.marker) { // CCSDS 3.3.5
+        // Notify that we need to send any packets we have in queue
+
+        // add this packet to a new queue
+
+    }
+
+    if (m_prevHeader.ext != frame_ptr->header.ext) { // CCSDS 3.3.6
+        // Notify that we need to send any packets we have in queue
+
+        // add this packet to a new queue
+    }
+
+
+    if (m_prevHeader.timestamp != ntohl(frame_ptr->header.timestamp)) { // CCSDS 3.3.4
+        // Notify that we need to send any packets we have in queue
+
+        // add this packet to a new queue
+
+    }
+
+    
+    /**
+     * If we have gotten to this point... 
+     *  1. We have a good RTP frame
+     *  2. This RTP frame qualifies to be concatentated 
+     * Proceed to concatenate the frame. 
+    */
+
+
+
+
+   
+
+    return RTP_OK;
+}
 
 /**
  * Take a video frame and encapsulate into an RTP packet.

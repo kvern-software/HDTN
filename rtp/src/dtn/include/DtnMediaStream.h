@@ -3,12 +3,12 @@
 #pragma once
 
 
-#include "../include/VideoDriver.h"
+#include "../../video_driver/VideoDriver.h"
 
 #include "DtnEncoder.h"
 #include "DtnMedia.h"
 #include "DtnUtil.h"
-#include "Rtp.h"
+#include "DtnRtp.h"
 #include "DtnFrameQueue.h"
 
 #include <memory>

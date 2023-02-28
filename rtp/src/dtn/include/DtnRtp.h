@@ -11,7 +11,14 @@
 #include <atomic>
 #include <arpa/inet.h>
 
+#include "UdpBundleSink.h"
 
+typedef enum RTP_ERROR_CODES {
+    RTP_OK = 0,
+    RTP_INVALID_HEADER = 1,
+    RTP_MISMATCH_SSRC = 2,
+    RTP_INVALID_VERSION = 3
+} rtp_error_codes_t;
 
 /**
  * This class effectively acts as a tracker for all the
@@ -23,23 +30,19 @@ class DtnRtp
 private:
     rtp_format_t m_fmt;
     std::shared_ptr<std::atomic<uint32_t>> m_ssrc; // as seen in rtp frames
-    size_t m_rtpMTU; // max transmission unit of an rtp packet
-    
-    uint32_t m_timestamp; // as seen in rtp frames
-    uint16_t m_sequence; // as seen in rtp frames
-    
+
+
+    rtp_header m_prevHeader; 
     uint32_t m_clockRate; // sampling clock rate, not hardware
     std::chrono::time_point<std::chrono::high_resolution_clock> m_wallClockStart; // filled upon first call to FillHeader
 
     size_t m_sentPackets = 0; // number of packets sent through this object and put into rtp frames. does not necessarily equal the number of frames sent over the line
-
-    // size_t m_delay; // max delay before all fragments of a fragmented rtp packet are received before it is dropped
+    size_t m_maximumTransmissionUnit;    
 
 
 public:
     // each rtp packet must have a particular format and ssrc. get this information from the MediaStream object on creation
-    DtnRtp(rtp_format_t fmt, std::shared_ptr<std::atomic<std::uint32_t>> ssrc, 
-            size_t rtp_mtu);
+    DtnRtp(size_t maximumTransmissionUnit);
     ~DtnRtp();
 
     // some helpful getters
@@ -55,6 +58,9 @@ public:
     void IncSequence();
 
     // setters for the rtp packet configuration
+    void SetSequence(uint16_t host_sequence);
+    void SetMarkerBit(uint8_t marker_bit);
+    void SetFormat(rtp_format_t fmt);
     void SetClockRate(rtp_format_t fmt); // this is not hardware clock. this is the sampling frequency of the given format. usually 90 kHz
     void SetDynamicPayload(uint8_t payload);
     void SetTimestamp(uint32_t timestamp); 
@@ -63,6 +69,7 @@ public:
 
     void FillHeader(rtp_frame * frame);     // takes pointer to a rtp frame and fills the header with the current information about the rtp session
     int PacketHandler(ssize_t size, void *packet, int rce_flags, std::shared_ptr<DtnFrameQueue> incomingFrameQueue);
+    rtp_error_codes_t PacketHandler(padded_vector_uint8_t &wholeBundleVec);
 
     void UpdateSequence(rtp_frame * frame); // takes pointer to a rtp frame and updates the header with the curent sequence number
 

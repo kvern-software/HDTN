@@ -1,5 +1,5 @@
 #pragma once
-#include "VideoDriver.h"
+#include "../../video_driver/VideoDriver.h"
 #include "DtnFrameQueue.h"
 
 class DtnEncoder
