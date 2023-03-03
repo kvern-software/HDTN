@@ -17,20 +17,38 @@ typedef SSIZE_T ssize_t;
 #endif
 
 #include <stdint.h>
-
+#include <cstring> // memcpy
 #include <random>
 
 uint32_t GenRandom();
 
 
-typedef enum RTP_MODES {
-    RTP_RECV_ONLY = 1,
-    RTP_SEND_ONLY = 2,
-    RTP_SEND_RECV = 3
-} rtp_modes_t;
 
 
+struct buffer {
+        void   *start;
+        size_t  length;
+        
+        void allocate(size_t new_length)
+        {
+            start = malloc(new_length);
+            length = new_length;
+        }
 
+        void unallocate()
+        {
+            free(start);
+        }
+
+        void copy(void * src)
+        {
+            if (!start)
+                return;
+
+            memcpy(start, src, length);
+        }
+
+};
 
 
 
@@ -88,7 +106,8 @@ typedef enum RTP_FORMAT {
     /* Formats with dynamic payload numbers 96 - 127, including default values.
     * Use RCC_DYN_PAYLOAD_TYPE flag to change the number if desired. */
 
-    RTP_FORMAT_G726_40   = 96,  ///< G726, 40 kbit/s
+    RTP_FORMAT_DYNAMICRTP   = 96,  // used by ffmpeg
+
     RTP_FORMAT_G726_32   = 97,  ///< G726, 32 kbit/s
     RTP_FORMAT_G726_24   = 98,  ///< G726, 24 kbit/s
     RTP_FORMAT_G726_16   = 99,  ///< G726, 16 kbit/s

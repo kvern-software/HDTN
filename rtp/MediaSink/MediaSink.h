@@ -9,7 +9,7 @@
 #include "Logger.h"
 
 #include "DtnMediaStream.h"
-#include "RtpFrame.h"
+#include "DtnRtp.h"
  
 struct FinalStatsBpSink {
     FinalStatsBpSink() : m_totalBytesRx(0), m_totalBundlesRx(0), m_receivedCount(0), m_duplicateCount(0),

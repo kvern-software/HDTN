@@ -20,7 +20,7 @@ media_source_process=$!
 sleep 1
 
 # ffmpeg
-ffmpeg  -hide_banner -f v4l2 -framerate 30 -video_size 1920x1080 -i /dev/video0 -c:v libx265 -f rtp "rtp://127.0.0.1:$port&buffer_size=$udpbuffersize"
+ffmpeg  -hide_banner -f v4l2 -framerate 30 -video_size 1920x1080 -i /dev/video0 -c:v libx265 -f rtp "rtp://127.0.0.1:$port&buffer_size=$udpbuffersize&localrtpport=51522"
 
 
 

@@ -10,7 +10,7 @@
 #include "Logger.h"
 
 #include "DtnMediaStream.h"
-#include "RtpFrame.h"
+#include "DtnRtpFrame.h"
 
 class MediaSource : public BpSourcePattern
 {

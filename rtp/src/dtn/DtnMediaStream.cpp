@@ -32,7 +32,7 @@ int DtnMediaStream::Init(rtp_format_t fmt, //int fps_numerator, //int fps_denomi
     m_sourcePort = srcPort;
     m_rtpMTU = rtp_mtu;
 
-    m_DtnRtp = std::make_shared<DtnRtp>(m_fmt, m_ssrc, m_rtpMTU);
+    m_DtnRtp = std::make_shared<DtnRtp>(m_rtpMTU);
 
     m_outgoingFrameQueue = std::make_shared<DtnFrameQueue>(m_frameQueueSize);
     m_IncomingFrameQueue = std::make_shared<DtnFrameQueue>(m_frameQueueSize);

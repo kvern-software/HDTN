@@ -24,30 +24,7 @@
 #include <boost/thread/lockable_adapter.hpp>
 #include <boost/thread/strict_lock.hpp>
 
-struct buffer {
-        void   *start;
-        size_t  length;
-        
-        void allocate(size_t new_length)
-        {
-            start = malloc(new_length);
-            length = new_length;
-        }
-
-        void unallocate()
-        {
-            free(start);
-        }
-
-        void copy(void * src)
-        {
-            if (!start)
-                return;
-
-            memcpy(start, src, length);
-        }
-
-};
+#include "DtnUtil.h"
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 #define DEFAULT_CHUNK_WRITE_SIZE 8192*4

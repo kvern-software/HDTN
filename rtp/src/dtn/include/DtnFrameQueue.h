@@ -2,7 +2,7 @@
 #include <queue>
 
 #include "../../video_driver/VideoDriver.h"
-#include "RtpFrame.h"
+#include "DtnRtpFrame.h"
 
 class DtnFrameQueue
 {

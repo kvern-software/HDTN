@@ -1,5 +1,4 @@
 #include "DtnRtp.h"
-#include "RtpFrame.h"
 #include "DtnUtil.h"
 #include <random>
 #include <cstring>
@@ -59,14 +58,18 @@ uint32_t DtnRtp::GetClockRate()     const
     return m_clockRate;
 }
 
-size_t DtnRtp::GetPayloadSize()   const
-{
-    // return m_rtpMTU - sizeof(rtp_header);
-}
+// size_t DtnRtp::GetPayloadSize()   const
+// {
+//     // return m_rtpMTU - sizeof(rtp_header);
+// }
 
 size_t DtnRtp::GetPktMaxDelay()   const
 {
     return 0; // not implemented
+}
+
+rtp_header * DtnRtp::GetHeader() {
+    return &m_prevHeader;
 }
 
 
@@ -105,6 +108,7 @@ void DtnRtp::SetClockRate(rtp_format_t fmt)
     switch (fmt) {
         case RTP_FORMAT_H264:
         case RTP_FORMAT_H265:
+        case RTP_FORMAT_DYNAMICRTP:
             m_clockRate = 90000;
             break;
         default:
@@ -169,174 +173,193 @@ void DtnRtp::UpdateSequence(rtp_frame * frame)
 */
 int DtnRtp::PacketHandler(ssize_t size, void *packet, int rce_flags,  std::shared_ptr<DtnFrameQueue> incomingFrameQueue)
 {
-    (void)rce_flags;
-    /* not an RTP frame */
-    if (size < 12) {       
-        LOG_ERROR(subprocess) << "Received RTP packet is too small to contain header";
-        return -1;
-    }
+//     (void)rce_flags;
+//     /* not an RTP frame */
+//     if (size < 12) {       
+//         LOG_ERROR(subprocess) << "Received RTP packet is too small to contain header";
+//         return -1;
+//     }
     
-    rtp_frame tmp_frame; // allocate new frame to be filled
-    rtp_frame * frame_ptr = (rtp_frame *) packet;
-    // uint8_t *ptr = (uint8_t *)packet;
+//     rtp_frame tmp_frame; // allocate new frame to be filled
+//     rtp_frame * incomingFramePtr = (rtp_frame *) packet;
+//     // uint8_t *ptr = (uint8_t *)packet;
 
-    /* invalid version */
-    if (frame_ptr->header.version != 2) {
-        LOG_ERROR(subprocess) << "Received RTP packet with invalid version";
-        return -1;
-    }
+//     /* invalid version */
+//     if (incomingFramePtr->header.version != 2) {
+//         LOG_ERROR(subprocess) << "Received RTP packet with invalid version";
+//         return -1;
+//     }
 
-    tmp_frame.header.version   = (unsigned int) frame_ptr->header.version;
-    tmp_frame.header.padding   = (unsigned int) frame_ptr->header.padding;
-    tmp_frame.header.ext       = (unsigned int) frame_ptr->header.ext; 
-    tmp_frame.header.cc        = (unsigned int) frame_ptr->header.cc; 
-    tmp_frame.header.marker    = (unsigned int) frame_ptr->header.marker;
-    tmp_frame.header.payload   = (unsigned int) frame_ptr->header.payload; 
-    tmp_frame.header.seq       =  (frame_ptr->header.seq);     // still in network byte order here
-    tmp_frame.header.timestamp =  (frame_ptr->header.timestamp); // still in network byte order here
-    tmp_frame.header.ssrc      =  (frame_ptr->header.ssrc);
+//     tmp_frame.header.version   = (unsigned int) incomingFramePtr->header.version;
+//     tmp_frame.header.padding   = (unsigned int) incomingFramePtr->header.padding;
+//     tmp_frame.header.ext       = (unsigned int) incomingFramePtr->header.ext; 
+//     tmp_frame.header.cc        = (unsigned int) incomingFramePtr->header.cc; 
+//     tmp_frame.header.marker    = (unsigned int) incomingFramePtr->header.marker;
+//     tmp_frame.header.payload   = (unsigned int) incomingFramePtr->header.payload; 
+//     tmp_frame.header.seq       =  (incomingFramePtr->header.seq);     // still in network byte order here
+//     tmp_frame.header.timestamp =  (incomingFramePtr->header.timestamp); // still in network byte order here
+//     tmp_frame.header.ssrc      =  (incomingFramePtr->header.ssrc);
 
-    tmp_frame.payload.length = (size_t)size - sizeof(rtp_header);
-    tmp_frame.print_header();
+//     tmp_frame.payload.length = (size_t)size - sizeof(rtp_header);
+//     tmp_frame.print_header();
 
-    // /* Skip the generics RTP header
-    //  * There may be 0..N CSRC entries after the header, so check those */
-    // ptr += sizeof(rtp_header);
+//     // /* Skip the generics RTP header
+//     //  * There may be 0..N CSRC entries after the header, so check those */
+//     // ptr += sizeof(rtp_header);
 
-    if (tmp_frame.header.cc > 0) {
-       // LOG_INFO(subprocess) << "frame contains csrc entries";
+//     if (tmp_frame.header.cc > 0) {
+//        // LOG_INFO(subprocess) << "frame contains csrc entries";
 
- //       if ((ssize_t) (tmp_frame.payload.length- tmp_frame.header.cc * sizeof(uint32_t) ) < 0) {
-   //         LOG_ERROR(subprocess) << "Invalid frame length, " << tmp_frame.header.cc << "CSRC entries, total length " << tmp_frame.payload.length;
-     //       return -1;
-       // }
+//  //       if ((ssize_t) (tmp_frame.payload.length- tmp_frame.header.cc * sizeof(uint32_t) ) < 0) {
+//    //         LOG_ERROR(subprocess) << "Invalid frame length, " << tmp_frame.header.cc << "CSRC entries, total length " << tmp_frame.payload.length;
+//      //       return -1;
+//        // }
 
-       // LOG_INFO(subprocess) << "Allocating"  << tmp_frame.header.cc << "CSRC entries";
+//        // LOG_INFO(subprocess) << "Allocating"  << tmp_frame.header.cc << "CSRC entries";
 
-        // (*out)->csrc         = new uint32_t[(*out)->header.cc];
-        // (*out)->payload_len -= (*out)->header.cc * sizeof(uint32_t);
+//         // (*out)->csrc         = new uint32_t[(*out)->header.cc];
+//         // (*out)->payload_len -= (*out)->header.cc * sizeof(uint32_t);
 
-        // for (size_t i = 0; i < (*out)->header.cc; ++i) {
-        //     (*out)->csrc[i]  = *(uint32_t *)ptr;
-        //     ptr             += sizeof(uint32_t);
-        // }
-    }
+//         // for (size_t i = 0; i < (*out)->header.cc; ++i) {
+//         //     (*out)->csrc[i]  = *(uint32_t *)ptr;
+//         //     ptr             += sizeof(uint32_t);
+//         // }
+//     }
 
-    if (tmp_frame.header.ext) {
-        LOG_INFO(subprocess) << "Frame contains extension information";
-        // (*out)->ext = new uvgrtp::frame::ext_header;
-        // (*out)->ext->type    = ntohs(*(uint16_t *)&ptr[0]);
-        // (*out)->ext->len     = ntohs(*(uint16_t *)&ptr[2]) * sizeof(uint32_t);
-        // (*out)->ext->data    = (uint8_t *)memdup(ptr + 2 * sizeof(uint16_t), (*out)->ext->len);
-        // (*out)->payload_len -= 2 * sizeof(uint16_t) + (*out)->ext->len;
-        // ptr                 += 2 * sizeof(uint16_t) + (*out)->ext->len;
-    }
+//     if (tmp_frame.header.ext) {
+//         LOG_INFO(subprocess) << "Frame contains extension information";
+//         // (*out)->ext = new uvgrtp::frame::ext_header;
+//         // (*out)->ext->type    = ntohs(*(uint16_t *)&ptr[0]);
+//         // (*out)->ext->len     = ntohs(*(uint16_t *)&ptr[2]) * sizeof(uint32_t);
+//         // (*out)->ext->data    = (uint8_t *)memdup(ptr + 2 * sizeof(uint16_t), (*out)->ext->len);
+//         // (*out)->payload_len -= 2 * sizeof(uint16_t) + (*out)->ext->len;
+//         // ptr                 += 2 * sizeof(uint16_t) + (*out)->ext->len;
+//     }
 
-    /* If padding is set to 1, the last byte of the payload indicates
-     * how many padding bytes was used. Make sure the padding length is
-     * valid and subtract the amount of padding bytes from payload length */
-    if (tmp_frame.header.padding) {
-        LOG_INFO(subprocess) << "Frame contains padding";
-        // uint8_t padding_len = (*out)->payload[(*out)->payload_len - 1];
+//     /* If padding is set to 1, the last byte of the payload indicates
+//      * how many padding bytes was used. Make sure the padding length is
+//      * valid and subtract the amount of padding bytes from payload length */
+//     if (tmp_frame.header.padding) {
+//         LOG_INFO(subprocess) << "Frame contains padding";
+//         // uint8_t padding_len = (*out)->payload[(*out)->payload_len - 1];
 
-        // if (!padding_len || (*out)->payload_len <= padding_len) {
-        //     uvgrtp::frame::dealloc_frame(*out);
-        //     return -1;
-        // }
+//         // if (!padding_len || (*out)->payload_len <= padding_len) {
+//         //     uvgrtp::frame::dealloc_frame(*out);
+//         //     return -1;
+//         // }
 
-        // (*out)->payload_len -= padding_len;
-        // (*out)->padding_len  = padding_len;
-    }
+//         // (*out)->payload_len -= padding_len;
+//         // (*out)->padding_len  = padding_len;
+//     }
 
-    // copy out payload to tmp frame
-    // tmp_frame.payload.start = ptr;
-    tmp_frame.payload.allocate(tmp_frame.payload.length);
-    tmp_frame.payload.copy(packet + sizeof(rtp_header)); // todo correct this 
+//     // copy out payload to tmp frame
+//     // tmp_frame.payload.start = ptr;
+//     tmp_frame.payload.allocate(tmp_frame.payload.length);
+//     tmp_frame.payload.copy(packet + sizeof(rtp_header)); // todo correct this 
 
-    incomingFrameQueue->PushFrame(tmp_frame);
-    // tmp_frame.payload.start    =  //(uint8_t *) //memdup(ptr, (*out)->payload_len);
-    // tmp_frame.dgram      = (uint8_t *)packet;
+//     incomingFrameQueue->PushFrame(tmp_frame);
+//     // tmp_frame.payload.start    =  //(uint8_t *) //memdup(ptr, (*out)->payload_len);
+//     // tmp_frame.dgram      = (uint8_t *)packet;
     // tmp_frame.dgram_size = size;
 
     return 0;
 }
 
 
-rtp_error_codes_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec)
-{
-    static signed int previous_seq = -1;
-    
+rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec, const rtp_header * currentRtpFrameHeader)
+{    
     if (wholeBundleVec.size() < 12) {       
         LOG_ERROR(subprocess) << "Received UDP packet is too small to contain RTP header, discarding...";
         return RTP_INVALID_HEADER;
     }
+    // LOG_DEBUG(subprocess) << " In handler";
 
-    rtp_frame * frame_ptr = (rtp_frame *) wholeBundleVec.data();
+    rtp_frame * incomingFramePtr = (rtp_frame *) wholeBundleVec.data();
+    rtp_header * incomingHeaderPtr = &incomingFramePtr->header;
 
-    if (frame_ptr->header.version < 1) {
-        LOG_ERROR(subprocess) << "Unsupported RTP version. Use RTP Version > 1";
+    rtp_header_union_t currentHeaderFlags;
+    memcpy(&currentHeaderFlags.flags, incomingHeaderPtr, sizeof(uint16_t));
+    currentHeaderFlags.flags = htons(currentHeaderFlags.flags);
+
+    // incomingFramePtr->print_header();
+
+    if (!(RTP_VERSION_TWO_FLAG & currentHeaderFlags.flags)) {
+        LOG_ERROR(subprocess) << "Unsupported RTP version. Use RTP Version 2";
         return RTP_INVALID_VERSION;
     }
 
-    // This is indicitive that we have received the first message, handle correspondingly
-    if ((previous_seq == INVALID_SEQ)) {
-        SetSequence(ntohs(frame_ptr->header.seq)); // assign initial sequence number
-        m_ssrc = std::make_shared<std::atomic<uint32_t>>(frame_ptr->header.ssrc); // assign ssrc 
-        SetFormat((rtp_format_t ) frame_ptr->header.payload); // assign our payload type
-        SetClockRate((rtp_format_t ) frame_ptr->header.payload); // assign our payloads' clock rate
-        SetTimestamp(ntohl(frame_ptr->header.timestamp)); // assign initial timestamp
-        SetMarkerBit((bool) frame_ptr->header.marker);
+    // This is indicative that we have received the first message, handle correspondingly
+    if (!m_ssrc) {
+        rtp_format_t fmt = (rtp_format_t) (RTP_PAYLOAD_MASK & currentHeaderFlags.flags); // use mask to find out our payload type
+
+        LOG_INFO(subprocess) << "No active session. Creating active session with SSRC = " << incomingHeaderPtr->ssrc << "\n" \
+                << "RTP Format: " << fmt << "\n" \
+                << "Initial TS: " << ntohl(incomingHeaderPtr->timestamp) << "\n" \
+                << "Initial Seq: " << ntohs(incomingHeaderPtr->seq);
+
+        uint32_t ssrc = incomingHeaderPtr->ssrc; // extracting from packed struct
+        m_ssrc = std::make_shared<std::atomic<uint32_t>>(ssrc); // assign ssrc 
+        
+        
+        UpdateHeader(incomingHeaderPtr); // set the previous header to match current header for the first packet
+        SetClockRate(fmt); // assign our payload's clock rate 
+
+        return RTP_FIRST_FRAME; // no need to check for all the things below, just start new frame
     }
     
-
     /**
-     * Use the same SSRC for incoming and going, assume we only have 1 BpSendStream per media source per CCSDS standard.
+     * Use the same SSRC for incoming and outgoing, assume we only have 1 BpSendStream per media source per CCSDS standard.
      * SSRC is assigned when the first UDP packet arrives to the UdpHandler. If prevHeader.ssrc is unassigned, it gets assigned. 
      * the incoming SSRC != assigned SSRC, then the packet is discarded. 
     */
-    if (frame_ptr->header.ssrc != GetSsrc()) { // CCSDS 3.3.7  & 3.3.8
-        LOG_ERROR(subprocess) << "Received mismatched SSRC! Original SSRC: " <<   GetSsrc() << " New SSRC: " << frame_ptr->header.ssrc;
+    if (incomingHeaderPtr->ssrc != GetSsrc()) { // CCSDS 3.3.7  & 3.3.8
+        LOG_ERROR(subprocess) << "Received mismatched SSRC! Original SSRC: " <<   GetSsrc() << " New SSRC: " << incomingHeaderPtr->ssrc;
         LOG_ERROR(subprocess) << "Discarding new mismatched SSRC!";
         return RTP_MISMATCH_SSRC;
     }
 
-    if (ntohs(frame_ptr->header.seq) != (ntohs(m_prevHeader.seq) + 1)) {
-        std::cout << "sequence out of order" << ntohs(frame_ptr->header.seq) << std::endl;
-        // TODO : handle sequence out of order
-        // return RTP_OUT_OF_SEQ;
+    if (ntohs(incomingHeaderPtr->seq) !=  (ntohs(m_prevHeader.seq)+1)) {
+        LOG_ERROR(subprocess) << "RTP sequence out of order - Incoming: " << ntohs(incomingHeaderPtr->seq) << " Previous: " << ntohs(m_prevHeader.seq);
+        UpdateHeader(incomingHeaderPtr); // update prevHeader
+        return RTP_OUT_OF_SEQ;         // TODO : handle sequence out of order
     }
 
-    memcpy(&m_prevHeader, frame_ptr, sizeof(rtp_header)); // update previous header to current header
+    // boost::this_thread::sleep_for(boost::chrono::milliseconds(250));
 
     // This is where we start to apply the CCSDS rules 
-    
-    // Do not concatenate if the padding bit is set
-    if (frame_ptr->header.padding) {  // CCSDS 3.3.2
-        // Notify that we need to send any packets we have in queue
+    rtp_header_union_t prevHeaderFlags;
+    memcpy(&prevHeaderFlags.flags, &m_prevHeader, sizeof(uint16_t));
+    prevHeaderFlags.flags = htons(prevHeaderFlags.flags);
 
-        // add this packet to a new queue
+    if (ntohl(m_prevHeader.timestamp) != ntohl(incomingHeaderPtr->timestamp)) { // CCSDS 3.3.4 // do not concatenate if the timestamp has changed
+        UpdateHeader(incomingHeaderPtr);
+        // LOG_INFO(subprocess) << "timestamp changed";
+        return RTP_PUSH_PREVIOUS_FRAME;
     }
 
-    if (m_prevHeader.marker != frame_ptr->header.marker) { // CCSDS 3.3.5
-        // Notify that we need to send any packets we have in queue
+    if (RTP_PADDING_FLAG & currentHeaderFlags.flags) {  // CCSDS 3.3.2     // Do not concatenate if the padding bit is set
+        UpdateHeader(incomingHeaderPtr);
+        LOG_DEBUG(subprocess) << "Padding bit set";
+        return RTP_PUSH_PREVIOUS_FRAME;
+    }
 
-        // add this packet to a new queue
+    // // std::cout << (prevHeaderFlags.flags & RTP_MARKER_FLAG) << "  " << (currentHeaderFlags.flags & RTP_MARKER_FLAG) << std::endl;
+    // std::cout << currentRtpFrameHeader->marker << std::endl;
+    if (currentRtpFrameHeader->marker != incomingHeaderPtr->marker) { // CCSDS 3.3.5 // Do not concatenate if the incoming marker bit has changed from the current packet's marker bit
+        // incomingFramePtr->print_header();
+        UpdateHeader(incomingHeaderPtr);
+        LOG_INFO(subprocess) << "marker changed";
+        return RTP_PUSH_PREVIOUS_FRAME;
 
     }
 
-    if (m_prevHeader.ext != frame_ptr->header.ext) { // CCSDS 3.3.6
-        // Notify that we need to send any packets we have in queue
-
-        // add this packet to a new queue
+    if (currentRtpFrameHeader->ext != incomingHeaderPtr->ext) { // CCSDS 3.3.6 // Do not concatentate if the extension bit has changed
+        LOG_INFO(subprocess) << "ext changed";
+        UpdateHeader(incomingHeaderPtr);
+        return RTP_PUSH_PREVIOUS_FRAME;
     }
 
 
-    if (m_prevHeader.timestamp != ntohl(frame_ptr->header.timestamp)) { // CCSDS 3.3.4
-        // Notify that we need to send any packets we have in queue
-
-        // add this packet to a new queue
-
-    }
 
     
     /**
@@ -345,13 +368,16 @@ rtp_error_codes_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec)
      *  2. This RTP frame qualifies to be concatentated 
      * Proceed to concatenate the frame. 
     */
+    // LOG_INFO(subprocess) << "Packet valid for concatentation";
+   UpdateHeader(incomingHeaderPtr);
 
+    return RTP_CONCATENATE;
+}
 
-
-
-   
-
-    return RTP_OK;
+void DtnRtp::UpdateHeader(const rtp_header * nextHeaderPointer)
+{
+    // LOG_DEBUG(subprocess) << "updated header";
+    memcpy(&m_prevHeader, nextHeaderPointer, sizeof(rtp_header)); // update previous header to current header
 }
 
 /**

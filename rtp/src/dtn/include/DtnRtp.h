@@ -1,8 +1,8 @@
 #pragma once
 
-#include "DtnUtil.h"
-#include "RtpFrame.h"
 #include "DtnFrameQueue.h"
+#include "DtnUtil.h"
+
 
 #include <memory>
 #include <vector>
@@ -13,12 +13,8 @@
 
 #include "UdpBundleSink.h"
 
-typedef enum RTP_ERROR_CODES {
-    RTP_OK = 0,
-    RTP_INVALID_HEADER = 1,
-    RTP_MISMATCH_SSRC = 2,
-    RTP_INVALID_VERSION = 3
-} rtp_error_codes_t;
+
+
 
 /**
  * This class effectively acts as a tracker for all the
@@ -51,6 +47,7 @@ public:
     uint32_t     GetClockRate()    const;
     size_t       GetPayloadSize()  const;
     size_t       GetPktMaxDelay() const;
+    rtp_header * GetHeader();
     // rtp_format_t GetPayload()       const;
 
     // handles rtp paremeters 
@@ -69,10 +66,10 @@ public:
 
     void FillHeader(rtp_frame * frame);     // takes pointer to a rtp frame and fills the header with the current information about the rtp session
     int PacketHandler(ssize_t size, void *packet, int rce_flags, std::shared_ptr<DtnFrameQueue> incomingFrameQueue);
-    rtp_error_codes_t PacketHandler(padded_vector_uint8_t &wholeBundleVec);
+    rtp_packet_status_t PacketHandler(padded_vector_uint8_t &wholeBundleVec, const rtp_header * currentRtpFrameHeader);
 
     void UpdateSequence(rtp_frame * frame); // takes pointer to a rtp frame and updates the header with the curent sequence number
-
+    void UpdateHeader(const rtp_header * nextHeaderPointer);
 
     
 };

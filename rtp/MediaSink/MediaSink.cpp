@@ -1,7 +1,6 @@
 #include "MediaSink.h"
 #include "Logger.h"
 
-#include "RtpFrame.h"
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 

@@ -1,8 +1,9 @@
 #pragma once
 // This file borrows the packet definitions provided by uvgRTP
 
-#include "../../video_driver/VideoDriver.h"
+// #include "../../video_driver/VideoDriver.h"
 
+// #include "DtnRtp.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -14,6 +15,7 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
 
 /* https://stackoverflow.com/questions/1537964/visual-c-equivalent-of-gccs-attribute-packed  */
 #if defined(__MINGW32__) || defined(__MINGW64__) || defined(__GNUC__) || defined(__linux__)
@@ -22,7 +24,32 @@
 #define PACK(__Declaration__) __pragma(pack(push, 1)) __Declaration__ __pragma(pack(pop))
 #endif
 
+#include "DtnUtil.h"
 
+
+typedef enum RTP_ERROR_CODES {
+    RTP_CONCATENATE = 0,
+    RTP_INVALID_HEADER = 1,
+    RTP_MISMATCH_SSRC = 2,
+    RTP_INVALID_VERSION = 3,
+    RTP_PUSH_PREVIOUS_FRAME = 4, // push previous rtp frame and add current packet to next frame
+    RTP_OUT_OF_SEQ = 5,
+    RTP_FIRST_FRAME = 6
+} rtp_packet_status_t;
+
+
+typedef enum RTP_MODES {
+    RTP_RECV_ONLY = 1,
+    RTP_SEND_ONLY = 2,
+    RTP_SEND_RECV = 3
+} rtp_modes_t;
+
+#define RTP_VERSION_TWO_FLAG (3 << 15) 
+#define RTP_PADDING_FLAG (1 << 13) 
+#define RTP_EXT_FLAG (1 << 12) 
+#define RTP_CSRC_FMASK (15 << 11) // 1111 << 11 
+#define RTP_MARKER_FLAG (1 << 7) 
+#define RTP_PAYLOAD_MASK (127 << 0) // 1111111 << 0 
 
 enum RTCP_FRAME_TYPE {
     RTCP_FT_SR   = 200, /* Sender report */
@@ -38,11 +65,18 @@ PACK(struct rtp_header {
     uint8_t ext:1;
     uint8_t cc:4;
     uint8_t marker:1;
-    uint8_t payload:7;
+    uint8_t payload:7; 
     uint16_t seq = 0;
     uint32_t timestamp = 0;
     uint32_t ssrc = 0;
 });
+
+typedef union rtp_header_union {
+    uint16_t flags;
+
+    struct rtp_header;
+    
+} rtp_header_union_t; 
 
 PACK(struct ext_header {
     uint16_t type = 0;
@@ -57,13 +91,17 @@ struct rtp_frame {
 
     void print_header()
     {
+        rtp_header_union_t flags;
+        memcpy(&flags.flags, &header, sizeof(uint16_t));
+        flags.flags = htons(flags.flags);
+
         std::cout 
-        << "\n version: "   <<   (unsigned int) (header.version )
-        << "\n padding: "   <<   (unsigned int) (header.padding )
-        << "\n ext: "       <<   (unsigned int) (header.ext )
-        << "\n cc: "        <<   (unsigned int) (header.cc )
-        << "\n marker: "    <<   (unsigned int) (header.marker )
-        << "\n payload: "   <<   (unsigned int) (header.payload)
+        << "\n version: "   <<   ((RTP_VERSION_TWO_FLAG & flags.flags) >> 14)
+        << "\n padding: "   <<   (RTP_PADDING_FLAG & flags.flags)
+        << "\n ext: "       <<   (RTP_EXT_FLAG & flags.flags)
+        << "\n cc: "        <<   (RTP_CSRC_FMASK & flags.flags)
+        << "\n marker: "    <<   (RTP_MARKER_FLAG &flags.flags)
+        << "\n payload: "   <<   (rtp_format_t) (RTP_PAYLOAD_MASK & flags.flags)
         << "\n seq: "       <<   (unsigned int) (ntohs(header.seq)) << " (network " << header.seq << ")"
         << "\n timestamp: " <<   (unsigned int) (ntohl(header.timestamp)) << " (network " << header.timestamp << ")"
         << "\n ssrc: "      <<   (unsigned int) (header.ssrc )
@@ -71,6 +109,7 @@ struct rtp_frame {
     }
 
 };
+
 
 /** \brief Header of for all RTCP packets defined in <a href="https://www.rfc-editor.org/rfc/rfc3550#section-6" target="_blank">RFC 3550 section 6</a> */
 struct rtcp_header {
@@ -159,11 +198,11 @@ struct rtcp_app_packet {
     size_t payload_len = 0;
 };
 
-PACK(struct zrtp_frame {
-    uint8_t version:4;
-    uint16_t unused:12;
-    uint16_t seq = 0;
-    uint32_t magic = 0;
-    uint32_t ssrc = 0;
-    uint8_t payload[1];
-});
+// PACK(struct zrtp_frame {
+//     uint8_t version:4;
+//     uint16_t unused:12;
+//     uint16_t seq = 0;
+//     uint32_t magic = 0;
+//     uint32_t ssrc = 0;
+//     uint8_t payload[1];
+// });
