@@ -20,6 +20,8 @@ typedef SSIZE_T ssize_t;
 #include <cstring> // memcpy
 #include <random>
 
+#include <boost/circular_buffer.hpp>
+
 uint32_t GenRandom();
 
 
@@ -127,3 +129,50 @@ typedef enum RTP_FORMAT {
 
 
 
+
+#include <boost/thread/condition.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/circular_buffer.hpp>
+
+// Thread safe circular buffer 
+template <typename T> class ThreadSafeCircularBuffer //: private boost::noncopyable
+{
+public:
+    typedef boost::mutex::scoped_lock lock;
+
+    ThreadSafeCircularBuffer() {}
+    ThreadSafeCircularBuffer(int n) {cb.set_capacity(n);}
+    
+    void PushBack(const T& element) {
+        lock lk(m_monitor);
+        cb.push_back(std::move(element));
+        m_cbNotEmpty.notify_one();
+    }
+
+    // pop front element
+    T Pop() {
+        lock lk(m_monitor);
+        while (cb.empty())
+            m_cbNotEmpty.wait(lk);
+        T element = cb.front();
+        cb.pop_front();
+        return element;
+    }
+    void Clear() {
+        lock lk(m_monitor);
+        cb.clear();
+    }
+    int Size() {
+        lock lk(m_monitor);
+        return cb.size();
+    }
+    void SetCapacity(int capacity) {
+        lock lk(m_monitor);
+        cb.set_capacity(capacity);
+    }
+private:
+    boost::condition m_cbNotEmpty;
+    boost::mutex m_monitor;
+    boost::circular_buffer<T> cb;
+};

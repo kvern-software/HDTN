@@ -19,7 +19,7 @@ public:
 
     void WholeBundleReadyCallback(padded_vector_uint8_t & wholeBundleVec); // incoming udp packets come in here
     void DeleteCallback(); // gets called on socket shutdow, optional to do anything with it
-    void Concatenate(padded_vector_uint8_t &incomingRtpFrame, std::vector<uint8_t> &currentFrame, size_t &offset);
+    rtp_packet_status_t Concatenate(padded_vector_uint8_t &incomingRtpFrame, std::vector<uint8_t> &currentFrame, size_t &offset);
     void CreateFrame(std::vector<uint8_t> & currentFrame, size_t &offset);
     void PushFrame(std::vector<uint8_t> & currentFrame, size_t &offset);
 
@@ -29,8 +29,11 @@ public:
     std::shared_ptr<DtnRtp> m_outgoingDtnRtpPtr;
     std::shared_ptr<DtnRtp> m_incomingDtnRtpPtr;
 
-    std::queue<padded_vector_uint8_t> m_incomingPacketQueue; // consider making this a pre allocated vector
-    std::queue<std::vector<uint8_t>> m_OutgoingPacketQueue;
+    boost::circular_buffer<padded_vector_uint8_t> m_incomingCircularPacketQueue; // consider making this a pre allocated vector
+    // std::queue<std::vector<uint8_t>> m_OutgoingPacketQueue;
+
+    boost::circular_buffer<std::vector<uint8_t>> m_outgoingCircularFrameQueue;
+
 
 protected:
     virtual bool TryWaitForDataAvailable(const boost::posix_time::time_duration& timeout) override;
@@ -38,7 +41,10 @@ protected:
     virtual bool CopyPayload_Step2(uint8_t * destinationBuffer) override;
 
 private:
-    bool GetNextQueueTimeout(const boost::posix_time::time_duration& timeout);
+    bool TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration& timeout);
+    bool GetNextIncomingPacketTimeout(const boost::posix_time::time_duration& timeout);
+    
+    bool GetNextOutgoingPacketTimeout(const boost::posix_time::time_duration& timeout);
 
     volatile bool m_running;
 
@@ -48,9 +54,12 @@ private:
     uint64_t m_bpGenSequenceNumber;
 
 
-    boost::mutex m_queueMutex;     
-    boost::condition_variable m_queueCv;
-    
+    boost::mutex m_queueMutex;   
+    boost::mutex m_incomingQueueMutex;     
+  
+    boost::condition_variable m_outgoingQueueCv;
+    boost::condition_variable m_incomingQueueCv;
+
     std::unique_ptr<boost::thread> m_processingThread;
     std::unique_ptr<boost::thread> m_ioServiceThreadPtr;
 };

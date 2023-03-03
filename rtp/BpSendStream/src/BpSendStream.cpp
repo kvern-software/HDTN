@@ -40,6 +40,8 @@ BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomi
     // for (unsigned int i = 0; i < numFifoBuffers; ++i) {
     //     m_OutgoingPacketQueue[i].resize(maxOutgoingBundleSizeBytes);
     // }
+    m_incomingCircularPacketQueue.set_capacity(100);
+    m_outgoingCircularFrameQueue.set_capacity(100);
     
 }
 
@@ -54,20 +56,17 @@ BpSendStream::~BpSendStream()
         m_ioServiceThreadPtr.reset(); //delete it
     }
 
-    LOG_INFO(subprocess) << "Number of elements left in incoming queue: " << m_incomingPacketQueue.size();
+    LOG_INFO(subprocess) << "Number of elements left in incoming queue: " << m_incomingCircularPacketQueue.size();
+    LOG_INFO(subprocess) << "Number of elements left in outgoing queue: " << m_outgoingCircularFrameQueue.size();
 
     Stop();
 }
 
-
-
-
-
 void BpSendStream::WholeBundleReadyCallback(padded_vector_uint8_t &wholeBundleVec)
 {
-    // LOG_INFO(subprocess) << "Got bundle size " << wholeBundleVec.size();
     // copy out bundle to local queue for processing
-    m_incomingPacketQueue.emplace(std::move(wholeBundleVec));
+    m_incomingCircularPacketQueue.push_back(std::move(wholeBundleVec));
+    LOG_DEBUG(subprocess) << "callback " << m_incomingCircularPacketQueue.size();
 }
 
 
@@ -86,112 +85,92 @@ void BpSendStream::WholeBundleReadyCallback(padded_vector_uint8_t &wholeBundleVe
 void BpSendStream::ProcessIncomingBundlesThread()
 {
     // LOG_INFO(subprocess) << "Entered processing thread";
+    static const boost::posix_time::time_duration timeout(boost::posix_time::milliseconds(25));
     static std::vector<uint8_t> currentFrame;
     currentFrame.resize(m_maxOutgoingBundleSizeBytes); // todo account for bundle overhead
 
-    size_t offset;
-
-    m_OutgoingPacketQueue.emplace(std::vector<uint8_t>());
+    size_t offset = 0;
     
     while (m_running) {
-        if (m_incomingPacketQueue.size() > 0) {          
-            rtp_packet_status_t packetStatus = m_incomingDtnRtpPtr->PacketHandler(m_incomingPacketQueue.front(), (rtp_header *) currentFrame.data());
-            // process incoming data in our packet handler
+        bool inWaitForNewBundlesState = !TryWaitForIncomingDataAvailable(timeout);
+
+        if (!inWaitForNewBundlesState) {
+            LOG_DEBUG(subprocess) << "Data available";
+            rtp_packet_status_t packetStatus = m_incomingDtnRtpPtr->PacketHandler(m_incomingCircularPacketQueue.front(), (rtp_header *) currentFrame.data());
+            
             switch(packetStatus) {
+                /**
+                 * For the first valid frame we receive assign the CSRC, sequence number, and generic status bits by copying in the first header
+                 * Note - after this point, it is likely and intended that the sequence of the incoming and outgoing DtnRtp objects diverge.
+                */
                 case RTP_FIRST_FRAME:
-                    /**
-                     * For the first valid frame we receive assign the CSRC, sequence number, and generic status bits by copying in the first header
-                     * Note - after this point, it is likely and intended that the sequence of the incoming and outgoing DtnRtp objects diverge.
-                    */
-                    m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) m_incomingPacketQueue.front().data());
+                    m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) m_incomingCircularPacketQueue.front().data());
                     CreateFrame(currentFrame, offset);
-                    
-                    break;
-                case RTP_CONCATENATE:
-                    Concatenate(m_incomingPacketQueue.front(), currentFrame, offset);
                     break;
 
+                case RTP_CONCATENATE:
+                    // concatenation may fail if the bundle size is less than requested rtp frame, if so, goto RTP_PUSH_PREVIOUS_FRAME
+                    packetStatus = Concatenate(m_incomingCircularPacketQueue.front(), currentFrame, offset);
+                    if (packetStatus == RTP_CONCATENATE) 
+                        break;
+                    
                 case RTP_PUSH_PREVIOUS_FRAME: // push current frame and make incoming frame the current frame
                     PushFrame(currentFrame, offset);
-                    
                     CreateFrame(currentFrame, offset);
                     break;
 
                 case RTP_OUT_OF_SEQ: 
-                    // push current frame, make new frame on new sequence
-                    m_OutgoingPacketQueue.emplace(std::move(currentFrame));
-                    currentFrame.resize(m_maxOutgoingBundleSizeBytes);
-                    offset = 0;
-
-                    memcpy(&currentFrame.front(),
-                            &m_incomingPacketQueue.front(), 
-                            m_incomingPacketQueue.front().size());
-
+                    PushFrame(currentFrame, offset);
+                    CreateFrame(currentFrame, offset);
                     break;
                 case RTP_INVALID_HEADER: // discard incoming data
                 case RTP_MISMATCH_SSRC: // discard incoming data
                 case RTP_INVALID_VERSION: // discard incoming data
                 default:
                     LOG_ERROR(subprocess) << "Unknown return type " << packetStatus;
-                
             }
-            m_incomingPacketQueue.pop();
-
-            // LOG_INFO(subprocess) << "sizeof outgoing queue: " <<  m_OutgoingPacketQueue.size();
-        } else {
-            // boost::this_thread::sleep_for(boost::chrono::microseconds(1));
+            m_incomingCircularPacketQueue.pop_front();
         }
     }
-
+}
+// Copy in our outgoing Rtp header and the next rtp frame payload
+void BpSendStream::CreateFrame(std::vector<uint8_t> & currentFrame, size_t &offset)
+{
+    // fill header with outgoing Dtn Rtp header information
+    // this is tranlating from incoming DtnRtp session to outgoing DtnRtp session
+    memcpy(&currentFrame.front(), m_outgoingDtnRtpPtr->GetHeader(), sizeof(rtp_header));
+    offset = sizeof(rtp_header);
     
+    memcpy(&currentFrame.front(), 
+            &m_incomingCircularPacketQueue.front() + offset,  // skip the incoming header for our outgoing header instead
+            m_incomingCircularPacketQueue.front().size() - offset);
+    offset = m_incomingCircularPacketQueue.front().size(); // assumes that this had a header that we skipped
+}
+
+// if the current frame + incoming packet < bundle size, then concatenate
+rtp_packet_status_t BpSendStream::Concatenate(padded_vector_uint8_t &incomingRtpFrame, std::vector<uint8_t>  &currentFrame, size_t &offset)
+{
+    if ((offset + incomingRtpFrame.size() - sizeof(rtp_header)) < m_maxOutgoingBundleSizeBytes) { // concatenate if we have enough space
+        memcpy(&currentFrame.at(offset), // skip to our previous end of buffer
+                &incomingRtpFrame + sizeof(rtp_header), // skip incoming header, use outgoing header
+                incomingRtpFrame.size() - sizeof(rtp_header)); 
+        offset += incomingRtpFrame.size() - sizeof(rtp_header); // did not copy header
+        return RTP_CONCATENATE;
+    } else { // not enough space to concatenate, send separately
+        return RTP_PUSH_PREVIOUS_FRAME;
+    }
 }
 
 // Add current frame to the outgoing queue to be bundled and sent
 void BpSendStream::PushFrame(std::vector<uint8_t> & currentFrame, size_t &offset)
 {
-    m_OutgoingPacketQueue.emplace(std::move(currentFrame));
+    m_outgoingCircularFrameQueue.push_back(std::move(currentFrame));
     currentFrame.resize(m_maxOutgoingBundleSizeBytes);
     offset = 0;
 
+    std::cout << "out goiung circ buffer size : " << m_outgoingCircularFrameQueue.size() << std::endl; 
     // increment sequence number
     // m_OutgoingPacketQueue.`
-}
-
-void BpSendStream::CreateFrame(std::vector<uint8_t> & currentFrame, size_t &offset)
-{
-    // fill header with outgoing Dtn Rtp header information
-    memcpy(&currentFrame.front(), m_outgoingDtnRtpPtr->GetHeader(), sizeof(rtp_header));
-
-    offset = sizeof(rtp_header);
-    
-    memcpy(&currentFrame.front(), 
-            &m_incomingPacketQueue.front() + offset,  // skip the incoming header for our own instead
-            m_incomingPacketQueue.front().size() - offset);
-    
-    offset = m_incomingPacketQueue.front().size(); // assumes that this had a header that we skipped
-}
-
-void BpSendStream::Concatenate(padded_vector_uint8_t &incomingRtpFrame, std::vector<uint8_t>  &currentFrame, size_t &offset)
-{
-    if ((offset + m_incomingPacketQueue.front().size()) < m_maxOutgoingBundleSizeBytes) { // concatenate if we have enough space
-        memcpy(&currentFrame.at(offset),
-                &m_incomingPacketQueue.front() + sizeof(rtp_header), // skip incoming
-                m_incomingPacketQueue.front().size() - sizeof(rtp_header));  // concatenate current frame with incoming rtp frame (do not want to repeat header)
-        offset += m_incomingPacketQueue.front().size() - sizeof(rtp_header);
-    } else { // not enough space to concatenate, send separately
-        // copy out current frame 
-        m_OutgoingPacketQueue.emplace(std::move(currentFrame));
-        currentFrame.resize(m_maxOutgoingBundleSizeBytes);
-        offset = 0;
-
-        // set header for next frame using the outgoing DtnRtp 
-
-        // add incoming packet to next frame
-        // memcpy(&currentFrame.front(), 
-                // &m_incomingPacketQueue.front(),
-                // m_incomingPacketQueue.front().size());
-        // offset = m_incomingPacketQueue.front().size();
-    }
 }
 
 void BpSendStream::DeleteCallback()
@@ -202,21 +181,23 @@ void BpSendStream::DeleteCallback()
 
 uint64_t BpSendStream::GetNextPayloadLength_Step1() 
 {
-    if (m_OutgoingPacketQueue.empty()) {
+
+    if (m_outgoingCircularFrameQueue.size() == 0) {
         LOG_INFO(subprocess) << "waiting for data";
         return UINT64_MAX; // wait for data
     } 
+    
 
-    return (uint64_t) m_OutgoingPacketQueue.front().size();
+    return (uint64_t) m_outgoingCircularFrameQueue.front().size();
 }
 
 bool BpSendStream::CopyPayload_Step2(uint8_t * destinationBuffer) 
 {
     // copy out rtp packet
-    memcpy(destinationBuffer, &m_OutgoingPacketQueue.front(), m_OutgoingPacketQueue.front().size());
+    // memcpy(destinationBuffer, &m_OutgoingPacketQueue.front(), m_OutgoingPacketQueue.front().size());
 
     // pop outgoing queue
-    m_OutgoingPacketQueue.pop();
+    m_outgoingCircularFrameQueue.pop_front();
 
     return true;
 }
@@ -226,20 +207,42 @@ bool BpSendStream::CopyPayload_Step2(uint8_t * destinationBuffer)
  * If TryWaitForDataAvailable returns false, BpSourcePattern will recall this function after a timeout
 */
 bool BpSendStream::TryWaitForDataAvailable(const boost::posix_time::time_duration& timeout) {
-    if (m_OutgoingPacketQueue.empty()) {
-        return GetNextQueueTimeout(timeout);
+    if (m_outgoingCircularFrameQueue.size()==0) {
+        return GetNextOutgoingPacketTimeout(timeout);
     }
     return true; //
 }
 
-bool BpSendStream::GetNextQueueTimeout(const boost::posix_time::time_duration& timeout)
+/**
+ * If return true, we have data
+ * If return false, we do not have data
+*/
+bool BpSendStream::TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration& timeout) {
+    if (m_incomingCircularPacketQueue.size() == 0) { // if empty, we wait
+        return GetNextIncomingPacketTimeout(timeout);
+    }
+    return true; 
+}
+
+bool BpSendStream::GetNextOutgoingPacketTimeout(const boost::posix_time::time_duration& timeout)
 {
     boost::mutex::scoped_lock lock(m_queueMutex);
-    bool inWaitForPacketState = m_OutgoingPacketQueue.empty();
+    bool inWaitForPacketState = (m_outgoingCircularFrameQueue.size() == 0);
 
     if (inWaitForPacketState) {
-        m_queueCv.timed_wait(lock, timeout); //lock mutex (above) before checking condition
+        m_outgoingQueueCv.timed_wait(lock, timeout); //lock mutex (above) before checking condition
     }
 
     return inWaitForPacketState;
+}
+
+bool BpSendStream::GetNextIncomingPacketTimeout(const boost::posix_time::time_duration& timeout)
+{
+    boost::mutex::scoped_lock lock(m_incomingQueueMutex);
+    if ((m_incomingCircularPacketQueue.size() == 0)) {
+        m_incomingQueueCv.timed_wait(lock, timeout); //lock mutex (above) before checking condition
+        return false;
+    }
+    
+    return true;
 }
