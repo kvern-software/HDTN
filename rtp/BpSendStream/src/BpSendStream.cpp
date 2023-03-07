@@ -32,16 +32,14 @@ BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomi
     m_ioServiceThreadPtr = boost::make_unique<boost::thread>(boost::bind(&boost::asio::io_service::run, &m_ioService));
     ThreadNamer::SetIoServiceThreadName(m_ioService, "ioServiceBpUdpSink");
 
-    // allocate buffers for incoming and outgoing packets
-    // for (unsigned int i = 0; i < numFifoBuffers; ++i) {
-    //     m_incomingPacketQueue[i].resize(maxIncomingUdpPacketSizeBytes);
-    // }
 
-    // for (unsigned int i = 0; i < numFifoBuffers; ++i) {
-    //     m_OutgoingPacketQueue[i].resize(maxOutgoingBundleSizeBytes);
+    m_incomingCircularPacketQueue.set_capacity(numCircularBufferVectors);
+    m_outgoingCircularFrameQueue.set_capacity(numCircularBufferVectors);
+
+
+    // for (unsigned int i = 0; i < numCircularBufferVectors; ++i) {
+    //     m_incomingBuffersCbVec[i].resize(maxIncomingUdpPacketSizeBytes);
     // }
-    m_incomingCircularPacketQueue.set_capacity(100);
-    m_outgoingCircularFrameQueue.set_capacity(100);
     
 }
 
@@ -64,9 +62,15 @@ BpSendStream::~BpSendStream()
 
 void BpSendStream::WholeBundleReadyCallback(padded_vector_uint8_t &wholeBundleVec)
 {
-    // copy out bundle to local queue for processing
-    m_incomingCircularPacketQueue.push_back(std::move(wholeBundleVec));
-    LOG_DEBUG(subprocess) << "callback " << m_incomingCircularPacketQueue.size();
+    {
+        boost::mutex::scoped_lock lock(m_incomingQueueMutex);// lock mutex 
+        // copy out bundle to local queue for processing
+        m_incomingCircularPacketQueue.push_back(std::move(wholeBundleVec));
+        
+        // unlock 
+    }
+        
+    m_outgoingQueueCv.notify_one();
 }
 
 
@@ -84,18 +88,18 @@ void BpSendStream::WholeBundleReadyCallback(padded_vector_uint8_t &wholeBundleVe
 */
 void BpSendStream::ProcessIncomingBundlesThread()
 {
-    // LOG_INFO(subprocess) << "Entered processing thread";
-    static const boost::posix_time::time_duration timeout(boost::posix_time::milliseconds(25));
-    static std::vector<uint8_t> currentFrame;
-    currentFrame.resize(m_maxOutgoingBundleSizeBytes); // todo account for bundle overhead
+    static const boost::posix_time::time_duration timeout(boost::posix_time::milliseconds(250));
+    static std::vector<uint8_t> currentFrame;  // make a member var
+    size_t offset = 0;// make a member var
 
-    size_t offset = 0;
+    currentFrame.reserve(m_maxOutgoingBundleSizeBytes);
+
     
     while (m_running) {
         bool inWaitForNewBundlesState = !TryWaitForIncomingDataAvailable(timeout);
 
         if (!inWaitForNewBundlesState) {
-            LOG_DEBUG(subprocess) << "Data available";
+            // boost::this_thread::sleep_for(boost::chrono::milliseconds(250));
             rtp_packet_status_t packetStatus = m_incomingDtnRtpPtr->PacketHandler(m_incomingCircularPacketQueue.front(), (rtp_header *) currentFrame.data());
             
             switch(packetStatus) {
@@ -104,15 +108,13 @@ void BpSendStream::ProcessIncomingBundlesThread()
                  * Note - after this point, it is likely and intended that the sequence of the incoming and outgoing DtnRtp objects diverge.
                 */
                 case RTP_FIRST_FRAME:
-                    m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) m_incomingCircularPacketQueue.front().data());
+                    m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) m_incomingCircularPacketQueue.front().data(), USE_INCOMING_SEQ);
                     CreateFrame(currentFrame, offset);
                     break;
 
                 case RTP_CONCATENATE:
-                    // concatenation may fail if the bundle size is less than requested rtp frame, if so, goto RTP_PUSH_PREVIOUS_FRAME
-                    packetStatus = Concatenate(m_incomingCircularPacketQueue.front(), currentFrame, offset);
-                    if (packetStatus == RTP_CONCATENATE) 
-                        break;
+                    Concatenate(m_incomingCircularPacketQueue.front(), currentFrame, offset); // concatenation may fail if the bundle size is less than requested rtp frame, if so RTP_PUSH_PREVIOUS_FRAME is performed 
+                    break;
                     
                 case RTP_PUSH_PREVIOUS_FRAME: // push current frame and make incoming frame the current frame
                     PushFrame(currentFrame, offset);
@@ -120,7 +122,7 @@ void BpSendStream::ProcessIncomingBundlesThread()
                     break;
 
                 case RTP_OUT_OF_SEQ: 
-                    PushFrame(currentFrame, offset);
+                    PushFrame(currentFrame, offset); 
                     CreateFrame(currentFrame, offset);
                     break;
                 case RTP_INVALID_HEADER: // discard incoming data
@@ -136,6 +138,8 @@ void BpSendStream::ProcessIncomingBundlesThread()
 // Copy in our outgoing Rtp header and the next rtp frame payload
 void BpSendStream::CreateFrame(std::vector<uint8_t> & currentFrame, size_t &offset)
 {
+    currentFrame.resize(m_incomingCircularPacketQueue.front().size()); 
+
     // fill header with outgoing Dtn Rtp header information
     // this is tranlating from incoming DtnRtp session to outgoing DtnRtp session
     memcpy(&currentFrame.front(), m_outgoingDtnRtpPtr->GetHeader(), sizeof(rtp_header));
@@ -144,49 +148,75 @@ void BpSendStream::CreateFrame(std::vector<uint8_t> & currentFrame, size_t &offs
     memcpy(&currentFrame.front(), 
             &m_incomingCircularPacketQueue.front() + offset,  // skip the incoming header for our outgoing header instead
             m_incomingCircularPacketQueue.front().size() - offset);
-    offset = m_incomingCircularPacketQueue.front().size(); // assumes that this had a header that we skipped
+    offset = m_incomingCircularPacketQueue.front().size(); // assumes that this had aheader that we skipped
+
+    m_outgoingDtnRtpPtr->IncNumConcatenated();
 }
 
 // if the current frame + incoming packet < bundle size, then concatenate
-rtp_packet_status_t BpSendStream::Concatenate(padded_vector_uint8_t &incomingRtpFrame, std::vector<uint8_t>  &currentFrame, size_t &offset)
+void BpSendStream::Concatenate(padded_vector_uint8_t &incomingRtpFrame, std::vector<uint8_t>  &currentFrame, size_t &offset)
 {
+
     if ((offset + incomingRtpFrame.size() - sizeof(rtp_header)) < m_maxOutgoingBundleSizeBytes) { // concatenate if we have enough space
+        currentFrame.resize(currentFrame.size() + incomingRtpFrame.size()); // enlarge buffer
+        
         memcpy(&currentFrame.at(offset), // skip to our previous end of buffer
                 &incomingRtpFrame + sizeof(rtp_header), // skip incoming header, use outgoing header
                 incomingRtpFrame.size() - sizeof(rtp_header)); 
         offset += incomingRtpFrame.size() - sizeof(rtp_header); // did not copy header
-        return RTP_CONCATENATE;
+
+        m_outgoingDtnRtpPtr->IncNumConcatenated();
+
+        LOG_DEBUG(subprocess) << "Number of RTP packets in current frame: " << m_outgoingDtnRtpPtr->GetNumConcatenated();
+ 
     } else { // not enough space to concatenate, send separately
-        return RTP_PUSH_PREVIOUS_FRAME;
+        LOG_DEBUG(subprocess) << "Not enough space to concatenate, sending as separate bundle.";
+        PushFrame(currentFrame, offset);
+        CreateFrame(currentFrame, offset);
     }
 }
 
 // Add current frame to the outgoing queue to be bundled and sent
 void BpSendStream::PushFrame(std::vector<uint8_t> & currentFrame, size_t &offset)
 {
-    m_outgoingCircularFrameQueue.push_back(std::move(currentFrame));
-    currentFrame.resize(m_maxOutgoingBundleSizeBytes);
-    offset = 0;
+    LOG_DEBUG(subprocess) << "Push frame with \n"
+        << m_outgoingDtnRtpPtr->GetNumConcatenated() << " concatenated RTP packets\n"
+        << ntohs(m_outgoingDtnRtpPtr->GetSequence()) << " =seq\n" 
+        << ntohl(m_outgoingDtnRtpPtr->GetTimestamp()) << "=ts\n"
+        << currentFrame.size() << "=size into outgoing queue";
 
-    std::cout << "out goiung circ buffer size : " << m_outgoingCircularFrameQueue.size() << std::endl; 
-    // increment sequence number
-    // m_OutgoingPacketQueue.`
+    {
+        boost::mutex::scoped_lock lock (m_ougoingQueueCv)    // lock mutex 
+
+        m_outgoingCircularFrameQueue.push_back(std::move(currentFrame));
+        
+        currentFrame.resize(0);
+        offset = 0;
+
+    }
+
+    m_outgoingQueueCv.notify_one();
+
+
+    // Outgoing DtnRtp session needs to update seq status since we just sent an RTP frame
+    m_outgoingDtnRtpPtr->IncSequence();
+    m_outgoingDtnRtpPtr->ResetNumConcatenated();
+    m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) m_incomingCircularPacketQueue.front().data(), USE_OUTGOING_SEQ); // updates our next header to have the correct ts, fmt, ext, m ect.
+
+
+    // LOG_DEBUG(subprocess) << "out going circ buffer size : " << m_outgoingCircularFrameQueue.size(); 
 }
 
 void BpSendStream::DeleteCallback()
 {
-    
 }
 
 
 uint64_t BpSendStream::GetNextPayloadLength_Step1() 
 {
-
     if (m_outgoingCircularFrameQueue.size() == 0) {
-        LOG_INFO(subprocess) << "waiting for data";
         return UINT64_MAX; // wait for data
     } 
-    
 
     return (uint64_t) m_outgoingCircularFrameQueue.front().size();
 }
@@ -194,10 +224,18 @@ uint64_t BpSendStream::GetNextPayloadLength_Step1()
 bool BpSendStream::CopyPayload_Step2(uint8_t * destinationBuffer) 
 {
     // copy out rtp packet
-    // memcpy(destinationBuffer, &m_OutgoingPacketQueue.front(), m_OutgoingPacketQueue.front().size());
+    memcpy(destinationBuffer, m_outgoingCircularFrameQueue.front().data(), m_outgoingCircularFrameQueue.front().size());
 
+    rtp_frame * frame = (rtp_frame * ) m_outgoingCircularFrameQueue.front().data();
+
+    LOG_DEBUG(subprocess) << "Copied out frame with\n " << \
+            "seq=" << ntohs(frame->header.seq)     << "\n" << \
+            "size=" << m_outgoingCircularFrameQueue.front().size();
+                
     // pop outgoing queue
     m_outgoingCircularFrameQueue.pop_front();
+
+    LOG_DEBUG(subprocess) << "Size after copy and popping out " << m_outgoingCircularFrameQueue.size();
 
     return true;
 }
@@ -233,7 +271,7 @@ bool BpSendStream::GetNextOutgoingPacketTimeout(const boost::posix_time::time_du
         m_outgoingQueueCv.timed_wait(lock, timeout); //lock mutex (above) before checking condition
     }
 
-    return inWaitForPacketState;
+    return !inWaitForPacketState;
 }
 
 bool BpSendStream::GetNextIncomingPacketTimeout(const boost::posix_time::time_duration& timeout)

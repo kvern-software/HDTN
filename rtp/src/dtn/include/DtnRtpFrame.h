@@ -96,15 +96,15 @@ struct rtp_frame {
         flags.flags = htons(flags.flags);
 
         std::cout 
-        << "\n version: "   <<   ((RTP_VERSION_TWO_FLAG & flags.flags) >> 14)
-        << "\n padding: "   <<   (RTP_PADDING_FLAG & flags.flags)
-        << "\n ext: "       <<   (RTP_EXT_FLAG & flags.flags)
-        << "\n cc: "        <<   (RTP_CSRC_FMASK & flags.flags)
-        << "\n marker: "    <<   (RTP_MARKER_FLAG &flags.flags)
-        << "\n payload: "   <<   (rtp_format_t) (RTP_PAYLOAD_MASK & flags.flags)
+        // << "\n version: "   <<   ((RTP_VERSION_TWO_FLAG & flags.flags) >> 14)
+        // << "\n padding: "   <<   ((RTP_PADDING_FLAG & flags.flags) << 13)
+        // << "\n ext: "       <<   ((RTP_EXT_FLAG & flags.flags) >> 12)
+        // << "\n cc: "        <<   (RTP_CSRC_FMASK & flags.flags)
+        << "\n marker: "    <<   ((RTP_MARKER_FLAG &flags.flags)  >> 7)
+        // << "\n payload: "   <<   (rtp_format_t) (RTP_PAYLOAD_MASK & flags.flags)
         << "\n seq: "       <<   (unsigned int) (ntohs(header.seq)) << " (network " << header.seq << ")"
         << "\n timestamp: " <<   (unsigned int) (ntohl(header.timestamp)) << " (network " << header.timestamp << ")"
-        << "\n ssrc: "      <<   (unsigned int) (header.ssrc )
+        // << "\n ssrc: "      <<   (unsigned int) (header.ssrc )
         << std::endl;
     }
 

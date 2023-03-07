@@ -11,7 +11,7 @@ int main(int argc, const char* argv[]) {
     argc = 4;
 #endif
 
-    hdtn::Logger::initializeWithProcess(hdtn::Logger::Process::none);
+    hdtn::Logger::initializeWithProcess(hdtn::Logger::Process::bpsendfile);
     ThreadNamer::SetThisThreadName("BpSendStream");
     BpSendStreamRunner runner;
     volatile bool running;

@@ -52,39 +52,49 @@ uint16_t DtnRtp::GetSequence()      const
     return m_prevHeader.seq;
 }
 
+uint32_t DtnRtp::GetTimestamp() const
+{
+    return m_prevHeader.timestamp;
+}
 
 uint32_t DtnRtp::GetClockRate()     const
 {
     return m_clockRate;
 }
 
-// size_t DtnRtp::GetPayloadSize()   const
-// {
-//     // return m_rtpMTU - sizeof(rtp_header);
-// }
-
-size_t DtnRtp::GetPktMaxDelay()   const
-{
-    return 0; // not implemented
-}
-
 rtp_header * DtnRtp::GetHeader() {
     return &m_prevHeader;
 }
 
+/**
+ * This returns the number of times the current frame has been added to. 
+ * A frame with no data is zero. A frame that has been added to once is 1. 
+ * A frame that has been added two twice is 2. and so on.
+*/
+uint16_t DtnRtp::GetNumConcatenated()
+{
+    return m_numConcatenated;
+}
 
-// handles rtp paremeters 
+
+// handles rtp paremeters
 void DtnRtp::IncSentPkts()
 {
     m_sentPackets++;
 }
 void DtnRtp::IncSequence()
 {
-    // if (m_sequence != UINT16_MAX) {
-    //     m_sequence++;
-    // } else {
-    //     m_sequence = 0;
-    // }
+    m_prevHeader.seq = htons(ntohs(m_prevHeader.seq) + 1) ;
+}
+
+void DtnRtp::IncNumConcatenated()
+{
+    m_numConcatenated++;
+}
+
+void DtnRtp::ResetNumConcatenated()
+{
+    m_numConcatenated = 0;
 }
 
 void DtnRtp::SetSequence(uint16_t host_sequence)
@@ -94,12 +104,7 @@ void DtnRtp::SetSequence(uint16_t host_sequence)
 
 void DtnRtp::SetMarkerBit(uint8_t marker_bit)
 {
-    m_prevHeader.marker = marker_bit;
-}
-
-void DtnRtp::SetFormat(rtp_format_t fmt)
-{
-    m_fmt = fmt;
+    m_prevHeader.marker =  (m_prevHeader.marker | RTP_MARKER_FLAG);
 }
 
 // setters for the rtp packet configuration
@@ -281,7 +286,7 @@ rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec,
     memcpy(&currentHeaderFlags.flags, incomingHeaderPtr, sizeof(uint16_t));
     currentHeaderFlags.flags = htons(currentHeaderFlags.flags);
 
-    // incomingFramePtr->print_header();
+    incomingFramePtr->print_header();
 
     if (!(RTP_VERSION_TWO_FLAG & currentHeaderFlags.flags)) {
         LOG_ERROR(subprocess) << "Unsupported RTP version. Use RTP Version 2";
@@ -301,7 +306,7 @@ rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec,
         m_ssrc = std::make_shared<std::atomic<uint32_t>>(ssrc); // assign ssrc 
         
         
-        UpdateHeader(incomingHeaderPtr); // set the previous header to match current header for the first packet
+        UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ); // set the previous header to match current header for the first packet
         SetClockRate(fmt); // assign our payload's clock rate 
 
         return RTP_FIRST_FRAME; // no need to check for all the things below, just start new frame
@@ -320,9 +325,11 @@ rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec,
 
     if (ntohs(incomingHeaderPtr->seq) !=  (ntohs(m_prevHeader.seq)+1)) {
         LOG_ERROR(subprocess) << "RTP sequence out of order - Incoming: " << ntohs(incomingHeaderPtr->seq) << " Previous: " << ntohs(m_prevHeader.seq);
-        UpdateHeader(incomingHeaderPtr); // update prevHeader
+        UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ); // update prevHeader
         return RTP_OUT_OF_SEQ;         // TODO : handle sequence out of order
     }
+
+    // LOG_DEBUG(subprocess) << "Incoming sequence: " << ntohs(incomingHeaderPtr->seq);
 
     // boost::this_thread::sleep_for(boost::chrono::milliseconds(250));
 
@@ -331,23 +338,25 @@ rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec,
     memcpy(&prevHeaderFlags.flags, &m_prevHeader, sizeof(uint16_t));
     prevHeaderFlags.flags = htons(prevHeaderFlags.flags);
 
-    if (ntohl(m_prevHeader.timestamp) != ntohl(incomingHeaderPtr->timestamp)) { // CCSDS 3.3.4 // do not concatenate if the timestamp has changed
-        UpdateHeader(incomingHeaderPtr);
-        // LOG_INFO(subprocess) << "timestamp changed";
-        return RTP_PUSH_PREVIOUS_FRAME;
-    }
+    // int64_t deltat = ntohl(m_prevHeader.timestamp)- ntohl(incomingHeaderPtr->timestamp);
+    // std::cout << deltat << std::endl;
+    // if (deltat != 0) { // CCSDS 3.3.4 // do not concatenate if the timestamp has changed
+    //     UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
+    //     LOG_INFO(subprocess) << "Timestamp changed! \nPrevious TS: " << ntohl(m_prevHeader.timestamp) << \
+    //     " \nincoming TS: " << ntohl(incomingHeaderPtr->timestamp) << \
+    //     " \nDelta: " << ntohl(m_prevHeader.timestamp)- ntohl(incomingHeaderPtr->timestamp);
+
+    //     return RTP_PUSH_PREVIOUS_FRAME;
+    // }
 
     if (RTP_PADDING_FLAG & currentHeaderFlags.flags) {  // CCSDS 3.3.2     // Do not concatenate if the padding bit is set
-        UpdateHeader(incomingHeaderPtr);
+        UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
         LOG_DEBUG(subprocess) << "Padding bit set";
         return RTP_PUSH_PREVIOUS_FRAME;
     }
 
-    // // std::cout << (prevHeaderFlags.flags & RTP_MARKER_FLAG) << "  " << (currentHeaderFlags.flags & RTP_MARKER_FLAG) << std::endl;
-    // std::cout << currentRtpFrameHeader->marker << std::endl;
-    if (currentRtpFrameHeader->marker != incomingHeaderPtr->marker) { // CCSDS 3.3.5 // Do not concatenate if the incoming marker bit has changed from the current packet's marker bit
-        // incomingFramePtr->print_header();
-        UpdateHeader(incomingHeaderPtr);
+    if ((prevHeaderFlags.flags & RTP_MARKER_FLAG)  != (currentHeaderFlags.flags & RTP_MARKER_FLAG)) { // CCSDS 3.3.5 // Do not concatenate if the incoming marker bit has changed from the current packet's marker bit
+        UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
         LOG_INFO(subprocess) << "marker changed";
         return RTP_PUSH_PREVIOUS_FRAME;
 
@@ -355,7 +364,7 @@ rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec,
 
     if (currentRtpFrameHeader->ext != incomingHeaderPtr->ext) { // CCSDS 3.3.6 // Do not concatentate if the extension bit has changed
         LOG_INFO(subprocess) << "ext changed";
-        UpdateHeader(incomingHeaderPtr);
+        UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
         return RTP_PUSH_PREVIOUS_FRAME;
     }
 
@@ -369,15 +378,30 @@ rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec,
      * Proceed to concatenate the frame. 
     */
     // LOG_INFO(subprocess) << "Packet valid for concatentation";
-   UpdateHeader(incomingHeaderPtr);
+   UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
 
     return RTP_CONCATENATE;
 }
 
-void DtnRtp::UpdateHeader(const rtp_header * nextHeaderPointer)
+
+/**
+ * Take an incoming DtnSession header and update our own header accordingly.
+ * We copy everything execept the sequence number, since our session will be on
+ * our own sequence number
+*/
+
+void DtnRtp::UpdateHeader(const rtp_header * nextHeaderPointer, bool useIncomingSeq)
 {
     // LOG_DEBUG(subprocess) << "updated header";
-    memcpy(&m_prevHeader, nextHeaderPointer, sizeof(rtp_header)); // update previous header to current header
+    if (useIncomingSeq) {
+        memcpy(&m_prevHeader, nextHeaderPointer, sizeof(rtp_header)); // update previous header to current header
+    } else {
+        uint16_t currentSeq = m_prevHeader.seq;
+        // uint32_t currentTs = m_prevHeader.timestamp;
+        memcpy(&m_prevHeader, nextHeaderPointer, sizeof(rtp_header)); // update previous header to current header
+        m_prevHeader.seq = currentSeq;
+        // m_prevHeader.timestamp = currentTs;
+    }
 }
 
 /**

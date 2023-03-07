@@ -199,3 +199,43 @@ target_link_libraries(bpsend_stream
 	Boost::log
 	# ${AVCODEC_LIBRARY}
 ) 
+
+
+##### STREAM
+add_executable(bprecv_stream
+	BpReceiveStream/src/BpReceiveStreamMain.cpp
+	BpReceiveStream/src/BpReceiveStreamRunner.cpp
+	BpReceiveStream/src/BpReceiveStream.cpp
+
+	${DTN_SOURCES}
+)
+target_include_directories(bprecv_stream PUBLIC 
+		BpReceiveStream/include 
+		src/dtn/include
+)
+target_link_libraries(bprecv_stream   
+	#HDTN
+	HDTN::HDTNUtil
+	HDTN::TelemetryDefinitions
+	HDTN::LtpLib
+	HDTN::BpAppPatternsLib
+	HDTN::Bpcodec
+	HDTN::EgressLib
+	HDTN::HDTNConfigLib
+	HDTN::HDTNCgrLib
+	HDTN::InductManagerLib
+	HDTN::IngressLib
+	HDTN::LoggerLib
+	HDTN::OutductManagerLib
+	HDTN::StcpLib
+	HDTN::StorageLib
+	HDTN::TcpclLib
+	HDTN::UdpLib
+	HDTN::UdpDelaySimLib
+
+	Boost::unit_test_framework
+	Boost::timer
+    Boost::program_options 
+	Boost::thread
+	Boost::log
+) 

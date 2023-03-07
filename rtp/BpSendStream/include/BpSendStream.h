@@ -14,12 +14,11 @@ public:
     BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes,  uint64_t numFifoBuffers);
     ~BpSendStream();
 
-
     void ProcessIncomingBundlesThread(); // worker thread that calls RTP packet handler
 
     void WholeBundleReadyCallback(padded_vector_uint8_t & wholeBundleVec); // incoming udp packets come in here
     void DeleteCallback(); // gets called on socket shutdow, optional to do anything with it
-    rtp_packet_status_t Concatenate(padded_vector_uint8_t &incomingRtpFrame, std::vector<uint8_t> &currentFrame, size_t &offset);
+    void Concatenate(padded_vector_uint8_t &incomingRtpFrame, std::vector<uint8_t> &currentFrame, size_t &offset);
     void CreateFrame(std::vector<uint8_t> & currentFrame, size_t &offset);
     void PushFrame(std::vector<uint8_t> & currentFrame, size_t &offset);
 
@@ -34,7 +33,6 @@ public:
 
     boost::circular_buffer<std::vector<uint8_t>> m_outgoingCircularFrameQueue;
 
-
 protected:
     virtual bool TryWaitForDataAvailable(const boost::posix_time::time_duration& timeout) override;
     virtual uint64_t GetNextPayloadLength_Step1() override;
@@ -43,7 +41,6 @@ protected:
 private:
     bool TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration& timeout);
     bool GetNextIncomingPacketTimeout(const boost::posix_time::time_duration& timeout);
-    
     bool GetNextOutgoingPacketTimeout(const boost::posix_time::time_duration& timeout);
 
     volatile bool m_running;
@@ -62,4 +59,9 @@ private:
 
     std::unique_ptr<boost::thread> m_processingThread;
     std::unique_ptr<boost::thread> m_ioServiceThreadPtr;
+
+
+   
+
 };
+
