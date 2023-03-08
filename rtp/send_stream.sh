@@ -5,7 +5,7 @@
 config_files=$HDTN_RTP_DIR/config_files
 source_config=$config_files/outducts/streamsource_stcp.json
 
-port=50572
+port=50574
 udpbuffersize=1400
 
 cd $HDTN_RTP_DIR
@@ -13,7 +13,7 @@ cd $HDTN_RTP_DIR
 # stream send
 ./build/bpsend_stream  --bundle-size=100000 --bundle-rate=0  \
         --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --outducts-config-file=$source_config \
-        --max-incoming-udp-packet-size-bytes=1400 --incoming-rtp-stream-port=$port --num-circular-buffer-vectors=100 & #enlarge buffer a bit +100
+        --max-incoming-udp-packet-size-bytes=1600 --incoming-rtp-stream-port=$port --num-circular-buffer-vectors=100 & #enlarge buffer a bit +100
 media_source_process=$!
 
 sleep 1

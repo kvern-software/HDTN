@@ -4,23 +4,22 @@
 #include "app_patterns/BpSourcePattern.h"
 #include "DtnRtp.h"
 
-typedef boost::function<void(padded_vector_uint8_t & wholeBundleVec)> WholeBundleReadyCallbackUdp_t;
-typedef boost::function<void()> NotifyReadyToDeleteCallback_t;
+// typedef boost::function<void(padded_vector_uint8_t & wholeBundleVec)> WholeBundleReadyCallbackUdp_t;
+// typedef boost::function<void()> NotifyReadyToDeleteCallback_t;
 
 class BpSendStream : public BpSourcePattern
 {
 public:
 
-    BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes,  uint64_t numFifoBuffers);
+    BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes);
     ~BpSendStream();
 
     void ProcessIncomingBundlesThread(); // worker thread that calls RTP packet handler
-
     void WholeBundleReadyCallback(padded_vector_uint8_t & wholeBundleVec); // incoming udp packets come in here
     void DeleteCallback(); // gets called on socket shutdow, optional to do anything with it
-    void Concatenate(padded_vector_uint8_t &incomingRtpFrame, std::vector<uint8_t> &currentFrame, size_t &offset);
-    void CreateFrame(std::vector<uint8_t> & currentFrame, size_t &offset);
-    void PushFrame(std::vector<uint8_t> & currentFrame, size_t &offset);
+    void Concatenate(padded_vector_uint8_t &incomingRtpFrame);
+    void CreateFrame();
+    void PushFrame();
 
     boost::asio::io_service m_ioService; // socket uses this to grab data from incoming rtp stream
     
@@ -29,9 +28,7 @@ public:
     std::shared_ptr<DtnRtp> m_incomingDtnRtpPtr;
 
     boost::circular_buffer<padded_vector_uint8_t> m_incomingCircularPacketQueue; // consider making this a pre allocated vector
-    // std::queue<std::vector<uint8_t>> m_OutgoingPacketQueue;
-
-    boost::circular_buffer<std::vector<uint8_t>> m_outgoingCircularFrameQueue;
+    boost::circular_buffer<padded_vector_uint8_t> m_outgoingCircularFrameQueue;
 
 protected:
     virtual bool TryWaitForDataAvailable(const boost::posix_time::time_duration& timeout) override;
@@ -43,6 +40,9 @@ private:
     bool GetNextIncomingPacketTimeout(const boost::posix_time::time_duration& timeout);
     bool GetNextOutgoingPacketTimeout(const boost::posix_time::time_duration& timeout);
 
+    padded_vector_uint8_t m_currentFrame;  
+    size_t m_offset = 0;
+
     volatile bool m_running;
 
     uint64_t m_maxIncomingUdpPacketSizeBytes; // passed in via config file, should be greater than or equal to the RTP stream source maximum packet size
@@ -51,7 +51,7 @@ private:
     uint64_t m_bpGenSequenceNumber;
 
 
-    boost::mutex m_queueMutex;   
+    boost::mutex m_outgoingQueueMutex;   
     boost::mutex m_incomingQueueMutex;     
   
     boost::condition_variable m_outgoingQueueCv;
@@ -60,7 +60,12 @@ private:
     std::unique_ptr<boost::thread> m_processingThread;
     std::unique_ptr<boost::thread> m_ioServiceThreadPtr;
 
-
+    uint64_t m_totalRtpPacketsReceived = 0; // counted when received from udp sink
+    uint64_t m_totalRtpPacketsSent = 0; // counted when send to bundler
+    uint64_t m_totalRtpPacketsQueued = 0; // counted when pushed into outgoing queue
+    uint64_t m_totalConcatenationsPerformed = 0; // counted when a packet is successfully concatenated 
+    uint64_t m_totalMarkerBits = 0;
+    uint64_t m_totalTimestampChanged = 0;
    
 
 };

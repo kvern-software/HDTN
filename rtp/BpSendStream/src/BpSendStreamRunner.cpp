@@ -160,7 +160,7 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
 
         LOG_INFO(subprocess) << "starting..";
 
-        BpSendStream bpSendStream(maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, numCircularBufferVectors, maxBundleSizeBytes, 100 );
+        BpSendStream bpSendStream(maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, numCircularBufferVectors, maxBundleSizeBytes);
 
         bpSendStream.Start(
             outductsConfigPtr,

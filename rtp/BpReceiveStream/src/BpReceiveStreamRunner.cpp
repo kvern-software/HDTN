@@ -34,7 +34,12 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
         cbhe_eid_t myEid;
         bool isAcsAware;
         uint64_t maxBundleSizeBytes;
-        uint16_t outgoingRtpPort;
+
+        // bp send stream
+        uint16_t remotePort;
+        std::string remoteHostname;
+        size_t numCircularBufferVectors;
+        uint16_t maxOutgoingRtpPacketSizeBytes;
 
         boost::program_options::options_description desc("Allowed options");
         try {
@@ -46,6 +51,9 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
                 ("acs-aware-bundle-agent", "Custody transfer should support Aggregate Custody Signals if valid CTEB present.")
                 ("max-rx-bundle-size-bytes", boost::program_options::value<uint64_t>()->default_value(10000000), "Max bundle size bytes to receive (default=10MB).")
                 ("outgoing-rtp-port", boost::program_options::value<uint16_t>()->default_value(50560), "Destination port for the created RTP stream")
+                ("remote-hostname",  boost::program_options::value<std::string>()->default_value("127.0.0.1"), "Remote IP to forward rtp packets to")
+                ("num-circular-buffer-vectors", boost::program_options::value<size_t>()->default_value(50), "Number of circular buffer vector elements for incoming bundles")
+                ("max-outgoing-rtp-packet-size-bytes", boost::program_options::value<uint16_t>()->default_value(1400), "Max size in bytes of the outgoing rtp packets")
                 ;
 
             boost::program_options::variables_map vm;
@@ -71,11 +79,11 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
                 }
                 std::size_t numInducts = inductsConfigPtr->m_inductElementConfigVector.size();
                 if (numInducts != 1) {
-                    LOG_ERROR(subprocess) << "number of BpReceiveStream inducts is not 1: got " << numInducts;
+                    LOG_ERROR(subprocess) << "number of BpRecvStream inducts is not 1: got " << numInducts;
                 }
             }
             else {
-                LOG_WARNING(subprocess) << "notice: BpReceiveStream has no induct... bundle data will have to flow in through a bidirectional tcpcl outduct";
+                LOG_WARNING(subprocess) << "notice: BpRecvStream has no induct... bundle data will have to flow in through a bidirectional tcpcl outduct";
             }
 
             //create outduct for custody signals
@@ -88,13 +96,18 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
                 }
                 std::size_t numOutducts = outductsConfigPtr->m_outductElementConfigVector.size();
                 if (numOutducts != 1) {
-                    LOG_ERROR(subprocess) << "number of BpReceiveStream outducts is not 1: got " << numOutducts;
+                    LOG_ERROR(subprocess) << "number of BpRecvStream outducts is not 1: got " << numOutducts;
                 }
             }
             isAcsAware = (vm.count("acs-aware-bundle-agent"));
             maxBundleSizeBytes = vm["max-rx-bundle-size-bytes"].as<uint64_t>();
 
-            outgoingRtpPort = vm["outgoing-rtp-port"].as<uint16_t>();
+
+            remotePort                    = vm["outgoing-rtp-port"].as<uint16_t>();
+            remoteHostname                = vm["remote-hostname"].as<std::string>();
+            numCircularBufferVectors      = vm["num-circular-buffer-vectors"].as<size_t>();
+            maxOutgoingRtpPacketSizeBytes = vm["max-outgoing-rtp-packet-size-bytes"].as<uint16_t>();
+
         }
         catch (boost::bad_any_cast & e) {
             LOG_ERROR(subprocess) << "invalid data error: " << e.what() << "\n";
@@ -112,7 +125,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
 
 
         LOG_INFO(subprocess) << "starting..";
-        BpReceiveStream BpReceiveStream(outgoingRtpPort);
+        BpReceiveStream BpReceiveStream(numCircularBufferVectors, remoteHostname, remotePort, maxOutgoingRtpPacketSizeBytes);
         BpReceiveStream.Init(inductsConfigPtr, outductsConfigPtr, isAcsAware, myEid, 0, maxBundleSizeBytes);
 
 
@@ -129,7 +142,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
 
 
         LOG_INFO(subprocess) << "Exiting cleanly..";
-        BpReceiveStream.Stop();
+        // BpReceiveStream.Stop();
         //safe to get any stats now if needed
     }
     LOG_INFO(subprocess) << "Exited cleanly";

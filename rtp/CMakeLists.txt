@@ -4,6 +4,7 @@ project(dtn_rtp_streaming)
 set(CMAKE_CXX_STANDARD 11)   
 set(CMAKE_VERBOSE_MAKEFILE FALSE)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wformat -std=c++2a  -g") # -Werror
+set(CMAKE_BUILD_TYPE Release)
 
 set(MIN_BOOST_VERSION 1.66.0)
 find_package(Boost ${MIN_BOOST_VERSION} REQUIRED system date_time filesystem timer thread regex filesystem unit_test_framework program_options iostreams random log log_setup)
