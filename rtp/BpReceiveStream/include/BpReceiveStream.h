@@ -18,8 +18,14 @@ protected:
 private:
     bool TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration& timeout);
     bool GetNextIncomingPacketTimeout(const boost::posix_time::time_duration& timeout);
+
+    bool TryWaitForSuccessfulSend(const boost::posix_time::time_duration &timeout);
+    bool GetSuccessfulSendTimeout(const boost::posix_time::time_duration &timeout);
+
     void OnSentRtpPacketCallback(bool success, std::shared_ptr<std::vector<UdpSendPacketInfo> >& udpSendPacketInfoVecSharedPtr, const std::size_t numPacketsSent);
 
+
+    int SendUdpPacket(const std::vector<uint8_t>& message);
     volatile bool m_running; // exit condition
     
     boost::circular_buffer<padded_vector_uint8_t> m_incomingCircularPacketQueue; // incoming rtp frames from HDTN put here
@@ -33,10 +39,15 @@ private:
     uint16_t m_maxOutgoingRtpPacketSizeBytes;
     uint16_t m_maxOutgoingRtpPayloadSizeBytes;
     // outbound udp
+	boost::asio::io_service io_service;
+    boost::asio::ip::udp::socket socket;
+
     boost::asio::ip::udp::endpoint m_udpEndpoint;
     std::shared_ptr<UdpBatchSender> m_udpBatchSenderPtr;
+    boost::mutex m_sentPacketsMutex;
+    boost::condition_variable m_cvSentPacket; // notify when UdpBatchSender has sent out our RTP frames to network
+    volatile bool m_sentPacketsSuccess;
 
-    
     // multithreading 
     boost::condition_variable m_incomingQueueCv;
     boost::mutex m_incomingQueueMutex;     
@@ -49,4 +60,6 @@ private:
     uint64_t m_totalRtpPacketsSent = 0; 
     uint64_t m_totalRtpBytesSent = 0;
     uint64_t m_totalRtpPacketsQueued = 0;
+
+
 };

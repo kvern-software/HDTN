@@ -341,9 +341,9 @@ rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec,
     int64_t deltat = ntohl(m_prevHeader.timestamp) - ntohl(incomingHeaderPtr->timestamp);
     if (deltat != 0) { // CCSDS 3.3.4 // do not concatenate if the timestamp has changed
         UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
-        LOG_INFO(subprocess) << "Timestamp changed! \nPrevious TS: " << ntohl(m_prevHeader.timestamp) << \
-        " \nincoming TS: " << ntohl(incomingHeaderPtr->timestamp) << \
-        " \nDelta: " << ntohl(m_prevHeader.timestamp)- ntohl(incomingHeaderPtr->timestamp);
+        // LOG_INFO(subprocess) << "Timestamp changed! \nPrevious TS: " << ntohl(m_prevHeader.timestamp) << \
+        // " \nincoming TS: " << ntohl(incomingHeaderPtr->timestamp) << \
+        // " \nDelta: " << ntohl(m_prevHeader.timestamp)- ntohl(incomingHeaderPtr->timestamp);
 
         return RTP_PUSH_PREVIOUS_FRAME;
     }

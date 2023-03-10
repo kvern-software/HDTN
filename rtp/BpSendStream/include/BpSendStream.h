@@ -11,7 +11,8 @@ class BpSendStream : public BpSourcePattern
 {
 public:
 
-    BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes);
+    BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, 
+            size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation);
     ~BpSendStream();
 
     void ProcessIncomingBundlesThread(); // worker thread that calls RTP packet handler
@@ -50,6 +51,7 @@ private:
     uint64_t m_maxOutgoingBundleSizeBytes;
     uint64_t m_bpGenSequenceNumber;
 
+    bool m_enableRtpConcatentation;
 
     boost::mutex m_outgoingQueueMutex;   
     boost::mutex m_incomingQueueMutex;     

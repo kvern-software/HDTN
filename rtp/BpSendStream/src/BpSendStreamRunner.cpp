@@ -46,6 +46,7 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
         uint16_t incomingRtpStreamPort;
         size_t numCircularBufferVectors;
         uint32_t maxBundleSizeBytes;
+        bool enableRtpConcatenation;
 
         boost::program_options::options_description desc("Allowed options");
         try {
@@ -67,7 +68,7 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
                 ("max-incoming-udp-packet-size-bytes", boost::program_options::value<size_t>()->default_value(2), "Max size of incoming UDP packets (from the RTP stream). Use in conjection with FFmpeg")
                 ("incoming-rtp-stream-port", boost::program_options::value<uint16_t>()->default_value(50000), "Where incoming RTP stream is being delivered")
                 ("num-circular-buffer-vectors", boost::program_options::value<size_t>()->default_value(50), "Number of circular buffer vector elements in the udp sink")
-                ;
+                ("enable-rtp-concatenation", boost::program_options::value<bool>()->default_value(true), "Enable concatenation of incoming RTP packets to reduce RTP overhead");
 
                 boost::program_options::variables_map vm;
                 boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc, boost::program_options::command_line_style::unix_style | boost::program_options::command_line_style::case_insensitive), vm);
@@ -141,6 +142,7 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
                 numCircularBufferVectors = vm["num-circular-buffer-vectors"].as<size_t>();
                 maxBundleSizeBytes = vm["bundle-size"].as<uint32_t>();
                 bundleRate = vm["bundle-rate"].as<uint32_t>();
+                enableRtpConcatenation = vm["enable-rtp-concatenation"].as<bool>();
 
         }
         catch (boost::bad_any_cast & e) {
@@ -160,7 +162,7 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
 
         LOG_INFO(subprocess) << "starting..";
 
-        BpSendStream bpSendStream(maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, numCircularBufferVectors, maxBundleSizeBytes);
+        BpSendStream bpSendStream(maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, numCircularBufferVectors, maxBundleSizeBytes, enableRtpConcatenation);
 
         bpSendStream.Start(
             outductsConfigPtr,

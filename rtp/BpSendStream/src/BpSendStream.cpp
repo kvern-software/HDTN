@@ -4,11 +4,13 @@
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
-BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes) : BpSourcePattern(),
+BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, size_t numCircularBufferVectors, 
+        size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation) : BpSourcePattern(),
     m_running(true),
     m_maxIncomingUdpPacketSizeBytes(maxIncomingUdpPacketSizeBytes),
     m_incomingRtpStreamPort(incomingRtpStreamPort),
-    m_maxOutgoingBundleSizeBytes(maxOutgoingBundleSizeBytes)
+    m_maxOutgoingBundleSizeBytes(maxOutgoingBundleSizeBytes),
+    m_enableRtpConcatentation(enableRtpConcatentation)
 {
 
     m_currentFrame.reserve(m_maxOutgoingBundleSizeBytes);
@@ -102,11 +104,14 @@ void BpSendStream::ProcessIncomingBundlesThread()
                         break;
 
                     case RTP_CONCATENATE:
-                        // PushFrame();
-                        // CreateFrame();
-
-                        Concatenate(m_incomingCircularPacketQueue.front()); // concatenation may fail if the bundle size is less than requested rtp frame, if so RTP_PUSH_PREVIOUS_FRAME is performed 
-                        break;
+                        if (m_enableRtpConcatentation) {
+                            Concatenate(m_incomingCircularPacketQueue.front()); // concatenation may fail if the bundle size is less than requested rtp frame, if so RTP_PUSH_PREVIOUS_FRAME is performed 
+                            break;
+                        } else {
+                            PushFrame();
+                            CreateFrame();
+                            break;
+                        }
                         
                     case RTP_PUSH_PREVIOUS_FRAME: // push current frame and make incoming frame the current frame
                         PushFrame();
@@ -136,15 +141,11 @@ void BpSendStream::CreateFrame()
 
     // fill header with outgoing Dtn Rtp header information
     // this is tranlating from incoming DtnRtp session to outgoing DtnRtp session
-    memcpy(&m_currentFrame.front(), m_outgoingDtnRtpPtr->GetHeader(), sizeof(rtp_header));
-    
-
-
-    memcpy(&m_currentFrame.front() + sizeof(rtp_header), 
-            &m_incomingCircularPacketQueue.front() + sizeof(rtp_header),  // skip the incoming header for our outgoing header instead
-            m_incomingCircularPacketQueue.front().size() - sizeof(rtp_header));
-    
-    
+    // memcpy(&m_currentFrame.front(), m_outgoingDtnRtpPtr->GetHeader(), sizeof(rtp_header));
+     memcpy(&m_currentFrame.front(), m_incomingCircularPacketQueue.front().data(), m_incomingCircularPacketQueue.front().size());
+    // memcpy(&m_currentFrame.front() + sizeof(rtp_header), 
+    //         &m_incomingCircularPacketQueue.front() + sizeof(rtp_header),  // skip the incoming header for our outgoing header instead
+    //         m_incomingCircularPacketQueue.front().size() - sizeof(rtp_header));
 
     m_offset = m_incomingCircularPacketQueue.front().size(); // assumes that this had a header that we skipped
 
@@ -179,26 +180,31 @@ void BpSendStream::Concatenate(padded_vector_uint8_t &incomingRtpFrame)
 // Add current frame to the outgoing queue to be bundled and sent
 void BpSendStream::PushFrame()
 {
-    LOG_DEBUG(subprocess) << "Push frame with "
-        // << m_outgoingDtnRtpPtr->GetNumConcatenated() << " concatenated RTP packets\n"
-        << ntohs(m_outgoingDtnRtpPtr->GetSequence()) << " =seq & " 
-        // << ntohl(m_outgoingDtnRtpPtr->GetTimestamp()) << "=ts\n"
-        << m_currentFrame.size() << "=size into outgoing queue";
+    // LOG_DEBUG(subprocess) 
+    //     // << m_outgoingDtnRtpPtr->GetNumConcatenated() << " concatenated RTP packets\n"
+    //     << ntohs(m_outgoingDtnRtpPtr->GetSequence()) << "=seq & " 
+    //     // << ntohl(m_outgoingDtnRtpPtr->GetTimestamp()) << "=ts\n"
+    //     << m_currentFrame.size() << "=size into outgoing queue";
     
 
     {
         boost::mutex::scoped_lock lock(m_outgoingQueueMutex);    // lock mutex 
         m_outgoingCircularFrameQueue.push_back(std::move(m_currentFrame));
-    }
+        // rtp_frame * frame = (rtp_frame *) m_outgoingCircularFrameQueue.back().data();
+        // frame->print_header();
+    } 
+
+    // exit(-1);
     m_outgoingQueueCv.notify_one();
+    
+    // Outgoing DtnRtp session needs to update seq status since we just sent an RTP frame. This is the seq number used for the next packet
+    m_outgoingDtnRtpPtr->IncSequence();
+    m_outgoingDtnRtpPtr->ResetNumConcatenated();
+    m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) m_incomingCircularPacketQueue.front().data(), USE_OUTGOING_SEQ); // updates our next header to have the correct ts, fmt, ext, m ect.
 
     m_currentFrame.resize(0);
     m_offset = 0;
     
-    // Outgoing DtnRtp session needs to update seq status since we just sent an RTP frame
-    m_outgoingDtnRtpPtr->IncSequence();
-    m_outgoingDtnRtpPtr->ResetNumConcatenated();
-    m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) m_incomingCircularPacketQueue.front().data(), USE_OUTGOING_SEQ); // updates our next header to have the correct ts, fmt, ext, m ect.
 
     m_totalRtpPacketsQueued++;
 }
@@ -229,14 +235,14 @@ bool BpSendStream::CopyPayload_Step2(uint8_t * destinationBuffer)
     // std::cout << "OUTGOING SEQ =" << ntohs(m_outgoingDtnRtpPtr->GetSequence()) << std::endl;
 
 
-    LOG_DEBUG(subprocess) << "Copied out frame with " <<  "seq=" << ntohs(incomingHeaderPtr->seq) << "   " <<  "size=" << m_outgoingCircularFrameQueue.front().size();
+    // LOG_DEBUG(subprocess) << "Copied out frame with " <<  "seq=" << ntohs(incomingHeaderPtr->seq) << "   " <<  "size=" << m_outgoingCircularFrameQueue.front().size();
                 
     // copy out rtp packet
     memcpy(destinationBuffer, m_outgoingCircularFrameQueue.front().data(), m_outgoingCircularFrameQueue.front().size());
     
     m_outgoingCircularFrameQueue.pop_front(); // pop outgoing queue
 
-    LOG_DEBUG(subprocess) << "Size after copy and popping out " << m_outgoingCircularFrameQueue.size();
+    // LOG_DEBUG(subprocess) << "Size after copy and popping out " << m_outgoingCircularFrameQueue.size();
     
     m_totalRtpPacketsSent++;
     return true;
