@@ -35,6 +35,7 @@ BpReceiveStream::~BpReceiveStream()
     LOG_INFO(subprocess) << "m_totalRtpPacketsReceived: " << m_totalRtpPacketsReceived;
     LOG_INFO(subprocess) << "m_totalRtpPacketsSent: " << m_totalRtpPacketsSent;
     LOG_INFO(subprocess) << "m_totalRtpPacketsQueued: " << m_totalRtpPacketsQueued;
+    LOG_INFO(subprocess) << "m_totalRtpPacketFailedToSend: " << m_totalRtpPacketsFailedToSend;
 
 }
 
@@ -67,7 +68,7 @@ void BpReceiveStream::ProcessIncomingBundlesThread()
             // this is where we copy incoming frames into, reserve max space right now for efficiency
             // std::vector<std::vector<uint8_t>> rtpFrameVec(numPacketsToTransferPayload);
             // for (auto vec=rtpFrameVec.begin(); vec!=rtpFrameVec.end(); vec++)  {
-            //     vec->reserve(m_maxOutgoingRtpPacketSizeBytes);
+                // vec->reserve(m_maxOutgoingRtpPacketSizeBytes);
             // }
             
             // LOG_DEBUG(subprocess) << "Sending " << numPacketsToTransferPayload  << " packets";
@@ -78,17 +79,21 @@ void BpReceiveStream::ProcessIncomingBundlesThread()
             }
 
             size_t offset = sizeof(rtp_header); // start first byte after header 
+
+            std::vector<uint8_t> rtpFrame;
+            rtpFrame.reserve(m_maxOutgoingRtpPacketSizeBytes);
+            size_t nextPacketSize;
+
             for (size_t i = 0; i < numPacketsToTransferPayload; i++)
             {
-                size_t nextPacketSize;
                 if ( (bytesPayloadRemaining + sizeof(rtp_header)) >= m_maxOutgoingRtpPacketSizeBytes) {
                     nextPacketSize = m_maxOutgoingRtpPacketSizeBytes;
                 } else {
                     nextPacketSize = bytesPayloadRemaining + sizeof(rtp_header);
                 }
                 size_t bytesPayloadToCopy = nextPacketSize - sizeof(rtp_header);
-
-                std::vector<uint8_t> rtpFrame(nextPacketSize);
+                
+                rtpFrame.resize(nextPacketSize);
 
                 // update header (everything execpt sequence number & marker bit from the incoming packet)
                 m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) incomingPacket.data(), USE_INCOMING_SEQ);
@@ -138,20 +143,22 @@ void BpReceiveStream::ProcessIncomingBundlesThread()
     }
 }
 
+// Data from BpSourcePattern comes in through here
 bool BpReceiveStream::ProcessPayload(const uint8_t *data, const uint64_t size)
 {
     padded_vector_uint8_t vec(size);
     memcpy(vec.data(), data, size);
 
     {
-        boost::mutex::scoped_lock lock(m_incomingQueueMutex);// lock mutex 
+        boost::mutex::scoped_lock lock(m_incomingQueueMutex); // lock mutex 
         m_incomingCircularPacketQueue.push_back(std::move(vec));
+        m_totalRtpPacketsQueued++;
     }
     m_incomingQueueCv.notify_one();
     m_totalRtpPacketsReceived++;
 
-    // LOG_DEBUG(subprocess) << "Got bundle of size " << size;
     // rtp_frame * frame= (rtp_frame *) data;
+    // LOG_DEBUG(subprocess) << "Got bundle of size " << size;
     // frame->print_header();
     return true;
 }
@@ -217,17 +224,16 @@ void BpReceiveStream::OnSentRtpPacketCallback(bool success, std::shared_ptr<std:
 int BpReceiveStream::SendUdpPacket(const std::vector<uint8_t>& message) {
 
 
-	try {
-		// Open the socket, socket's destructor will
-		// automatically close it.
-		// And send the string... (synchronous / blocking)
-		socket.send_to(boost::asio::buffer(message), m_udpEndpoint);
-	
-	} catch (const boost::system::system_error& ex) {
-		// Exception thrown!
-		// Examine ex.code() and ex.what() to see what went wrong!
-        LOG_ERROR(subprocess) << "Failed to send code: " << ex.code() << " what:" << ex.what();
-		return -1;
-	}
+    m_totalRtpBytesSent += socket.send_to(boost::asio::buffer(message), m_udpEndpoint);
+	// try {
+	// } catch (const boost::system::system_error& ex) {
+	// 	// Exception thrown!
+	// 	// Examine ex.code() and ex.what() to see what went wrong!
+    //     m_totalRtpPacketsFailedToSend++;
+    //     LOG_ERROR(subprocess) << "Failed to send code: " << ex.code() << " what:" << ex.what();
+	// 	return -1;
+	// }
+
+    m_totalRtpPacketsSent++;
 	return 0;
 }

@@ -92,8 +92,7 @@ void DtnMediaStream::PushFrame(buffer * img_buffer)
 */
 void DtnMediaStream::ReceivePayload(const uint8_t * data, const uint64_t size)
 {
-    buffer  tmp_buf;
-    payloadBuffers.emplace_back(tmp_buf);
+    payloadBuffers.emplace_back();
     payloadBuffers.back().allocate(size);
     payloadBuffers.back().copy((void * ) data);
 }

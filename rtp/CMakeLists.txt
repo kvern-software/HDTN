@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.12)  # CMake version check
 project(dtn_rtp_streaming)          
 set(CMAKE_CXX_STANDARD 11)   
 set(CMAKE_VERBOSE_MAKEFILE FALSE)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wformat -std=c++2a  -g") # -Werror
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wformat -std=c++2a  -g -O3 -Werror") 
 set(CMAKE_BUILD_TYPE Release)
 
 set(MIN_BOOST_VERSION 1.66.0)
@@ -40,12 +40,12 @@ find_package(Boost "1.67.0" REQUIRED timer unit_test_framework)
 # add_subdirectory(uvgRTP)
 
 set(DTN_SOURCES 
-	src/dtn/DtnContext.cpp
-	src/dtn/DtnEncoder.cpp
-	src/dtn/DtnFrameQueue.cpp
-	src/dtn/DtnMedia.cpp
-	src/dtn/DtnMediaStream.cpp
-	src/dtn/DtnSession.cpp
+	# src/dtn/DtnContext.cpp
+	# src/dtn/DtnEncoder.cpp
+	# src/dtn/DtnFrameQueue.cpp
+	# src/dtn/DtnMedia.cpp
+	# src/dtn/DtnMediaStream.cpp
+	# src/dtn/DtnSession.cpp
 	src/dtn/DtnUtil.cpp
 	src/dtn/DtnRtp.cpp
 )
@@ -62,103 +62,103 @@ set(GUI_SOURCES
 )
 
 ##### SINK
-add_executable(dtn_rtp_stream_sink   
-	#gui
-	MediaGui/MediaGui.cpp
-	${GUI_SOURCES}
+# add_executable(dtn_rtp_stream_sink   
+# 	#gui
+# 	MediaGui/MediaGui.cpp
+# 	${GUI_SOURCES}
 
-	src/video_driver/VideoDriver.cpp
-	# dtn related items such as streams 
-	${DTN_SOURCES}
+# 	src/video_driver/VideoDriver.cpp
+# 	# dtn related items such as streams 
+# 	${DTN_SOURCES}
 
-	MediaSink/MediaSink.cpp
-	MediaSink/MediaSinkMain.cpp
-	MediaSink/MediaSinkRunner.cpp)
+# 	MediaSink/MediaSink.cpp
+# 	MediaSink/MediaSinkMain.cpp
+# 	MediaSink/MediaSinkRunner.cpp)
 
-target_include_directories(dtn_rtp_stream_sink PUBLIC
-	src/dtn/include
-	src/video_driver
-	MediaGui/
-	MediaGui/include/imgui
-	MediaGui/include/imgui/backends #gui
-	MediaGui/include/stb #quick file loader
-)
-target_link_libraries(dtn_rtp_stream_sink
-	#gui
-	glfw 
-	OpenGL::GL 
-	${CMAKE_DL_LIBS}	
+# target_include_directories(dtn_rtp_stream_sink PUBLIC
+# 	src/dtn/include
+# 	src/video_driver
+# 	MediaGui/
+# 	MediaGui/include/imgui
+# 	MediaGui/include/imgui/backends #gui
+# 	MediaGui/include/stb #quick file loader
+# )
+# target_link_libraries(dtn_rtp_stream_sink
+# 	#gui
+# 	glfw 
+# 	OpenGL::GL 
+# 	${CMAKE_DL_LIBS}	
 	
-	#HDTN
-	HDTN::HDTNUtil
-	HDTN::TelemetryDefinitions
-	HDTN::LtpLib
-	HDTN::BpAppPatternsLib
-	HDTN::Bpcodec
-	HDTN::EgressLib
-	HDTN::HDTNConfigLib
-	HDTN::HDTNCgrLib
-	HDTN::InductManagerLib
-	HDTN::IngressLib
-	HDTN::LoggerLib
-	HDTN::OutductManagerLib
-	HDTN::StcpLib
-	HDTN::StorageLib
-	HDTN::TcpclLib
-	HDTN::UdpLib
-	HDTN::UdpDelaySimLib
+# 	#HDTN
+# 	HDTN::HDTNUtil
+# 	HDTN::TelemetryDefinitions
+# 	HDTN::LtpLib
+# 	HDTN::BpAppPatternsLib
+# 	HDTN::Bpcodec
+# 	HDTN::EgressLib
+# 	HDTN::HDTNConfigLib
+# 	HDTN::HDTNCgrLib
+# 	HDTN::InductManagerLib
+# 	HDTN::IngressLib
+# 	HDTN::LoggerLib
+# 	HDTN::OutductManagerLib
+# 	HDTN::StcpLib
+# 	HDTN::StorageLib
+# 	HDTN::TcpclLib
+# 	HDTN::UdpLib
+# 	HDTN::UdpDelaySimLib
 
-	Boost::unit_test_framework
-	Boost::timer
-    Boost::program_options 
-	Boost::thread
-	Boost::log
-	${AVCODEC_LIBRARY}
-) 
+# 	Boost::unit_test_framework
+# 	Boost::timer
+#     Boost::program_options 
+# 	Boost::thread
+# 	Boost::log
+# 	${AVCODEC_LIBRARY}
+# ) 
 
-##### SOURCE
-add_executable(dtn_rtp_stream_source   	
-	# dtn related items such as streams 
-	MediaSource/MediaSource.cpp
-	MediaSource/MediaSourceMain.cpp
-    MediaSource/MediaSourceRunner.cpp
+# ##### SOURCE
+# add_executable(dtn_rtp_stream_source   	
+# 	# dtn related items such as streams 
+# 	MediaSource/MediaSource.cpp
+# 	MediaSource/MediaSourceMain.cpp
+#     MediaSource/MediaSourceRunner.cpp
 	
-	# dtn related items such as streams 
-	${DTN_SOURCES}
+# 	# dtn related items such as streams 
+# 	${DTN_SOURCES}
 	
-	src/video_driver/VideoDriver.cpp
-)
-target_include_directories(dtn_rtp_stream_source PUBLIC
-	src/dtn/include
-	src/video_driver
-)
-target_link_libraries(dtn_rtp_stream_source   
-	#HDTN
-	HDTN::HDTNUtil
-	HDTN::TelemetryDefinitions
-	HDTN::LtpLib
-	HDTN::BpAppPatternsLib
-	HDTN::Bpcodec
-	HDTN::EgressLib
-	HDTN::HDTNConfigLib
-	HDTN::HDTNCgrLib
-	HDTN::InductManagerLib
-	HDTN::IngressLib
-	HDTN::LoggerLib
-	HDTN::OutductManagerLib
-	HDTN::StcpLib
-	HDTN::StorageLib
-	HDTN::TcpclLib
-	HDTN::UdpLib
-	HDTN::UdpDelaySimLib
+# 	src/video_driver/VideoDriver.cpp
+# )
+# target_include_directories(dtn_rtp_stream_source PUBLIC
+# 	src/dtn/include
+# 	src/video_driver
+# )
+# target_link_libraries(dtn_rtp_stream_source   
+# 	#HDTN
+# 	HDTN::HDTNUtil
+# 	HDTN::TelemetryDefinitions
+# 	HDTN::LtpLib
+# 	HDTN::BpAppPatternsLib
+# 	HDTN::Bpcodec
+# 	HDTN::EgressLib
+# 	HDTN::HDTNConfigLib
+# 	HDTN::HDTNCgrLib
+# 	HDTN::InductManagerLib
+# 	HDTN::IngressLib
+# 	HDTN::LoggerLib
+# 	HDTN::OutductManagerLib
+# 	HDTN::StcpLib
+# 	HDTN::StorageLib
+# 	HDTN::TcpclLib
+# 	HDTN::UdpLib
+# 	HDTN::UdpDelaySimLib
 
-	Boost::unit_test_framework
-	Boost::timer
-    Boost::program_options 
-	Boost::thread
-	Boost::log
-	${AVCODEC_LIBRARY}
-) 
+# 	Boost::unit_test_framework
+# 	Boost::timer
+#     Boost::program_options 
+# 	Boost::thread
+# 	Boost::log
+# 	${AVCODEC_LIBRARY}
+# ) 
 
 
 ##### STREAM

@@ -123,153 +123,10 @@ void DtnRtp::SetClockRate(rtp_format_t fmt)
     }
 }
 
-// void DtnRtp::SetDynamicPayload(uint8_t payload);
 void DtnRtp::SetTimestamp(uint32_t timestamp)
 {
     m_prevHeader.timestamp = timestamp;
 }
-
-void DtnRtp::FillHeader(rtp_frame * frame)
-{
-    // if (!frame)
-    //     return;
-
-    // /* This is the first RTP message, get wall clock reading (t = 0)
-    //  * and generate random RTP timestamp for this reading */
-    // if (m_timestamp == INVALID_TS) {
-    //     m_timestamp        = GenRandom();
-    //     m_wallClockStart = std::chrono::high_resolution_clock::now();
-    // }
-
-    // frame->header.version = 2;
-    // frame->header.padding = 0;
-    // frame->header.ext = 0;
-    // frame->header.cc = 0; // not implemented
-    // frame->header.marker = 0;
-    // frame->header.payload = (m_fmt & 0x7f) | (0 << 7);
-    // // frame->header.seq =  htons(m_sequence);
-
-
-    // auto now = std::chrono::high_resolution_clock::now();
-    // std::chrono::microseconds wall_time_since_start = 
-    //     std::chrono::duration_cast<std::chrono::microseconds>(now - m_wallClockStart); // wall time total
-
-    // uint64_t u_seconds_elapsed = wall_time_since_start.count() * m_clockRate; // time elapsed using our media clock rate
-    // uint32_t rtp_timestamp = m_timestamp + uint32_t(u_seconds_elapsed / 1000000); // convert from micro seconds to seconds
-
-
-    // frame->header.timestamp = htonl((u_long)rtp_timestamp);
-    // frame->header.ssrc = htonl(*m_ssrc.get());
-}
-
-void DtnRtp::UpdateSequence(rtp_frame * frame)
-{
-    // if (!frame)
-    //     return;
-
-    // frame->header.seq = htons(m_sequence); //network byte order
-
-    // IncSequence();
-}
-
-
-/**
- * Parses payload into rtp packets
-*/
-int DtnRtp::PacketHandler(ssize_t size, void *packet, int rce_flags,  std::shared_ptr<DtnFrameQueue> incomingFrameQueue)
-{
-//     (void)rce_flags;
-//     /* not an RTP frame */
-//     if (size < 12) {       
-//         LOG_ERROR(subprocess) << "Received RTP packet is too small to contain header";
-//         return -1;
-//     }
-    
-//     rtp_frame tmp_frame; // allocate new frame to be filled
-//     rtp_frame * incomingFramePtr = (rtp_frame *) packet;
-//     // uint8_t *ptr = (uint8_t *)packet;
-
-//     /* invalid version */
-//     if (incomingFramePtr->header.version != 2) {
-//         LOG_ERROR(subprocess) << "Received RTP packet with invalid version";
-//         return -1;
-//     }
-
-//     tmp_frame.header.version   = (unsigned int) incomingFramePtr->header.version;
-//     tmp_frame.header.padding   = (unsigned int) incomingFramePtr->header.padding;
-//     tmp_frame.header.ext       = (unsigned int) incomingFramePtr->header.ext; 
-//     tmp_frame.header.cc        = (unsigned int) incomingFramePtr->header.cc; 
-//     tmp_frame.header.marker    = (unsigned int) incomingFramePtr->header.marker;
-//     tmp_frame.header.payload   = (unsigned int) incomingFramePtr->header.payload; 
-//     tmp_frame.header.seq       =  (incomingFramePtr->header.seq);     // still in network byte order here
-//     tmp_frame.header.timestamp =  (incomingFramePtr->header.timestamp); // still in network byte order here
-//     tmp_frame.header.ssrc      =  (incomingFramePtr->header.ssrc);
-
-//     tmp_frame.payload.length = (size_t)size - sizeof(rtp_header);
-//     tmp_frame.print_header();
-
-//     // /* Skip the generics RTP header
-//     //  * There may be 0..N CSRC entries after the header, so check those */
-//     // ptr += sizeof(rtp_header);
-
-//     if (tmp_frame.header.cc > 0) {
-//        // LOG_INFO(subprocess) << "frame contains csrc entries";
-
-//  //       if ((ssize_t) (tmp_frame.payload.length- tmp_frame.header.cc * sizeof(uint32_t) ) < 0) {
-//    //         LOG_ERROR(subprocess) << "Invalid frame length, " << tmp_frame.header.cc << "CSRC entries, total length " << tmp_frame.payload.length;
-//      //       return -1;
-//        // }
-
-//        // LOG_INFO(subprocess) << "Allocating"  << tmp_frame.header.cc << "CSRC entries";
-
-//         // (*out)->csrc         = new uint32_t[(*out)->header.cc];
-//         // (*out)->payload_len -= (*out)->header.cc * sizeof(uint32_t);
-
-//         // for (size_t i = 0; i < (*out)->header.cc; ++i) {
-//         //     (*out)->csrc[i]  = *(uint32_t *)ptr;
-//         //     ptr             += sizeof(uint32_t);
-//         // }
-//     }
-
-//     if (tmp_frame.header.ext) {
-//         LOG_INFO(subprocess) << "Frame contains extension information";
-//         // (*out)->ext = new uvgrtp::frame::ext_header;
-//         // (*out)->ext->type    = ntohs(*(uint16_t *)&ptr[0]);
-//         // (*out)->ext->len     = ntohs(*(uint16_t *)&ptr[2]) * sizeof(uint32_t);
-//         // (*out)->ext->data    = (uint8_t *)memdup(ptr + 2 * sizeof(uint16_t), (*out)->ext->len);
-//         // (*out)->payload_len -= 2 * sizeof(uint16_t) + (*out)->ext->len;
-//         // ptr                 += 2 * sizeof(uint16_t) + (*out)->ext->len;
-//     }
-
-//     /* If padding is set to 1, the last byte of the payload indicates
-//      * how many padding bytes was used. Make sure the padding length is
-//      * valid and subtract the amount of padding bytes from payload length */
-//     if (tmp_frame.header.padding) {
-//         LOG_INFO(subprocess) << "Frame contains padding";
-//         // uint8_t padding_len = (*out)->payload[(*out)->payload_len - 1];
-
-//         // if (!padding_len || (*out)->payload_len <= padding_len) {
-//         //     uvgrtp::frame::dealloc_frame(*out);
-//         //     return -1;
-//         // }
-
-//         // (*out)->payload_len -= padding_len;
-//         // (*out)->padding_len  = padding_len;
-//     }
-
-//     // copy out payload to tmp frame
-//     // tmp_frame.payload.start = ptr;
-//     tmp_frame.payload.allocate(tmp_frame.payload.length);
-//     tmp_frame.payload.copy(packet + sizeof(rtp_header)); // todo correct this 
-
-//     incomingFrameQueue->PushFrame(tmp_frame);
-//     // tmp_frame.payload.start    =  //(uint8_t *) //memdup(ptr, (*out)->payload_len);
-//     // tmp_frame.dgram      = (uint8_t *)packet;
-    // tmp_frame.dgram_size = size;
-
-    return 0;
-}
-
 
 rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec, const rtp_header * currentRtpFrameHeader)
 {    
@@ -341,8 +198,8 @@ rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec,
     int64_t deltat = ntohl(m_prevHeader.timestamp) - ntohl(incomingHeaderPtr->timestamp);
     if (deltat != 0) { // CCSDS 3.3.4 // do not concatenate if the timestamp has changed
         UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
-        // LOG_INFO(subprocess) << "Timestamp changed! \nPrevious TS: " << ntohl(m_prevHeader.timestamp) << \
-        // " \nincoming TS: " << ntohl(incomingHeaderPtr->timestamp) << \
+        // LOG_INFO(subprocess) << "Timestamp changed! \nPrevious TS: " << ntohl(m_prevHeader.timestamp) << 
+        // " \nincoming TS: " << ntohl(incomingHeaderPtr->timestamp) << 
         // " \nDelta: " << ntohl(m_prevHeader.timestamp)- ntohl(incomingHeaderPtr->timestamp);
 
         return RTP_PUSH_PREVIOUS_FRAME;
@@ -381,10 +238,10 @@ rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec,
     return RTP_CONCATENATE;
 }
 
-rtp_packet_status_t DtnRtp::BundleHandler(padded_vector_uint8_t &wholeBundleVec)
-{
+// rtp_packet_status_t DtnRtp::BundleHandler(padded_vector_uint8_t &wholeBundleVec)
+// {
     
-}
+// }
 
 /**
  * Take an incoming DtnSession header and update our own header accordingly.
@@ -406,12 +263,3 @@ void DtnRtp::UpdateHeader(const rtp_header * nextHeaderPointer, bool useIncoming
         // m_prevHeader.timestamp = currentTs;
     }
 }
-
-/**
- * Take a video frame and encapsulate into an RTP packet.
- * Follow the DTN/BP contatenation rules provided by CCSDSS
- * 
- *  - If SRTP (secure) is used, do not concatenate
- *  - All concatenated packets must have the same RTP timestamp. Effectively, this means only concatenate frames from the same frame.
- *      
-*/ 

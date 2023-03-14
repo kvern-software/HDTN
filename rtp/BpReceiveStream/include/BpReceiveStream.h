@@ -58,6 +58,7 @@ private:
     // book keeping
     uint64_t m_totalRtpPacketsReceived = 0; 
     uint64_t m_totalRtpPacketsSent = 0; 
+    uint64_t m_totalRtpPacketsFailedToSend = 0;
     uint64_t m_totalRtpBytesSent = 0;
     uint64_t m_totalRtpPacketsQueued = 0;
 
