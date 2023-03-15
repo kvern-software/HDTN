@@ -17,6 +17,21 @@ if( build_type_lower STREQUAL "debug" )
 	message(WARNING "You are building in Debug mode!  HDTN can run order(s) of magnitude slower!")
 endif()
 
+if(DEFINED CMAKE_SYSTEM_PROCESSOR)
+	if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm") 
+		message("CMAKE_SYSTEM_PROCESSOR = ${CMAKE_SYSTEM_PROCESSOR}")
+		message("You are compiling for ARM, shared libraries, x86 hardware accleration features and related unit tests have been disabled")
+		set(NON_ARM_COMPILATION false)
+		option(BUILD_SHARED_LIBS "Build shared libraries" Off)
+		option(LTP_RNG_USE_RDSEED Off)
+		option(USE_X86_HARDWARE_ACCELERATION Off) 
+		option(Boost_USE_STATIC_LIBS Off)
+		set(CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG -fPIC)
+	endif()
+else()
+	set(NON_ARM_COMPILATION true) # assume non ARM compilation if not specified
+endif()
+
 include(GenerateExportHeader)
 include(CheckIncludeFile)
 include(CheckCXXSourceCompiles)
@@ -123,25 +138,15 @@ OPTION(DO_STATS_LOGGING "Should stats be logged to files" Off)
 if (DO_STATS_LOGGING)
 	add_compile_definitions(DO_STATS_LOGGING)
 endif()
-OPTION(USE_WEB_INTERFACE "Use CivetWeb HDTN Web Interface" OFF)
-if(USE_WEB_INTERFACE)
-	#add_compile_definitions(USE_WEB_INTERFACE) #not needed globally, rather this is set specifically to HdtnOneProcessRunner.cpp in the one process CMakeLists.txt
-	if (WIN32)
-		set(civetweb_INCLUDE "C:/civetweb_msvc2017/include" CACHE PATH "Folder to CivetServer.h and civetweb.h")
-		set(civetweb_LIB "C:/civetweb_msvc2017/lib_release/civetweb.lib" CACHE FILEPATH "Civetweb library")
-		set(civetwebcpp_LIB "C:/civetweb_msvc2017/lib_release/civetweb-cpp.lib" CACHE FILEPATH "Civetweb CPP library")
-	else()
-		set(civetweb_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/external/include" CACHE PATH "Folder to CivetServer.h and civetweb.h")
-		set(civetweb_LIB "${CMAKE_CURRENT_SOURCE_DIR}/external/lib/libcivetweb.a" CACHE FILEPATH "Civetweb library")
-		set(civetwebcpp_LIB "" CACHE FILEPATH "Civetweb CPP library")
-	endif()
-endif()
+OPTION(USE_WEB_INTERFACE "Use Boost Beast HDTN Web Interface" OFF)
+#add_compile_definitions(USE_WEB_INTERFACE) #not needed globally, rather this is set specifically to HdtnOneProcessRunner.cpp in the one process CMakeLists.txt
+
 
 if (DO_STATS_LOGGING OR USE_WEB_INTERFACE)
 	set(RUN_TELEMETRY ON)
 endif()
 
-OPTION(ENABLE_OPENSSL_SUPPORT "TcpclV4 can use OpenSSL" ON)
+OPTION(ENABLE_OPENSSL_SUPPORT "TcpclV4 and GUI Web Server can use OpenSSL" ON)
 if(ENABLE_OPENSSL_SUPPORT)
     add_compile_definitions(OPENSSL_SUPPORT_ENABLED)
 	list(APPEND COMPILE_DEFINITIONS_TO_EXPORT OPENSSL_SUPPORT_ENABLED) #used by TcpAsyncSender.h and various TcpclV4 includes
@@ -151,6 +156,10 @@ if(ENABLE_OPENSSL_SUPPORT)
 	endif()
 	find_package(OpenSSL REQUIRED)
 endif()
+if(USE_WEB_INTERFACE AND ENABLE_OPENSSL_SUPPORT AND (${Boost_VERSION} LESS 107000))
+	message(WARNING "USE_WEB_INTERFACE and ENABLE_OPENSSL_SUPPORT are set to ON, but boost version ${Boost_VERSION} is less than 107000 (v1.70).  HTTPS will be disabled for the web interface gui.")
+endif()
+
 
 include(${CMAKE_SOURCE_DIR}/add_hdtn_package_export.cmake)
 
