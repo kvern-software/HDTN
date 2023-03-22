@@ -24,8 +24,12 @@ static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess:
 LtpBundleSink::LtpBundleSink(const LtpWholeBundleReadyCallback_t& ltpWholeBundleReadyCallback, const LtpEngineConfig& ltpRxCfg) :
     m_ltpWholeBundleReadyCallback(ltpWholeBundleReadyCallback),
     m_ltpRxCfg(ltpRxCfg),
-    M_EXPECTED_SESSION_ORIGINATOR_ENGINE_ID(ltpRxCfg.remoteEngineId)
+    M_EXPECTED_SESSION_ORIGINATOR_ENGINE_ID(ltpRxCfg.remoteEngineId),
+    m_ltpEnginePtr(NULL)
 {
+    m_telemetry.m_connectionName = ltpRxCfg.remoteHostname + ":" + boost::lexical_cast<std::string>(ltpRxCfg.remotePort)
+        + " Eng:" + boost::lexical_cast<std::string>(ltpRxCfg.remoteEngineId);
+    m_telemetry.m_inputName = std::string("*:") + boost::lexical_cast<std::string>(ltpRxCfg.myBoundUdpPort);
 }
 
 bool LtpBundleSink::Init() {
@@ -47,6 +51,8 @@ LtpBundleSink::~LtpBundleSink() {}
 void LtpBundleSink::RedPartReceptionCallback(const Ltp::session_id_t & sessionId, padded_vector_uint8_t & movableClientServiceDataVec,
     uint64_t lengthOfRedPart, uint64_t clientServiceId, bool isEndOfBlock)
 {
+    m_telemetry.m_totalBundleBytesReceived += movableClientServiceDataVec.size();
+    ++(m_telemetry.m_totalBundlesReceived);
     m_ltpWholeBundleReadyCallback(movableClientServiceDataVec);
 
     //This function is holding up the LtpEngine thread.  Once this red part reception callback exits, the last LTP checkpoint report segment (ack)
@@ -56,4 +62,28 @@ void LtpBundleSink::RedPartReceptionCallback(const Ltp::session_id_t & sessionId
 
 void LtpBundleSink::ReceptionSessionCancelledCallback(const Ltp::session_id_t & sessionId, CANCEL_SEGMENT_REASON_CODES reasonCode) {
     LOG_INFO(subprocess) << "remote has cancelled session " << sessionId << " with reason code " << (int)reasonCode;
+}
+
+void LtpBundleSink::SyncTelemetry() {
+    if (m_ltpEnginePtr) {
+        m_telemetry.m_numReportSegmentTimerExpiredCallbacks = m_ltpEnginePtr->m_numReportSegmentTimerExpiredCallbacksRef;
+        m_telemetry.m_numReportSegmentsUnableToBeIssued = m_ltpEnginePtr->m_numReportSegmentsUnableToBeIssuedRef;
+        m_telemetry.m_numReportSegmentsTooLargeAndNeedingSplit = m_ltpEnginePtr->m_numReportSegmentsTooLargeAndNeedingSplitRef;
+        m_telemetry.m_numReportSegmentsCreatedViaSplit = m_ltpEnginePtr->m_numReportSegmentsCreatedViaSplitRef;
+        m_telemetry.m_numGapsFilledByOutOfOrderDataSegments = m_ltpEnginePtr->m_numGapsFilledByOutOfOrderDataSegmentsRef;
+        m_telemetry.m_numDelayedFullyClaimedPrimaryReportSegmentsSent = m_ltpEnginePtr->m_numDelayedFullyClaimedPrimaryReportSegmentsSentRef;
+        m_telemetry.m_numDelayedFullyClaimedSecondaryReportSegmentsSent = m_ltpEnginePtr->m_numDelayedFullyClaimedSecondaryReportSegmentsSentRef;
+        m_telemetry.m_numDelayedPartiallyClaimedPrimaryReportSegmentsSent = m_ltpEnginePtr->m_numDelayedPartiallyClaimedPrimaryReportSegmentsSentRef;
+        m_telemetry.m_numDelayedPartiallyClaimedSecondaryReportSegmentsSent = m_ltpEnginePtr->m_numDelayedPartiallyClaimedSecondaryReportSegmentsSentRef;
+
+        m_telemetry.m_totalCancelSegmentsStarted = m_ltpEnginePtr->m_totalCancelSegmentsStarted;
+        m_telemetry.m_totalCancelSegmentSendRetries = m_ltpEnginePtr->m_totalCancelSegmentSendRetries;
+        m_telemetry.m_totalCancelSegmentsFailedToSend = m_ltpEnginePtr->m_totalCancelSegmentsFailedToSend;
+        m_telemetry.m_totalCancelSegmentsAcknowledged = m_ltpEnginePtr->m_totalCancelSegmentsAcknowledged;
+        m_telemetry.m_numRxSessionsCancelledBySender = m_ltpEnginePtr->m_numRxSessionsCancelledBySender;
+        m_telemetry.m_numStagnantRxSessionsDeleted = m_ltpEnginePtr->m_numStagnantRxSessionsDeleted;
+
+        m_telemetry.m_countTxUdpPacketsLimitedByRate = m_ltpEnginePtr->m_countAsyncSendsLimitedByRate;
+        SyncTransportLayerSpecificTelem(); //virtual function call
+    }
 }

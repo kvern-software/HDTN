@@ -71,19 +71,19 @@ TcpclV4BidirectionalLink::TcpclV4BidirectionalLink(
 
     m_base_myNextTransferId(0),
 
+    m_base_tcpclRemoteNodeId(0),
+
     M_BASE_MY_MAX_TX_UNACKED_BUNDLES(myMaxTxUnackedBundles), //bundle sink has MAX_UNACKED(maxUnacked + 5),
     M_BASE_MY_MAX_RX_SEGMENT_SIZE_BYTES(myMaxRxSegmentSizeBytes),
     M_BASE_MY_MAX_RX_BUNDLE_SIZE_BYTES(myMaxRxBundleSizeBytes),
 
-    m_base_userAssignedUuid(0),
+    m_base_remoteMaxRxSegmentSizeBytes(0),
+    m_base_remoteMaxRxBundleSizeBytes(0),
+    m_base_remoteMaxRxSegmentsPerBundle(0),
+    m_base_maxUnackedSegments(0),
+    m_base_ackCbSize(0),
 
-    //stats
-    m_base_totalBundlesAcked(0),
-    m_base_totalBytesAcked(0),
-    m_base_totalBundlesSent(0),
-    m_base_totalFragmentedAcked(0),
-    m_base_totalFragmentedSent(0),
-    m_base_totalBundleBytesSent(0)
+    m_base_userAssignedUuid(0)
 {
     
     m_base_tcpclV4RxStateMachine.SetMaxReceiveBundleSizeBytes(myMaxRxBundleSizeBytes);
@@ -128,53 +128,67 @@ TcpclV4BidirectionalLink::~TcpclV4BidirectionalLink() {
 }
 
 void TcpclV4BidirectionalLink::BaseClass_TryToWaitForAllBundlesToFinishSending() {
-    boost::mutex localMutex;
-    boost::mutex::scoped_lock lock(localMutex);
-    m_base_useLocalConditionVariableAckReceived = true;
-    std::size_t previousUnacked = std::numeric_limits<std::size_t>::max();
-    for (unsigned int attempt = 0; attempt < 10; ++attempt) {
-        const std::size_t numUnacked = Virtual_GetTotalBundlesUnacked();
-        if (numUnacked) {
-            LOG_INFO(subprocess) << M_BASE_IMPLEMENTATION_STRING_FOR_COUT << ": destructor waiting on " << numUnacked << " unacked bundles";
+    try {
+        boost::mutex localMutex;
+        boost::mutex::scoped_lock lock(localMutex);
+        m_base_useLocalConditionVariableAckReceived = true;
+        std::size_t previousUnacked = std::numeric_limits<std::size_t>::max();
+        for (unsigned int attempt = 0; attempt < 10; ++attempt) {
+            const std::size_t numUnacked = Virtual_GetTotalBundlesUnacked();
+            if (numUnacked) {
+                LOG_INFO(subprocess) << M_BASE_IMPLEMENTATION_STRING_FOR_COUT << ": destructor waiting on " << numUnacked << " unacked bundles";
 
-            LOG_INFO(subprocess) << "   acked: " << m_base_totalBundlesAcked;
-            LOG_INFO(subprocess) << "   total sent: " << m_base_totalBundlesSent;
+                LOG_INFO(subprocess) << "   acked: " << m_base_outductTelemetry.m_totalBundlesAcked;
+                LOG_INFO(subprocess) << "   total sent: " << m_base_outductTelemetry.m_totalBundlesSent;
 
-            if (previousUnacked > numUnacked) {
-                previousUnacked = numUnacked;
-                attempt = 0;
+                if (previousUnacked > numUnacked) {
+                    previousUnacked = numUnacked;
+                    attempt = 0;
+                }
+                m_base_localConditionVariableAckReceived.timed_wait(lock, boost::posix_time::milliseconds(250)); // call lock.unlock() and blocks the current thread
+                //thread is now unblocked, and the lock is reacquired by invoking lock.lock()
+                continue;
             }
-            m_base_localConditionVariableAckReceived.timed_wait(lock, boost::posix_time::milliseconds(250)); // call lock.unlock() and blocks the current thread
-            //thread is now unblocked, and the lock is reacquired by invoking lock.lock()
-            continue;
+            break;
         }
-        break;
+        m_base_useLocalConditionVariableAckReceived = false;
     }
-    m_base_useLocalConditionVariableAckReceived = false;
+    catch (const boost::condition_error& e) {
+        LOG_ERROR(subprocess) << "condition_error in TcpclV4BidirectionalLink::BaseClass_TryToWaitForAllBundlesToFinishSending: " << e.what();
+    }
+    catch (const boost::thread_resource_error& e) {
+        LOG_ERROR(subprocess) << "thread_resource_error in TcpclV4BidirectionalLink::BaseClass_TryToWaitForAllBundlesToFinishSending: " << e.what();
+    }
+    catch (const boost::thread_interrupted&) {
+        LOG_ERROR(subprocess) << "thread_interrupted in TcpclV4BidirectionalLink::BaseClass_TryToWaitForAllBundlesToFinishSending";
+    }
+    catch (const boost::lock_error& e) {
+        LOG_ERROR(subprocess) << "lock_error in TcpclV4BidirectionalLink::BaseClass_TryToWaitForAllBundlesToFinishSending: " << e.what();
+    }
 }
 
 std::size_t TcpclV4BidirectionalLink::Virtual_GetTotalBundlesAcked() {
-    return m_base_totalBundlesAcked;
+    return m_base_outductTelemetry.m_totalBundlesAcked;
 }
 
 std::size_t TcpclV4BidirectionalLink::Virtual_GetTotalBundlesSent() {
-    return m_base_totalBundlesSent;
+    return m_base_outductTelemetry.m_totalBundlesSent;
 }
 
 std::size_t TcpclV4BidirectionalLink::Virtual_GetTotalBundlesUnacked() {
-    return m_base_totalBundlesSent - m_base_totalBundlesAcked;
+    return m_base_outductTelemetry.m_totalBundlesSent - m_base_outductTelemetry.m_totalBundlesAcked;
 }
 
 std::size_t TcpclV4BidirectionalLink::Virtual_GetTotalBundleBytesAcked() {
-    return m_base_totalBytesAcked;
+    return m_base_outductTelemetry.m_totalBundleBytesAcked;
 }
 
 std::size_t TcpclV4BidirectionalLink::Virtual_GetTotalBundleBytesSent() {
-    return m_base_totalBundleBytesSent;
+    return m_base_outductTelemetry.m_totalBundleBytesSent;
 }
 
 std::size_t TcpclV4BidirectionalLink::Virtual_GetTotalBundleBytesUnacked() {
-    return m_base_totalBundleBytesSent - m_base_totalBytesAcked;
+    return m_base_outductTelemetry.m_totalBundleBytesSent - m_base_outductTelemetry.m_totalBundleBytesAcked;
 }
 
 unsigned int TcpclV4BidirectionalLink::Virtual_GetMaxTxBundlesInPipeline() {
@@ -255,6 +269,10 @@ void TcpclV4BidirectionalLink::BaseClass_DataSegmentCallback(padded_vector_uint8
     uint64_t bytesToAck = 0;
     if (isStartFlag && isEndFlag) { //optimization for whole (non-fragmented) data
         bytesToAck = dataSegmentDataVec.size(); //grab the size now in case vector gets stolen in m_wholeBundleReadyCallback
+        ++(m_base_inductConnectionTelemetry.m_totalBundlesReceived);
+        m_base_inductConnectionTelemetry.m_totalBundleBytesReceived += bytesToAck;
+        m_base_outductTelemetry.m_totalBundlesReceived = m_base_inductConnectionTelemetry.m_totalBundlesReceived;
+        m_base_outductTelemetry.m_totalBundleBytesReceived = m_base_inductConnectionTelemetry.m_totalBundleBytesReceived;
         Virtual_WholeBundleReady(dataSegmentDataVec);
     }
     else {
@@ -271,6 +289,10 @@ void TcpclV4BidirectionalLink::BaseClass_DataSegmentCallback(padded_vector_uint8
         m_base_fragmentedBundleRxConcat.insert(m_base_fragmentedBundleRxConcat.end(), dataSegmentDataVec.begin(), dataSegmentDataVec.end()); //concatenate
         bytesToAck = m_base_fragmentedBundleRxConcat.size();
         if (isEndFlag) { //fragmentation complete
+            ++(m_base_inductConnectionTelemetry.m_totalBundlesReceived);
+            m_base_inductConnectionTelemetry.m_totalBundleBytesReceived += bytesToAck;
+            m_base_outductTelemetry.m_totalBundlesReceived = m_base_inductConnectionTelemetry.m_totalBundlesReceived;
+            m_base_outductTelemetry.m_totalBundleBytesReceived = m_base_inductConnectionTelemetry.m_totalBundleBytesReceived;
             Virtual_WholeBundleReady(m_base_fragmentedBundleRxConcat);
         }
     }
@@ -322,10 +344,13 @@ void TcpclV4BidirectionalLink::BaseClass_AckCallback(const TcpclV4::tcpclv4_ack_
     std::vector<uint8_t> & userData = m_base_userDataCbVec[readIndex];
     if (toAckFromQueue == ack) {
         const bool isFragment = !(ack.isStartSegment && ack.isEndSegment);
-        m_base_totalFragmentedAcked += isFragment;
+        m_base_outductTelemetry.m_totalFragmentsAcked += isFragment;
+        m_base_inductConnectionTelemetry.m_totalIncomingFragmentsAcked = m_base_outductTelemetry.m_totalFragmentsAcked;
         if (ack.isEndSegment) { //entire bundle
-            ++m_base_totalBundlesAcked;
-            m_base_totalBytesAcked += ack.totalBytesAcknowledged;
+            ++m_base_outductTelemetry.m_totalBundlesAcked;
+            m_base_outductTelemetry.m_totalBundleBytesAcked += ack.totalBytesAcknowledged;
+            m_base_inductConnectionTelemetry.m_totalBundlesSentAndAcked = m_base_outductTelemetry.m_totalBundlesAcked;
+            m_base_inductConnectionTelemetry.m_totalBundleBytesSentAndAcked = m_base_outductTelemetry.m_totalBundleBytesAcked;
             if (m_base_onSuccessfulBundleSendCallback) {
                 m_base_onSuccessfulBundleSendCallback(userData, m_base_userAssignedUuid);
             }
@@ -450,6 +475,7 @@ void TcpclV4BidirectionalLink::BaseClass_DoHandleSocketShutdown(bool doCleanShut
         // Timer was cancelled as expected.  This method keeps socket shutdown within io_service thread.
 
         m_base_readyToForward = false;
+        m_base_outductTelemetry.m_linkIsUpPhysically = false;
         if (m_base_onOutductLinkStatusChangedCallback) { //let user know of link down event
             m_base_onOutductLinkStatusChangedCallback(true, m_base_userAssignedUuid);
         }
@@ -663,8 +689,10 @@ bool TcpclV4BidirectionalLink::BaseClass_Forward(std::unique_ptr<zmq::message_t>
 
         
 
-    ++m_base_totalBundlesSent;
-    m_base_totalBundleBytesSent += dataSize;
+    ++m_base_outductTelemetry.m_totalBundlesSent;
+    m_base_outductTelemetry.m_totalBundleBytesSent += dataSize;
+    m_base_inductConnectionTelemetry.m_totalBundlesSent = m_base_outductTelemetry.m_totalBundlesSent;
+    m_base_inductConnectionTelemetry.m_totalBundleBytesSent = m_base_outductTelemetry.m_totalBundleBytesSent;
 
         
     std::vector<TcpAsyncSenderElement*> elements;
@@ -773,7 +801,8 @@ bool TcpclV4BidirectionalLink::BaseClass_Forward(std::unique_ptr<zmq::message_t>
         
 
     if (elements.size()) { //is fragmented
-        m_base_totalFragmentedSent += elements.size();
+        m_base_outductTelemetry.m_totalFragmentsSent += elements.size();
+        m_base_inductConnectionTelemetry.m_totalOutgoingFragmentsSent = m_base_outductTelemetry.m_totalFragmentsSent;
         for (std::size_t i = 0; i < elements.size(); ++i) {
 #ifdef OPENSSL_SUPPORT_ENABLED
             if (m_base_usingTls) {
@@ -988,6 +1017,7 @@ void TcpclV4BidirectionalLink::BaseClass_SessionInitCallback(uint16_t keepAliveI
         return;
     }
 
+    m_base_inductConnectionTelemetry.m_connectionName += ((m_base_didSuccessfulSslHandshake) ? std::string(" TLS ") : std::string(" ")) + remoteNodeEidUri; //append after remote ip:port
     m_base_tcpclRemoteEidString = remoteNodeEidUri;
     m_base_tcpclRemoteNodeId = remoteNodeId;
     LOG_INFO(subprocess) << M_BASE_IMPLEMENTATION_STRING_FOR_COUT << " received valid SessionInit from remote with EID " << m_base_tcpclRemoteEidString;
@@ -1078,6 +1108,7 @@ void TcpclV4BidirectionalLink::BaseClass_SessionInitCallback(uint16_t keepAliveI
 
     m_base_readyToForward = true;
     Virtual_OnSessionInitReceivedAndProcessedSuccessfully();
+    m_base_outductTelemetry.m_linkIsUpPhysically = true;
     if (m_base_onOutductLinkStatusChangedCallback) { //let user know of link up event
         m_base_onOutductLinkStatusChangedCallback(false, m_base_userAssignedUuid);
     }

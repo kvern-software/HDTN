@@ -61,23 +61,34 @@ void TcpclBundleSource::Stop() {
 
     BaseClass_DoTcpclShutdown(true, false);
     while (!m_base_tcpclShutdownComplete) {
-        boost::this_thread::sleep(boost::posix_time::milliseconds(250));
+        try {
+            boost::this_thread::sleep(boost::posix_time::milliseconds(250));
+        }
+        catch (const boost::thread_resource_error&) {}
+        catch (const boost::thread_interrupted&) {}
+        catch (const boost::condition_error&) {}
+        catch (const boost::lock_error&) {}
     }
     m_base_tcpAsyncSenderPtr.reset(); //stop this first
     m_base_ioServiceRef.stop(); //ioservice requires stopping before join because of the m_work object
 
-    if(m_ioServiceThreadPtr) {
-        m_ioServiceThreadPtr->join();
-        m_ioServiceThreadPtr.reset(); //delete it
+    if (m_ioServiceThreadPtr) {
+        try {
+            m_ioServiceThreadPtr->join();
+            m_ioServiceThreadPtr.reset(); //delete it
+        }
+        catch (const boost::thread_resource_error&) {
+            LOG_ERROR(subprocess) << "error stopping TcpclBundleSource io_service";
+        }
     }
 
     //print stats
-    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalBundlesAcked " << m_base_totalBundlesAcked;
-    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalBytesAcked " << m_base_totalBytesAcked;
-    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalBundlesSent " << m_base_totalBundlesSent;
-    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalFragmentedAcked " << m_base_totalFragmentedAcked;
-    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalFragmentedSent " << m_base_totalFragmentedSent;
-    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalBundleBytesSent " << m_base_totalBundleBytesSent;
+    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalBundlesAcked " << m_base_outductTelemetry.m_totalBundlesAcked;
+    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalBundleBytesAcked " << m_base_outductTelemetry.m_totalBundleBytesAcked;
+    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalBundlesSent " << m_base_outductTelemetry.m_totalBundlesSent;
+    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalFragmentsAcked " << m_base_outductTelemetry.m_totalFragmentsAcked;
+    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalFragmentsSent " << m_base_outductTelemetry.m_totalFragmentsSent;
+    LOG_INFO(subprocess) << "TcpclV3 Bundle Source totalBundleBytesSent " << m_base_outductTelemetry.m_totalBundleBytesSent;
 }
 
 
@@ -115,8 +126,10 @@ void TcpclBundleSource::OnConnect(const boost::system::error_code & ec) {
 
     if (ec) {
         if (ec != boost::asio::error::operation_aborted) {
-            LOG_ERROR(subprocess) << "OnConnect: " << ec.value() << " " << ec.message();
-            LOG_ERROR(subprocess) << "Will try to reconnect after 2 seconds";
+            if (m_base_outductTelemetry.m_numTcpReconnectAttempts <= 1) {
+                LOG_ERROR(subprocess) << "OnConnect: " << ec.value() << " " << ec.message();
+                LOG_ERROR(subprocess) << "Will continue to try to reconnect every 2 seconds";
+            }
             m_reconnectAfterOnConnectErrorTimer.expires_from_now(boost::posix_time::seconds(2));
             m_reconnectAfterOnConnectErrorTimer.async_wait(boost::bind(&TcpclBundleSource::OnReconnectAfterOnConnectError_TimerExpired, this, boost::asio::placeholders::error));
         }
@@ -147,7 +160,10 @@ void TcpclBundleSource::OnConnect(const boost::system::error_code & ec) {
 void TcpclBundleSource::OnReconnectAfterOnConnectError_TimerExpired(const boost::system::error_code& e) {
     if (e != boost::asio::error::operation_aborted) {
         // Timer was not cancelled, take necessary action.
-        LOG_INFO(subprocess) << "TcpclBundleSource Trying to reconnect...";
+        if (m_base_outductTelemetry.m_numTcpReconnectAttempts == 0) {
+            LOG_INFO(subprocess) << "TcpclBundleSource Trying to reconnect...";
+        }
+        ++m_base_outductTelemetry.m_numTcpReconnectAttempts;
         boost::asio::async_connect(
             *m_base_tcpSocketPtr,
             m_resolverResults,
@@ -227,7 +243,10 @@ void TcpclBundleSource::Virtual_WholeBundleReady(padded_vector_uint8_t & wholeBu
 void TcpclBundleSource::OnNeedToReconnectAfterShutdown_TimerExpired(const boost::system::error_code& e) {
     if (e != boost::asio::error::operation_aborted) {
         // Timer was not cancelled, take necessary action.
-        LOG_INFO(subprocess) << "Trying to reconnect...";
+        if (m_base_outductTelemetry.m_numTcpReconnectAttempts == 0) {
+            LOG_INFO(subprocess) << "Trying to reconnect...";
+        }
+        ++m_base_outductTelemetry.m_numTcpReconnectAttempts;
         m_base_tcpAsyncSenderPtr.reset();
         m_base_tcpSocketPtr = std::make_shared<boost::asio::ip::tcp::socket>(m_base_ioServiceRef);
         m_base_shutdownCalled = false;
