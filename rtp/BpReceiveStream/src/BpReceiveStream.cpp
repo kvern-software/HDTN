@@ -1,13 +1,17 @@
 #include "BpReceiveStream.h"
 #include "Logger.h"
+#include <boost/process.hpp>
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
-BpReceiveStream::BpReceiveStream(size_t numCircularBufferVectors, const std::string& remoteHostname, const uint16_t remotePort, uint16_t maxOutgoingRtpPacketSizeBytes) : BpSinkPattern(), 
+#define FFMPEG_SDP_HEADER "data:application/sdp;charset=UTF-8,"
+
+BpReceiveStream::BpReceiveStream(size_t numCircularBufferVectors, const std::string& remoteHostname, const uint16_t remotePort, uint16_t maxOutgoingRtpPacketSizeBytes, std::string ffmpegCommand) : BpSinkPattern(), 
         m_numCircularBufferVectors(numCircularBufferVectors),
         m_outgoingRtpPort(remotePort),
         m_maxOutgoingRtpPacketSizeBytes(maxOutgoingRtpPacketSizeBytes),
-        socket(io_service)
+        socket(io_service),
+        m_ffmpegCommand(ffmpegCommand)
 {
     m_maxOutgoingRtpPayloadSizeBytes = m_maxOutgoingRtpPacketSizeBytes - sizeof(rtp_header);
     m_outgoingDtnRtpPtr = std::make_shared<DtnRtp>(UINT64_MAX);
@@ -36,13 +40,16 @@ BpReceiveStream::~BpReceiveStream()
     LOG_INFO(subprocess) << "m_totalRtpPacketsSent: " << m_totalRtpPacketsSent;
     LOG_INFO(subprocess) << "m_totalRtpPacketsQueued: " << m_totalRtpPacketsQueued;
     LOG_INFO(subprocess) << "m_totalRtpPacketFailedToSend: " << m_totalRtpPacketsFailedToSend;
-
+    LOG_INFO(subprocess) << "m_incomingCircularPacketQueue.size(): " << m_incomingCircularPacketQueue.size();
 }
 
 void BpReceiveStream::ProcessIncomingBundlesThread()
 {
     static const boost::posix_time::time_duration timeout(boost::posix_time::milliseconds(250));
     static bool firstPacket = true;
+
+    std::vector<uint8_t> rtpFrame;
+    rtpFrame.reserve(m_maxOutgoingRtpPacketSizeBytes);
 
     while (m_running) 
     {
@@ -80,8 +87,6 @@ void BpReceiveStream::ProcessIncomingBundlesThread()
 
             size_t offset = sizeof(rtp_header); // start first byte after header 
 
-            std::vector<uint8_t> rtpFrame;
-            rtpFrame.reserve(m_maxOutgoingRtpPacketSizeBytes);
             size_t nextPacketSize;
 
             for (size_t i = 0; i < numPacketsToTransferPayload; i++)
@@ -148,6 +153,18 @@ bool BpReceiveStream::ProcessPayload(const uint8_t *data, const uint64_t size)
 {
     padded_vector_uint8_t vec(size);
     memcpy(vec.data(), data, size);
+    if (vec.at(0) == SDP_FILE_STR_HEADER) 
+    {
+        LOG_INFO(subprocess) << "Got SDP File information";
+        std::string sdpFile((char * )&vec[1], size - sizeof(uint8_t));
+        LOG_INFO(subprocess) << "Sdp File: \n" << sdpFile;
+        
+        if (ReadSdpFileFromString(sdpFile) == 0) 
+        {
+            ExecuteFFmpegInstance();
+        }
+
+    }
 
     {
         boost::mutex::scoped_lock lock(m_incomingQueueMutex); // lock mutex 
@@ -161,6 +178,63 @@ bool BpReceiveStream::ProcessPayload(const uint8_t *data, const uint64_t size)
     // LOG_DEBUG(subprocess) << "Got bundle of size " << size;
     // frame->print_header();
     return true;
+}
+
+// we need to change the port number to the outgoing rtp port
+int BpReceiveStream::ReadSdpFileFromString(std::string sdpFileString)
+{
+    size_t mediaDescriptorLocation;
+    size_t rtpDescriptorLocation = sdpFileString.find("RTP"); // sdp protocol
+    
+    // check for video stream first
+    mediaDescriptorLocation = sdpFileString.find("m=video"); // this is sdp protocol
+    if (mediaDescriptorLocation == std::string::npos) // if no video stream found, check for audio stream
+    {
+        mediaDescriptorLocation = sdpFileString.find("m=audio");
+    }
+
+    LOG_DEBUG(subprocess) << "location:" << mediaDescriptorLocation;
+
+    if ((mediaDescriptorLocation!=std::string::npos) && (rtpDescriptorLocation != std::string::npos))
+    {
+        size_t portLeftBound = mediaDescriptorLocation + sizeof("m=video") ; // m=audio and m=video have the same length 
+
+        // replace the port with our outgoing port
+        std::string newSdpFileString = std::string(&sdpFileString[0], &sdpFileString[portLeftBound]); // first half
+        newSdpFileString.append(std::to_string(m_outgoingRtpPort) + " "); // add new port and space
+        newSdpFileString.append(std::string(&sdpFileString[rtpDescriptorLocation], &sdpFileString[sdpFileString.size()])); // remaining half
+        m_sdpFileString = newSdpFileString;
+        LOG_INFO(subprocess) << "New SDP String:\n" << m_sdpFileString;
+        return 0;
+    }
+
+    return -1;
+}
+
+int BpReceiveStream::ExecuteFFmpegInstance()
+{
+    std::string finalCommand;
+    finalCommand = m_ffmpegCommand;
+
+    std::string sdp = "\"";
+    sdp.append(FFMPEG_SDP_HEADER);
+    sdp.append(m_sdpFileString);
+    sdp.pop_back(); // remove new line
+    sdp.append("\"");
+
+    size_t inputParamLocation = finalCommand.find("-i") + 3 ; // offest from -i 
+
+    if (inputParamLocation != std::string::npos)
+    {
+        finalCommand.insert(inputParamLocation, sdp);
+        LOG_INFO(subprocess) << "Final ffmpeg command: \n" << finalCommand;
+        
+        boost::process::child ffmpegProcess(finalCommand);
+        ffmpegProcess.detach();
+    }
+
+
+    return 0;
 }
 
 bool BpReceiveStream::TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration &timeout)

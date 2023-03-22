@@ -12,7 +12,7 @@ class BpSendStream : public BpSourcePattern
 public:
 
     BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, 
-            size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation);
+            size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, std::string sdpFile);
     ~BpSendStream();
 
     void ProcessIncomingBundlesThread(); // worker thread that calls RTP packet handler
@@ -21,7 +21,7 @@ public:
     void Concatenate(padded_vector_uint8_t &incomingRtpFrame);
     void CreateFrame();
     void PushFrame();
-
+ 
     boost::asio::io_service m_ioService; // socket uses this to grab data from incoming rtp stream
     
     std::shared_ptr<UdpBundleSink> m_bundleSinkPtr; 
@@ -45,7 +45,7 @@ private:
     size_t m_offset = 0;
 
     volatile bool m_running;
-
+    
     uint64_t m_maxIncomingUdpPacketSizeBytes; // passed in via config file, should be greater than or equal to the RTP stream source maximum packet size
     uint64_t m_incomingRtpStreamPort;
     uint64_t m_maxOutgoingBundleSizeBytes;
@@ -62,13 +62,17 @@ private:
     std::unique_ptr<boost::thread> m_processingThread;
     std::unique_ptr<boost::thread> m_ioServiceThreadPtr;
 
+    bool m_sentSdpFile = false;
+    std::string m_sdpFileStr;
+
     uint64_t m_totalRtpPacketsReceived = 0; // counted when received from udp sink
     uint64_t m_totalRtpPacketsSent = 0; // counted when send to bundler
     uint64_t m_totalRtpPacketsQueued = 0; // counted when pushed into outgoing queue
     uint64_t m_totalConcatenationsPerformed = 0; // counted when a packet is successfully concatenated 
     uint64_t m_totalMarkerBits = 0;
     uint64_t m_totalTimestampChanged = 0;
-   
+    uint64_t m_totalIncomingCbOverruns = 0;
+    uint64_t m_totalOutgoingCbOverruns = 0;
 
 };
 

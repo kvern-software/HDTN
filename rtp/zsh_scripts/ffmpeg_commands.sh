@@ -22,3 +22,22 @@ v4l2-ctl --list-formats-ext
 #nvidia codec options
 https://gist.github.com/nico-lab/c2d192cbb793dfd241c1eafeb52a21c3
 
+# for psnr and ssim ensure that the videos are same framerate and scaled correctly
+
+# psnr
+ffmpeg \
+    -i transmitted.mp4 \
+    -i original.mp4 \
+    psnr="psnr.log" \ 
+    -f null -
+
+# ssim
+ffmpeg \
+    -i transmitted.mp4 \
+    -i original.mp4 \
+    ssim="ssim.log" \ 
+    -f null -
+
+# get last 60 seconds of  file into new file
+ffmpeg -sseof -60 -i A012C002H2201038S_CANON_01-Surface_Tension.MXF -c copy tesntion_out.MKV            
+ffmpeg -ss 00:04:18 -i A012C002H2201038S_CANON_01-Surface_Tension.MXF -t 60 -c copy trimmed.MKV

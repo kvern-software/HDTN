@@ -7,15 +7,17 @@
 
 class BpReceiveStream : public BpSinkPattern {
 public:
-    BpReceiveStream(size_t numCircularBufferVectors, const std::string& remoteHostname, const uint16_t remotePort, uint16_t maxOutgoingRtpPacketSizeBytes);
+    BpReceiveStream(size_t numCircularBufferVectors, const std::string& remoteHostname, const uint16_t remotePort, uint16_t maxOutgoingRtpPacketSizeByte, std::string ffmpegCommand);
     virtual ~BpReceiveStream() override;
-
-
-
     void ProcessIncomingBundlesThread(); // worker thread 
+
 protected:
     virtual bool ProcessPayload(const uint8_t * data, const uint64_t size) override;
+    
 private:
+    int ReadSdpFileFromString(std::string sdpFileString);
+    int ExecuteFFmpegInstance();
+
     bool TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration& timeout);
     bool GetNextIncomingPacketTimeout(const boost::posix_time::time_duration& timeout);
 
@@ -38,10 +40,12 @@ private:
     uint16_t m_outgoingRtpPort;
     uint16_t m_maxOutgoingRtpPacketSizeBytes;
     uint16_t m_maxOutgoingRtpPayloadSizeBytes;
+    std::string m_sdpFileString;
     // outbound udp
 	boost::asio::io_service io_service;
     boost::asio::ip::udp::socket socket;
-
+    std::string m_ffmpegCommand;
+    
     boost::asio::ip::udp::endpoint m_udpEndpoint;
     std::shared_ptr<UdpBatchSender> m_udpBatchSenderPtr;
     boost::mutex m_sentPacketsMutex;

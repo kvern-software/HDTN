@@ -40,6 +40,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
         std::string remoteHostname;
         size_t numCircularBufferVectors;
         uint16_t maxOutgoingRtpPacketSizeBytes;
+        std::string ffmpegCommand;
 
         boost::program_options::options_description desc("Allowed options");
         try {
@@ -54,6 +55,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
                 ("remote-hostname",  boost::program_options::value<std::string>()->default_value("127.0.0.1"), "Remote IP to forward rtp packets to")
                 ("num-circular-buffer-vectors", boost::program_options::value<size_t>()->default_value(50), "Number of circular buffer vector elements for incoming bundles")
                 ("max-outgoing-rtp-packet-size-bytes", boost::program_options::value<uint16_t>()->default_value(1400), "Max size in bytes of the outgoing rtp packets")
+                ("ffmpeg-command", boost::program_options::value<std::string>()->default_value(""), "FFmpeg full command")
                 ;
 
             boost::program_options::variables_map vm;
@@ -107,7 +109,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
             remoteHostname                = vm["remote-hostname"].as<std::string>();
             numCircularBufferVectors      = vm["num-circular-buffer-vectors"].as<size_t>();
             maxOutgoingRtpPacketSizeBytes = vm["max-outgoing-rtp-packet-size-bytes"].as<uint16_t>();
-
+            ffmpegCommand = vm["ffmpeg-command"].as<std::string>();
         }
         catch (boost::bad_any_cast & e) {
             LOG_ERROR(subprocess) << "invalid data error: " << e.what() << "\n";
@@ -125,7 +127,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
 
 
         LOG_INFO(subprocess) << "starting..";
-        BpReceiveStream BpReceiveStream(numCircularBufferVectors, remoteHostname, remotePort, maxOutgoingRtpPacketSizeBytes);
+        BpReceiveStream BpReceiveStream(numCircularBufferVectors, remoteHostname, remotePort, maxOutgoingRtpPacketSizeBytes, ffmpegCommand);
         BpReceiveStream.Init(inductsConfigPtr, outductsConfigPtr, isAcsAware, myEid, 0, maxBundleSizeBytes);
 
 

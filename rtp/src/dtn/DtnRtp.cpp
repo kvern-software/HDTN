@@ -174,68 +174,68 @@ rtp_packet_status_t DtnRtp::PacketHandler(padded_vector_uint8_t &wholeBundleVec,
      * SSRC is assigned when the first UDP packet arrives to the UdpHandler. If prevHeader.ssrc is unassigned, it gets assigned. 
      * the incoming SSRC != assigned SSRC, then the packet is discarded. 
     */
-    if (incomingHeaderPtr->ssrc != GetSsrc()) { // CCSDS 3.3.7  & 3.3.8
-        LOG_ERROR(subprocess) << "Received mismatched SSRC! Original SSRC: " <<   GetSsrc() << " New SSRC: " << incomingHeaderPtr->ssrc;
-        LOG_ERROR(subprocess) << "Discarding new mismatched SSRC!";
-        return RTP_MISMATCH_SSRC;
-    }
+//     if (incomingHeaderPtr->ssrc != GetSsrc()) { // CCSDS 3.3.7  & 3.3.8
+//         LOG_ERROR(subprocess) << "Received mismatched SSRC! Original SSRC: " <<   GetSsrc() << " New SSRC: " << incomingHeaderPtr->ssrc;
+//         LOG_ERROR(subprocess) << "Discarding new mismatched SSRC!";
+//         return RTP_MISMATCH_SSRC;
+//     }
 
-    if (ntohs(incomingHeaderPtr->seq) !=  (ntohs(m_prevHeader.seq)+1)) {
-        LOG_ERROR(subprocess) << "RTP sequence out of order - Incoming: " << ntohs(incomingHeaderPtr->seq) << " Previous: " << ntohs(m_prevHeader.seq);
-        UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ); // update prevHeader
-        return RTP_OUT_OF_SEQ;         // TODO : handle sequence out of order
-    }
+//     if (ntohs(incomingHeaderPtr->seq) !=  (ntohs(m_prevHeader.seq)+1)) {
+//         LOG_ERROR(subprocess) << "RTP sequence out of order - Incoming: " << ntohs(incomingHeaderPtr->seq) << " Previous: " << ntohs(m_prevHeader.seq);
+//         UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ); // update prevHeader
+//         return RTP_OUT_OF_SEQ;         // TODO : handle sequence out of order
+//     }
 
-    // LOG_DEBUG(subprocess) << "Incoming sequence: " << ntohs(incomingHeaderPtr->seq);
+//     // LOG_DEBUG(subprocess) << "Incoming sequence: " << ntohs(incomingHeaderPtr->seq);
 
-    // boost::this_thread::sleep_for(boost::chrono::milliseconds(250));
+//     // boost::this_thread::sleep_for(boost::chrono::milliseconds(250));
 
-    // This is where we start to apply the CCSDS rules 
-    rtp_header_union_t prevHeaderFlags;
-    memcpy(&prevHeaderFlags.flags, &m_prevHeader, sizeof(uint16_t));
-    prevHeaderFlags.flags = htons(prevHeaderFlags.flags);
+//     // This is where we start to apply the CCSDS rules 
+//     rtp_header_union_t prevHeaderFlags;
+//     memcpy(&prevHeaderFlags.flags, &m_prevHeader, sizeof(uint16_t));
+//     prevHeaderFlags.flags = htons(prevHeaderFlags.flags);
 
-    int64_t deltat = ntohl(m_prevHeader.timestamp) - ntohl(incomingHeaderPtr->timestamp);
-    if (deltat != 0) { // CCSDS 3.3.4 // do not concatenate if the timestamp has changed
-        UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
-        // LOG_INFO(subprocess) << "Timestamp changed! \nPrevious TS: " << ntohl(m_prevHeader.timestamp) << 
-        // " \nincoming TS: " << ntohl(incomingHeaderPtr->timestamp) << 
-        // " \nDelta: " << ntohl(m_prevHeader.timestamp)- ntohl(incomingHeaderPtr->timestamp);
+//     int64_t deltat = ntohl(m_prevHeader.timestamp) - ntohl(incomingHeaderPtr->timestamp);
+//     if (deltat != 0) { // CCSDS 3.3.4 // do not concatenate if the timestamp has changed
+//         UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
+//         // LOG_INFO(subprocess) << "Timestamp changed! \nPrevious TS: " << ntohl(m_prevHeader.timestamp) << 
+//         // " \nincoming TS: " << ntohl(incomingHeaderPtr->timestamp) << 
+//         // " \nDelta: " << ntohl(m_prevHeader.timestamp)- ntohl(incomingHeaderPtr->timestamp);
 
-        return RTP_PUSH_PREVIOUS_FRAME;
-    }
+//         return RTP_PUSH_PREVIOUS_FRAME;
+//     }
 
-    if (RTP_PADDING_FLAG & currentHeaderFlags.flags) {  // CCSDS 3.3.2     // Do not concatenate if the padding bit is set
-        UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
-        LOG_DEBUG(subprocess) << "Padding bit set";
-        return RTP_PUSH_PREVIOUS_FRAME;
-    }
+//     if (RTP_PADDING_FLAG & currentHeaderFlags.flags) {  // CCSDS 3.3.2     // Do not concatenate if the padding bit is set
+//         UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
+//         LOG_DEBUG(subprocess) << "Padding bit set";
+//         return RTP_PUSH_PREVIOUS_FRAME;
+//     }
 
-    if ((prevHeaderFlags.flags & RTP_MARKER_FLAG)  != (currentHeaderFlags.flags & RTP_MARKER_FLAG)) { // CCSDS 3.3.5 // Do not concatenate if the incoming marker bit has changed from the current packet's marker bit
-        UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
-        // LOG_INFO(subprocess) << "marker changed";
-        return RTP_PUSH_PREVIOUS_FRAME;
-    }
+//     if ((prevHeaderFlags.flags & RTP_MARKER_FLAG)  != (currentHeaderFlags.flags & RTP_MARKER_FLAG)) { // CCSDS 3.3.5 // Do not concatenate if the incoming marker bit has changed from the current packet's marker bit
+//         UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
+//         // LOG_INFO(subprocess) << "marker changed";
+//         return RTP_PUSH_PREVIOUS_FRAME;
+//     }
 
-    if (currentRtpFrameHeader->ext != incomingHeaderPtr->ext) { // CCSDS 3.3.6 // Do not concatentate if the extension bit has changed
-        LOG_INFO(subprocess) << "ext changed";
-        UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
-        return RTP_PUSH_PREVIOUS_FRAME;
-    }
+//     if (currentRtpFrameHeader->ext != incomingHeaderPtr->ext) { // CCSDS 3.3.6 // Do not concatentate if the extension bit has changed
+//         LOG_INFO(subprocess) << "ext changed";
+//         UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
+//         return RTP_PUSH_PREVIOUS_FRAME;
+//     }
 
 
 
     
-    /**
-     * If we have gotten to this point... 
-     *  1. We have a good RTP frame
-     *  2. This RTP frame qualifies to be concatentated 
-     * Proceed to concatenate the frame. 
-    */
-    // LOG_INFO(subprocess) << "Packet valid for concatentation";
-   UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
+//     /**
+//      * If we have gotten to this point... 
+//      *  1. We have a good RTP frame
+//      *  2. This RTP frame qualifies to be concatentated 
+//      * Proceed to concatenate the frame. 
+//     */
+//     // LOG_INFO(subprocess) << "Packet valid for concatentation";
+//    UpdateHeader(incomingHeaderPtr, USE_INCOMING_SEQ);
 
-    return RTP_CONCATENATE;
+    return RTP_PUSH_PREVIOUS_FRAME;
 }
 
 // rtp_packet_status_t DtnRtp::BundleHandler(padded_vector_uint8_t &wholeBundleVec)

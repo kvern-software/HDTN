@@ -2,8 +2,10 @@
 
 # path variables
 config_files=$HDTN_RTP_DIR/config_files
-video_source_config=$config_files/outducts/streamsource_stcp.json
-audio_source_config=$config_files/outducts/streamsource_stcp_5004.json
+
+video_source_config=$config_files/outducts/mediasource_stcp.json
+# video_source_config=$config_files/outducts/streamsource_stcp.json
+# audio_source_config=$config_files/outducts/streamsource_stcp_5004.json
 
 test_media_folder=/home/kyle/nasa/dev/test_media
 
@@ -21,14 +23,14 @@ cd $HDTN_RTP_DIR
         --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --outducts-config-file=$video_source_config \
         --max-incoming-udp-packet-size-bytes=1600 --incoming-rtp-stream-port=$video_port --num-circular-buffer-vectors=250\
         --enable-rtp-concatenation=false & 
-bp_audio_process=$!
+bp_video_process=$!
 
 # audio sender
-./build/bpsend_stream  --bundle-size=100000 --bundle-rate=0 --use-bp-version-7 \
-        --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --outducts-config-file=$audio_source_config \
-        --max-incoming-udp-packet-size-bytes=1600 --incoming-rtp-stream-port=$audio_port --num-circular-buffer-vectors=250\
-        --enable-rtp-concatenation=false & 
-bp_video_process=$!
+# ./build/bpsend_stream  --bundle-size=100000 --bundle-rate=0 --use-bp-version-7 \
+#         --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --outducts-config-file=$audio_source_config \
+#         --max-incoming-udp-packet-size-bytes=1600 --incoming-rtp-stream-port=$audio_port --num-circular-buffer-vectors=250\
+#         --enable-rtp-concatenation=false & 
+# bp_audio_process=$!
 
 
 
