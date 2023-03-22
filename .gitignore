@@ -32,3 +32,6 @@ module/telem_cmd_interface/external.install/*
 module/telem_cmd_interface/root/*
 
 *.bin
+
+rtp/build/*
+.cache/*
