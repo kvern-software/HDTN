@@ -8,7 +8,7 @@ static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess:
 
 BpReceiveStream::BpReceiveStream(size_t numCircularBufferVectors, const std::string& rtpDestHostname, const uint16_t rtpDestPort, uint16_t maxOutgoingRtpPacketSizeBytes, std::string ffmpegCommand) : BpSinkPattern(), 
         m_numCircularBufferVectors(numCircularBufferVectors),
-        m_outgoingRtpPort(remotePort),
+        m_outgoingRtpPort(rtpDestPort),
         m_maxOutgoingRtpPacketSizeBytes(maxOutgoingRtpPacketSizeBytes),
         socket(io_service),
         m_ffmpegCommand(ffmpegCommand)
@@ -22,7 +22,7 @@ BpReceiveStream::BpReceiveStream(size_t numCircularBufferVectors, const std::str
     m_udpBatchSenderPtr = std::make_shared<UdpBatchSender>();
     m_udpBatchSenderPtr->SetOnSentPacketsCallback(boost::bind(&BpReceiveStream::OnSentRtpPacketCallback, this, 
             boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
-    m_udpBatchSenderPtr->Init(remoteHostname, remotePort);
+    m_udpBatchSenderPtr->Init(rtpDestHostname, rtpDestPort);
     m_udpEndpoint = m_udpBatchSenderPtr->GetCurrentUdpEndpoint();
    
     socket.open(boost::asio::ip::udp::v4());
