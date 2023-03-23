@@ -8,7 +8,7 @@ set(CMAKE_BUILD_TYPE Release)
 
 set(MIN_BOOST_VERSION 1.66.0)
 find_package(Boost ${MIN_BOOST_VERSION} REQUIRED system date_time filesystem timer thread regex filesystem unit_test_framework program_options iostreams random log log_setup)
-find_package(glfw3 REQUIRED)
+# find_package(glfw3 REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(ZLIB) #for compression
 find_library(AVCODEC_LIBRARY avcodec)
