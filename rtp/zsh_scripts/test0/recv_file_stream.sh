@@ -2,8 +2,8 @@
 
 # path variables
 config_files=$HDTN_RTP_DIR/config_files
-sink_config=$config_files/inducts/ltp_media_sink.json
-# sink_config=$config_files/inducts/mediasink_stcp.json
+# sink_config=$config_files/inducts/ltp_media_sink.json
+sink_config=$config_files/inducts/mediasink_stcp.json
 # sink_config=$config_files/inducts/mediasink_tcpcl.json
 
 outgoing_rtp_port=60000
@@ -38,7 +38,7 @@ cd $HDTN_RTP_DIR
         -max_delay 500 \
         -reorder_queue_size 0 \
         -loglevel verbose \
-        -i  -vcodec copy -acodec copy -f matroska test_output_LTP_10bit_265.MKV"
+        -i  -vcodec copy -acodec copy -f mp4 test_water_stcp.mp4"
         # ffplay -i  -protocol_whitelist data,file,udp,rtp  -reorder_queue_size 0  -fflags nobuffer+fastseek+flush_packets -sync ext -flags low_delay -framedrop" &
 stream_recv_id=$!               
 

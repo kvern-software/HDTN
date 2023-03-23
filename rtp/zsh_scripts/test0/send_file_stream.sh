@@ -2,8 +2,8 @@
 
 # path variables
 config_files=$HDTN_RTP_DIR/config_files
-source_config=$config_files/outducts/ltp_media_source.json
-# source_config=$config_files/outducts/mediasource_stcp.json
+# source_config=$config_files/outducts/ltp_media_source.json
+source_config=$config_files/outducts/mediasource_stcp.json
 # source_config=$config_files/outducts/mediasource_tcpcl.json
 
 test_media_folder=/home/kyle/nasa/dev/test_media/official_test_media
@@ -12,7 +12,7 @@ test_media_folder=/home/kyle/nasa/dev/test_media/official_test_media
 # file=$test_media_folder/Surface_Tension.MKV
 # file=$test_media_folder/A012C002H2201038S_CANON_01-Surface_Tension.MXF
 # file=$test_media_folder/ammonia_trimmed.flac
-file=$test_media_folder/water_bubble.MXF
+file=$test_media_folder/water_bubble.mp4
 
 rtp_port=40002
 

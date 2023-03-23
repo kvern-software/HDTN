@@ -7,7 +7,7 @@
 
 class BpReceiveStream : public BpSinkPattern {
 public:
-    BpReceiveStream(size_t numCircularBufferVectors, const std::string& remoteHostname, const uint16_t remotePort, uint16_t maxOutgoingRtpPacketSizeByte, std::string ffmpegCommand);
+    BpReceiveStream(size_t numCircularBufferVectors, const std::string& rtpDestHostname, const uint16_t rtpDestPort, uint16_t maxOutgoingRtpPacketSizeByte, std::string ffmpegCommand);
     virtual ~BpReceiveStream() override;
     void ProcessIncomingBundlesThread(); // worker thread 
 

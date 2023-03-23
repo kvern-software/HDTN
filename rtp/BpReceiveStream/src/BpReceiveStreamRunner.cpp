@@ -52,7 +52,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
                 ("acs-aware-bundle-agent", "Custody transfer should support Aggregate Custody Signals if valid CTEB present.")
                 ("max-rx-bundle-size-bytes", boost::program_options::value<uint64_t>()->default_value(10000000), "Max bundle size bytes to receive (default=10MB).")
                 ("outgoing-rtp-port", boost::program_options::value<uint16_t>()->default_value(50560), "Destination port for the created RTP stream")
-                ("remote-hostname",  boost::program_options::value<std::string>()->default_value("127.0.0.1"), "Remote IP to forward rtp packets to")
+                ("outgoing-rtp-hostname",  boost::program_options::value<std::string>()->default_value("127.0.0.1"), "Remote IP to forward rtp packets to")
                 ("num-circular-buffer-vectors", boost::program_options::value<size_t>()->default_value(50), "Number of circular buffer vector elements for incoming bundles")
                 ("max-outgoing-rtp-packet-size-bytes", boost::program_options::value<uint16_t>()->default_value(1400), "Max size in bytes of the outgoing rtp packets")
                 ("ffmpeg-command", boost::program_options::value<std::string>()->default_value(""), "FFmpeg full command")
@@ -106,7 +106,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
 
 
             remotePort                    = vm["outgoing-rtp-port"].as<uint16_t>();
-            remoteHostname                = vm["remote-hostname"].as<std::string>();
+            remoteHostname                = vm["outgoing-rtp-hostname"].as<std::string>();
             numCircularBufferVectors      = vm["num-circular-buffer-vectors"].as<size_t>();
             maxOutgoingRtpPacketSizeBytes = vm["max-outgoing-rtp-packet-size-bytes"].as<uint16_t>();
             ffmpegCommand = vm["ffmpeg-command"].as<std::string>();

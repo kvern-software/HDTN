@@ -1,0 +1,12 @@
+{
+    "inductConfigName": "myconfig",
+    "inductVector": [
+        {
+            "name": "from Raspberry Pi to local mp4",
+            "convergenceLayer": "stcp",
+            "boundPort": 40003,
+            "numRxCircularBufferElements": 500,
+            "keepAliveIntervalSeconds": 15
+        }
+    ]
+}

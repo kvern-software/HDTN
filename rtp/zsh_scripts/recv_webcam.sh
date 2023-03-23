@@ -14,7 +14,7 @@ sleep 5
 cd $HDTN_RTP_DIR
 
 # Media app start. Media app inherits from BpSinkPattern and functions very similarly to bpreceive file
-./build/bprecv_stream  --my-uri-eid=ipn:2.1 --inducts-config-file=$sink_config  --remote-hostname=192.168.1.132 \
+./build/bprecv_stream  --my-uri-eid=ipn:2.1 --inducts-config-file=$sink_config  --outgoing-rtp-hostname=192.168.1.132 \
         --outgoing-rtp-port=$outgoing_rtp_port --num-circular-buffer-vectors=50 --max-outgoing-rtp-packet-size-bytes=1472
 stream_recv_id=$!
 sleep 3                

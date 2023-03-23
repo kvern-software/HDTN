@@ -1,0 +1,18 @@
+{
+    "outductConfigName": "myconfig",
+    "outductVector": [
+        {
+            "name": "from FFmpeg rtp stream to HDTN egress",
+            "convergenceLayer": "stcp",
+            "nextHopNodeId": 10,
+            "remoteHostname": "192.168.1.132",
+            "remotePort": 40003,
+            "maxNumberOfBundlesInPipeline": 1000,
+            "maxSumOfBundleBytesInPipeline": 50000000,
+            "finalDestinationEidUris": [
+                "ipn:2.*"
+            ],
+            "keepAliveIntervalSeconds": 1000
+        }
+    ]
+}

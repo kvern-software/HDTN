@@ -6,7 +6,7 @@ static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess:
 
 #define FFMPEG_SDP_HEADER "data:application/sdp;charset=UTF-8,"
 
-BpReceiveStream::BpReceiveStream(size_t numCircularBufferVectors, const std::string& remoteHostname, const uint16_t remotePort, uint16_t maxOutgoingRtpPacketSizeBytes, std::string ffmpegCommand) : BpSinkPattern(), 
+BpReceiveStream::BpReceiveStream(size_t numCircularBufferVectors, const std::string& rtpDestHostname, const uint16_t rtpDestPort, uint16_t maxOutgoingRtpPacketSizeBytes, std::string ffmpegCommand) : BpSinkPattern(), 
         m_numCircularBufferVectors(numCircularBufferVectors),
         m_outgoingRtpPort(remotePort),
         m_maxOutgoingRtpPacketSizeBytes(maxOutgoingRtpPacketSizeBytes),
