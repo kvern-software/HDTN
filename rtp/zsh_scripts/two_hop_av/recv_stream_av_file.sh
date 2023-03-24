@@ -26,7 +26,7 @@ ffplay_id=$!
 sleep 1
 
 # video recv
-./build/bprecv_stream  --my-uri-eid=ipn:2.1 --inducts-config-file=$video_sink_config  --outgoing-rtp-hostname=192.168.1.132 \
+./build/bprecv_stream  --my-uri-eid=ipn:2.3 --inducts-config-file=$video_sink_config  --outgoing-rtp-hostname=192.168.1.132 \
         --outgoing-rtp-port=$outgoing_rtp_video --num-circular-buffer-vectors=500 --max-outgoing-rtp-packet-size-bytes=1472 & 
        
 video_recv_process=$!               

@@ -2,7 +2,7 @@
     "hdtnConfigName": "my hdtn config",
     "userInterfaceOn": true,
     "mySchemeName": "unused_scheme_name",
-    "myNodeId": 10,
+    "myNodeId": 2,
     "myBpEchoServiceId": 2047,
     "myCustodialSsp": "unused_custodial_ssp",
     "myCustodialServiceId": 0,
@@ -34,7 +34,7 @@
             {
                 "name": "stcp egress on gateway to desktop",
                 "convergenceLayer": "stcp",
-                "nextHopNodeId": 30,
+                "nextHopNodeId": 3,
                 "remoteHostname": "192.168.1.132",
                 "remotePort": 4559,
                 "maxNumberOfBundlesInPipeline": 10000,
