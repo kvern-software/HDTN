@@ -153,18 +153,18 @@ bool BpReceiveStream::ProcessPayload(const uint8_t *data, const uint64_t size)
 {
     padded_vector_uint8_t vec(size);
     memcpy(vec.data(), data, size);
-   if (vec.at(0) == SDP_FILE_STR_HEADER) 
-    {
-        LOG_INFO(subprocess) << "Got SDP File information";
-        std::string sdpFile((char * )&vec[1], size - sizeof(uint8_t));
-        LOG_INFO(subprocess) << "Sdp File: \n" << sdpFile;
+//    if (vec.at(0) == SDP_FILE_STR_HEADER) 
+//     {
+//         LOG_INFO(subprocess) << "Got SDP File information";
+//         std::string sdpFile((char * )&vec[1], size - sizeof(uint8_t));
+//         LOG_INFO(subprocess) << "Sdp File: \n" << sdpFile;
         
-        if (ReadSdpFileFromString(sdpFile) == 0) 
-        {
-            ExecuteFFmpegInstance();
-        }
+//         if (ReadSdpFileFromString(sdpFile) == 0) 
+//         {
+//             ExecuteFFmpegInstance();
+//         }
  
-    }
+//     }
 
     {
         boost::mutex::scoped_lock lock(m_incomingQueueMutex); // lock mutex 

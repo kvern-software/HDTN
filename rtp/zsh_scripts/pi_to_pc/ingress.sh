@@ -22,7 +22,7 @@ cd $HDTN_RTP_DIR
         -max_delay 0 \
         -reorder_queue_size 0 \
         -loglevel verbose \
-        -i  -vcodec copy -acodec copy -f mp4 raspberry_ptp_264.mp4"
+        -i  pi_to_pc_flac.flac"
         # -listen_timeout -1 \
         # ffplay -i  -protocol_whitelist data,file,udp,rtp  -reorder_queue_size 0  -fflags nobuffer+fastseek+flush_packets -sync ext -flags low_delay -framedrop" &
 stream_recv_id=$!    

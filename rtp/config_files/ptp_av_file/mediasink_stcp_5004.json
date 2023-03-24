@@ -2,10 +2,10 @@
     "inductConfigName": "myconfig",
     "inductVector": [
         {
-            "name": "localhost bpsink",
+            "name": "audio from jetson to local",
             "convergenceLayer": "stcp",
-            "boundPort": 5002,
-            "numRxCircularBufferElements": 500,
+            "boundPort": 5004,
+            "numRxCircularBufferElements": 800,
             "keepAliveIntervalSeconds": 15
         }
     ]

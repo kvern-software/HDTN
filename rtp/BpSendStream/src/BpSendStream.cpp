@@ -227,9 +227,9 @@ void BpSendStream::DeleteCallback()
 
 uint64_t BpSendStream::GetNextPayloadLength_Step1() 
 {
-    if (!m_sentSdpFile) {
-        return m_sdpFileStr.size() + sizeof(uint8_t);
-    }
+    // if (!m_sentSdpFile) {
+    //     return m_sdpFileStr.size() + sizeof(uint8_t);
+    // }
 
 
     m_outgoingQueueMutex.lock();
@@ -246,14 +246,15 @@ uint64_t BpSendStream::GetNextPayloadLength_Step1()
 
 bool BpSendStream::CopyPayload_Step2(uint8_t * destinationBuffer) 
 {
-    if (!m_sentSdpFile) {
-        uint8_t header = SDP_FILE_STR_HEADER;
-        memcpy(destinationBuffer, &header, sizeof(header));
-        memcpy(destinationBuffer + sizeof(header), m_sdpFileStr.data(), m_sdpFileStr.size());
-        m_sentSdpFile = true;
-        LOG_INFO(subprocess) << "Sent SDP information";
-        return true;
-    }
+    // if (!m_sentSdpFile) {
+    //     uint8_t header = SDP_FILE_STR_HEADER;
+    //     memcpy(destinationBuffer, &header, sizeof(header));
+    //     memcpy(destinationBuffer + sizeof(header), m_sdpFileStr.data(), m_sdpFileStr.size());
+    //     m_sentSdpFile = true;
+    //     LOG_INFO(subprocess) << "Sent SDP information";
+    //     return true;
+    // }
+    
     
     // LOG_DEBUG(subprocess) << "Popping outgoing queue seq";
     memcpy(destinationBuffer, m_outgoingCircularFrameQueue.front().data(), m_outgoingCircularFrameQueue.front().size());
