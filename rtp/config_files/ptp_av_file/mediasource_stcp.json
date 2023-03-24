@@ -5,7 +5,7 @@
             "name": "video to pc",
             "convergenceLayer": "stcp",
             "nextHopNodeId": 10,
-            "remoteHostname": "localhost",
+            "remoteHostname": "192.168.1.132",
             "remotePort": 5002,
             "maxNumberOfBundlesInPipeline": 10000,
             "maxSumOfBundleBytesInPipeline": 500000000,
