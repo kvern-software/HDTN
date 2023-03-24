@@ -5,7 +5,7 @@
             "name": "from Raspberry Pi to local mp4",
             "convergenceLayer": "stcp",
             "boundPort": 40003,
-            "numRxCircularBufferElements": 1000,
+            "numRxCircularBufferElements": 5000,
             "keepAliveIntervalSeconds": 15
         }
     ]

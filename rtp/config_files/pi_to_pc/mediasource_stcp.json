@@ -2,7 +2,7 @@
     "outductConfigName": "myconfig",
     "outductVector": [
         {
-            "name": "from FFmpeg rtp stream to HDTN egress",
+            "name": "pi to HDTN egress to PC",
             "convergenceLayer": "stcp",
             "nextHopNodeId": 10,
             "remoteHostname": "192.168.1.132",

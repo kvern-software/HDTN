@@ -1,13 +1,15 @@
 # !/bin/zsh 
 
-config_files=$HDTN_RTP_DIR/config_files/point_to_point
+config_files=$HDTN_RTP_DIR/config_files/pi_to_pc
 # source_config=$config_files/outducts/ltp_media_source.json
 sink_config=$config_files/mediasink_stcp.json
 # source_config=$config_files/outducts/mediasource_tcpcl.json
 
 outgoing_rtp_port=40004
-# raspberrypi_ip=192.168.1.172
+
+
 cd $HDTN_RTP_DIR 
+
 
 ./build/bprecv_stream  --my-uri-eid=ipn:2.1 --inducts-config-file=$sink_config  --outgoing-rtp-hostname=127.0.0.1 \
         --outgoing-rtp-port=$outgoing_rtp_port --num-circular-buffer-vectors=500 --max-outgoing-rtp-packet-size-bytes=1472 \
