@@ -3,7 +3,7 @@
 # path variables
 config_files=$HDTN_RTP_DIR/config_files
 
-video_source_config=$config_files/two_hop_av/mediasource_stcp_to_4558.json
+video_source_config=$config_files/two_hop_av/egress_config.json
 # audio_source_config=$config_files/ptp_av_file/mediasource_stcp_5004.json
 
 test_media_folder=/home/jetson/test_media/official_test_media
@@ -18,7 +18,7 @@ cd $HDTN_RTP_DIR
 
 # video sender
 ./build/bpsend_stream  --bundle-size=100000 --bundle-rate=0 --use-bp-version-7 \
-        --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn2.1: --outducts-config-file=$video_source_config \
+        --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --outducts-config-file=$video_source_config \
         --max-incoming-udp-packet-size-bytes=1600 --incoming-rtp-stream-port=$video_port --num-circular-buffer-vectors=750\
         --enable-rtp-concatenation=false & 
 bp_video_process=$!

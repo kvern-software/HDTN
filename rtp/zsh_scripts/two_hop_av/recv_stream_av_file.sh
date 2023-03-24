@@ -3,7 +3,7 @@
 # path variables
 config_files=$HDTN_RTP_DIR/config_files
 
-video_sink_config=$config_files/two_hop_av/mediasink_stcp_at_4559.json
+video_sink_config=$config_files/two_hop_av/ingress_config.json
 # audio_sink_config=$config_files/two_hop_av/mediasink_stcp_5004.json
 
 outgoing_rtp_video=60004
