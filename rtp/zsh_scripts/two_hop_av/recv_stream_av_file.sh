@@ -3,8 +3,8 @@
 # path variables
 config_files=$HDTN_RTP_DIR/config_files
 
-video_sink_config=$config_files/ptp_av_file/mediasink_stcp.json
-audio_sink_config=$config_files/ptp_av_file/mediasink_stcp_5004.json
+video_sink_config=$config_files/two_hop_av/mediasink_stcp_at_4559.json
+# audio_sink_config=$config_files/two_hop_av/mediasink_stcp_5004.json
 
 outgoing_rtp_video=60004
 outgoing_rtp_audio=60006
@@ -20,7 +20,7 @@ ffmpeg  -y -strict experimental \
         -max_delay 0 \
         -reorder_queue_size 0 \
         -loglevel verbose \
-        -protocol_whitelist file,udp,rtp -i ptp_av.sdp -vcodec copy -acodec copy -c copy -f mp4 ptp_av.mp4 & 
+        -protocol_whitelist file,udp,rtp -i ptp_av.sdp -acodec copy -c copy -f mp4 two_hop_av.mp4 & 
 ffplay_id=$!
 
 sleep 1
@@ -31,12 +31,12 @@ sleep 1
        
 video_recv_process=$!               
 
-sleep 0.5
+# sleep 0.5
 
 #audio recv
-./build/bprecv_stream  --my-uri-eid=ipn:2.1 --inducts-config-file=$audio_sink_config  --outgoing-rtp-hostname=192.168.1.132 \
-        --outgoing-rtp-port=$outgoing_rtp_audio --num-circular-buffer-vectors=500 --max-outgoing-rtp-packet-size-bytes=1472 &
-audio_recv_process=$!   
+# ./build/bprecv_stream  --my-uri-eid=ipn:2.1 --inducts-config-file=$audio_sink_config  --outgoing-rtp-hostname=192.168.1.132 \
+#         --outgoing-rtp-port=$outgoing_rtp_audio --num-circular-buffer-vectors=500 --max-outgoing-rtp-packet-size-bytes=1472 &
+# audio_recv_process=$!   
 
 
 # cleanup

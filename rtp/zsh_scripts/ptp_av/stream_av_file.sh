@@ -31,8 +31,6 @@ bp_video_process=$!
 bp_audio_process=$!
 
 
-
-
 # audio and video stream stream
 ffmpeg -sdp_file HDTN.sdp -re -i $file -vcodec copy -an -f rtp "rtp://127.0.0.1:$video_port" \
         -vn -acodec copy -f rtp "rtp://127.0.0.1:$audio_port" &

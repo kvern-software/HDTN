@@ -1,0 +1,12 @@
+{
+    "inductConfigName": "myconfig",
+    "inductVector": [
+        {
+            "name": "from gateway to desktop",
+            "convergenceLayer": "stcp",
+            "boundPort": 4559,
+            "numRxCircularBufferElements": 5000,
+            "keepAliveIntervalSeconds": 15
+        }
+    ]
+}

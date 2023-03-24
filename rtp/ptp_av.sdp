@@ -3,12 +3,12 @@ o=- 0 0 IN IP4 127.0.0.1
 s=No Name
 t=0 0
 a=tool:libavformat 58.29.100
-m=video 50000 RTP/AVP 96
+m=video 60004 RTP/AVP 96
 c=IN IP4 127.0.0.1
 b=AS:10556
 a=rtpmap:96 H264/90000
 a=fmtp:96 packetization-mode=1; sprop-parameter-sets=Z01ANJWQA8AEPsBEAAAPpAAHUwIQ,aOuPIA==; profile-level-id=4D4034
-m=audio 50002 RTP/AVP 97
+m=audio 60006 RTP/AVP 97
 c=IN IP4 127.0.0.1
 b=AS:317
 a=rtpmap:97 MPEG4-GENERIC/48000/2

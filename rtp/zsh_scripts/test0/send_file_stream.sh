@@ -29,17 +29,22 @@ cd $HDTN_RTP_DIR
 
 
 # stream send
-# ./build/bpsend_stream  --bundle-size=2000 --bundle-rate=0 --use-bp-version-7 \
-#         --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --outducts-config-file=$source_config \
-#         --max-incoming-udp-packet-size-bytes=1600 --incoming-rtp-stream-port=$rtp_port --num-circular-buffer-vectors=5000 \
-#         --enable-rtp-concatenation=false --sdp-filepath="HDTN.sdp" &
-# media_source_process=$!
+./build/bpsend_stream  --bundle-size=2000 --bundle-rate=0 --use-bp-version-7 \
+        --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --outducts-config-file=$source_config \
+        --max-incoming-udp-packet-size-bytes=1600 --incoming-rtp-stream-port=$rtp_port --num-circular-buffer-vectors=1000 \
+        --enable-rtp-concatenation=false &
+media_source_process=$!
 
-# sleep 3
+sleep 3
+
+ffmpeg -y -re -i $file -c copy  -an -f rtp "rtp://127.0.0.1:$rtp_port"  &
+
+
+# ffmpeg -y -sdp_file HDTN.sdp -re -f rawvideo -pixel_format yuv422p10le -video_size 3840x2160 -i $file -c:v copy -an -f rtp "rtp://127.0.0.1:$rtp_port" &
+
+
+
 # ffmpeg -y -sdp_file HDTN.sdp -re -i $file -c copy -an -f rtp "rtp://127.0.0.1:$rtp_port" &
-ffmpeg -y -sdp_file HDTN.sdp -re -f rawvideo -pixel_format yuv422p10le -video_size 3840x2160 -i $file -c:v copy -an -f rtp "rtp://127.0.0.1:$rtp_port" &
-
-# ffmpeg -y -re -i $file -c copy  -an -f rtp "rtp://127.0.0.1:$rtp_port"  &
 
 
 sleep 400

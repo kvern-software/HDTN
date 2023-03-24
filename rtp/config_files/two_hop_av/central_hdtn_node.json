@@ -1,0 +1,66 @@
+{
+    "hdtnConfigName": "my hdtn config",
+    "userInterfaceOn": true,
+    "mySchemeName": "unused_scheme_name",
+    "myNodeId": 10,
+    "myBpEchoServiceId": 2047,
+    "myCustodialSsp": "unused_custodial_ssp",
+    "myCustodialServiceId": 0,
+    "mySchedulerServiceId": 100,
+    "isAcsAware": true,
+    "acsMaxFillsPerAcsPacket": 100,
+    "acsSendPeriodMilliseconds": 1000,
+    "retransmitBundleAfterNoCustodySignalMilliseconds": 10000,
+    "maxBundleSizeBytes": 10000000,
+    "maxIngressBundleWaitOnEgressMilliseconds": 2000,
+    "bufferRxToStorageOnLinkUpSaturation": false,
+    "maxLtpReceiveUdpPacketSizeBytes": 65536,
+    "zmqBoundSchedulerPubSubPortPath": 10200,
+    "inductsConfig": {
+        "inductConfigName": "bundles from jetson",
+        "inductVector": [
+            {
+                "name": "stcp ingress from jetson",
+                "convergenceLayer": "stcp",
+                "boundPort": 4558,
+                "numRxCircularBufferElements": 1000,
+                "keepAliveIntervalSeconds": 15
+            }
+        ]
+    },
+    "outductsConfig": {
+        "outductConfigName": "stcp egress on gateway to desktop",
+        "outductVector": [
+            {
+                "name": "stcp egress on gateway to desktop",
+                "convergenceLayer": "stcp",
+                "nextHopNodeId": 30,
+                "remoteHostname": "192.168.1.132",
+                "remotePort": 4559,
+                "maxNumberOfBundlesInPipeline": 10000,
+                "maxSumOfBundleBytesInPipeline": 50000000,
+                "finalDestinationEidUris": [
+                    "ipn:2.*"
+                ],
+                "keepAliveIntervalSeconds": 17
+            }
+        ]
+    },
+    "storageConfig": {
+        "storageImplementation": "asio_single_threaded",
+        "tryToRestoreFromDisk": false,
+        "autoDeleteFilesOnExit": true,
+        "totalStorageCapacityBytes": 81920000000,
+        "storageDiskConfigVector": [
+            {
+                "name": "d1",
+                "storeFilePath": ".\/store1.bin"
+            },
+            {
+                "name": "d2",
+                "storeFilePath": ".\/store2.bin"
+            }
+        ]
+    }
+}
+
