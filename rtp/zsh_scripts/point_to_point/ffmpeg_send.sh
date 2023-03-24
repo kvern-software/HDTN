@@ -1,6 +1,6 @@
 # !/bin/zsh 
 test_media_folder=/home/kyle/nasa/dev/test_media/official_test_media
-file=$test_media_folder/ammonia_trimmed.flac
+file=$test_media_folder/water_bubble.mp4
 
 rtp_port=40002
 raspberrypi_ip=192.168.1.172

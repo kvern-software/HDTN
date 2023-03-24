@@ -181,14 +181,16 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
 
 
         LOG_INFO(subprocess) << "starting..";
+        
 
         std::string sdpFile; 
         if (sdpFilePath.size() > 0)
             sdpFile = ReadSdpFile(sdpFilePath);
 
+        BpSendStream bpSendStream(maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, numCircularBufferVectors, maxBundleSizeBytes, enableRtpConcatenation, sdpFile);
+        
         std::cout << sdpFile << std::endl;
 
-        BpSendStream bpSendStream(maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, numCircularBufferVectors, maxBundleSizeBytes, enableRtpConcatenation, sdpFile);
 
         bpSendStream.Start(
             outductsConfigPtr,

@@ -27,7 +27,7 @@ outgoing_rtp_port=60000
 
 cd $HDTN_RTP_DIR 
 
-./build/bprecv_stream  --my-uri-eid=ipn:2.1 --inducts-config-file=$sink_config  --remote-hostname=127.0.0.1 \
+./build/bprecv_stream  --my-uri-eid=ipn:2.1 --inducts-config-file=$sink_config  --outgoing-rtp-hostname=127.0.0.1 \
         --outgoing-rtp-port=$outgoing_rtp_port --num-circular-buffer-vectors=500 --max-outgoing-rtp-packet-size-bytes=1472 \
         --ffmpeg-command="\
         ffmpeg -y -protocol_whitelist data,file,udp,rtp \
@@ -35,8 +35,8 @@ cd $HDTN_RTP_DIR
         -fflags +genpts \
         -seek2any 1 \
         -avoid_negative_ts +make_zero \
-        -max_delay 500 \
         -reorder_queue_size 0 \
+        -max_delay 0 \
         -loglevel verbose \
         -i  -vcodec copy -acodec copy -f mp4 test_water_stcp.mp4"
         # ffplay -i  -protocol_whitelist data,file,udp,rtp  -reorder_queue_size 0  -fflags nobuffer+fastseek+flush_packets -sync ext -flags low_delay -framedrop" &

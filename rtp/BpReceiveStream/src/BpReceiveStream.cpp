@@ -153,7 +153,7 @@ bool BpReceiveStream::ProcessPayload(const uint8_t *data, const uint64_t size)
 {
     padded_vector_uint8_t vec(size);
     memcpy(vec.data(), data, size);
-    if (vec.at(0) == SDP_FILE_STR_HEADER) 
+   if (vec.at(0) == SDP_FILE_STR_HEADER) 
     {
         LOG_INFO(subprocess) << "Got SDP File information";
         std::string sdpFile((char * )&vec[1], size - sizeof(uint8_t));
@@ -163,7 +163,7 @@ bool BpReceiveStream::ProcessPayload(const uint8_t *data, const uint64_t size)
         {
             ExecuteFFmpegInstance();
         }
-
+ 
     }
 
     {

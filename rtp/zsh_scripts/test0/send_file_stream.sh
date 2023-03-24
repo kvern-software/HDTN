@@ -18,21 +18,23 @@ rtp_port=40002
 
 cd $HDTN_RTP_DIR
 
-rm HDTN.sdp
+# rm HDTN.sdp
 
-ffmpeg -y -sdp_file HDTN.sdp -re -i $file -c copy -an -f rtp "rtp://127.0.0.1:$rtp_port" &
 # ffmpeg_sdp_process=$!
 # sleep 0.5
 # kill -2 $ffmpeg_sdp_process
 
 
+
 # stream send
 ./build/bpsend_stream  --bundle-size=2000 --bundle-rate=0 --use-bp-version-7 \
         --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --outducts-config-file=$source_config \
-        --max-incoming-udp-packet-size-bytes=1600 --incoming-rtp-stream-port=$rtp_port --num-circular-buffer-vectors=750 \
+        --max-incoming-udp-packet-size-bytes=1600 --incoming-rtp-stream-port=$rtp_port --num-circular-buffer-vectors=5000 \
         --enable-rtp-concatenation=false --sdp-filepath="HDTN.sdp" &
 media_source_process=$!
-# sleep 5
+
+sleep 3
+ffmpeg -y -sdp_file HDTN.sdp -re -i $file -c copy -an -f rtp "rtp://127.0.0.1:$rtp_port" &
 
 # ffmpeg -y -re -i $file -c copy  -an -f rtp "rtp://127.0.0.1:$rtp_port"  &
 
