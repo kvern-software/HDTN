@@ -4,7 +4,7 @@
 config_files=$HDTN_RTP_DIR/config_files
 
 video_source_config=$config_files/ptp_av_file/mediasource_stcp.json
-audio_source_config=$config_files/ptp_av_file/streamsource_stcp_5004.json
+audio_source_config=$config_files/ptp_av_file/mediasource_stcp_5004.json
 
 test_media_folder=/home/jetson/test_media/official_test_media
 
@@ -35,7 +35,7 @@ bp_audio_process=$!
 
 # audio and video stream stream
 ffmpeg -sdp_file HDTN.sdp -re -i $file -vcodec copy -an -f rtp "rtp://127.0.0.1:$video_port" \
-        -vn -acodec copy -f rtp "rtp://127.0.0.1:$audio_port"
+        -vn -acodec copy -f rtp "rtp://127.0.0.1:$audio_port" &
 
 
 
