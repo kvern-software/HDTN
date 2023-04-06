@@ -17,6 +17,7 @@ cd $HDTN_RTP_DIR
 
 ffmpeg -y -sdp_file HDTN.sdp -re -i $file -c copy -an -f rtp "rtp://127.0.0.1:$rtp_port" &
 ffmpeg_process=$!
+
 # pause ffmpeg to let HDTN start
 kill -s STOP $ffmpeg_process
 
