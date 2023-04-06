@@ -12,7 +12,7 @@ class BpSendStream : public BpSourcePattern
 public:
 
     BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, 
-            size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, std::string sdpFile);
+            size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, std::string sdpFile,  uint64_t sdpInterval_ms);
     ~BpSendStream();
 
     void ProcessIncomingBundlesThread(); // worker thread that calls RTP packet handler
@@ -38,6 +38,7 @@ protected:
 
 private:
     bool TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration& timeout);
+    bool SdpTimerThread();
     bool GetNextIncomingPacketTimeout(const boost::posix_time::time_duration& timeout);
     bool GetNextOutgoingPacketTimeout(const boost::posix_time::time_duration& timeout);
 
@@ -55,15 +56,20 @@ private:
 
     boost::mutex m_outgoingQueueMutex;   
     boost::mutex m_incomingQueueMutex;     
-  
+    boost::mutex m_sdpMutex;
+
     boost::condition_variable m_outgoingQueueCv;
     boost::condition_variable m_incomingQueueCv;
+    boost::condition_variable m_sdpCv;
 
     std::unique_ptr<boost::thread> m_processingThread;
     std::unique_ptr<boost::thread> m_ioServiceThreadPtr;
+    std::unique_ptr<boost::thread> m_sdpThread;
 
-    bool m_sentSdpFile = false;
+    bool m_sendSdp = true;
     std::string m_sdpFileStr;
+    uint64_t m_sdpInterval_ms;
+    
 
     uint64_t m_totalRtpPacketsReceived = 0; // counted when received from udp sink
     uint64_t m_totalRtpPacketsSent = 0; // counted when send to bundler

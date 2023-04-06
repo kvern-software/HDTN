@@ -22,10 +22,44 @@ void BpSendStreamRunner::MonitorExitKeypressThreadFunction() {
 BpSendStreamRunner::BpSendStreamRunner() {}
 BpSendStreamRunner::~BpSendStreamRunner() {}
 
+std::string BpSendStreamRunner::TranslateSdpToBp(std::string sdp, std::string uriCbheNumber, std::string bpEID)
+{
+    std::string newSdp;
+
+    // we do not care about the "o" and "v" fields
+
+    // replace the "c" field with DTN BP
+    newSdp.append("c=DTN BP IPN:");
+    newSdp.append(uriCbheNumber);
+    newSdp.append("\n");
+
+    // replace the "m" field with DTN endpoint
+    newSdp.append("m=");
+    if (sdp.find("m=video") != std::string::npos)
+        newSdp.append("video ");
+    if (sdp.find("m=audio") != std::string::npos)
+        newSdp.append("audio ");
+    newSdp.append(bpEID);
+    newSdp.append(" ");
+
+    // append the rest of the original SDP message
+    size_t rtpLocation = sdp.find("RTP/AVP 96"); // sdp protocol for RTP
+    if (rtpLocation == std::string::npos) 
+    {
+        LOG_ERROR(subprocess) << "Invalid SDP file";
+        return "ERROR";
+    }
+
+    std::string sdpSubString = sdp.substr(rtpLocation, UINT64_MAX);
+    newSdp.append(sdpSubString);
+    
+    LOG_INFO(subprocess) << "Translated SDP:\n" << newSdp;
+    return newSdp;
+}
 
 std::string BpSendStreamRunner::ReadSdpFile(const boost::filesystem::path sdpFilePath)
 {
-    std::string ffmpegCommand;
+    std::string sdpfile;
 
     while (!boost::filesystem::exists(sdpFilePath))
     {
@@ -33,10 +67,8 @@ std::string BpSendStreamRunner::ReadSdpFile(const boost::filesystem::path sdpFil
     }
     // wait for file to be written to
     boost::this_thread::sleep_for(boost::chrono::milliseconds(10));
-
-    boost::filesystem::load_string_file(sdpFilePath, ffmpegCommand);
-    // std::cout << ffmpegCommand << std::endl;
-    return ffmpegCommand;
+    boost::filesystem::load_string_file(sdpFilePath, sdpfile);
+    return sdpfile;
 }
 
 bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool & running, bool useSignalHandler) {
@@ -184,12 +216,17 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
         
 
         std::string sdpFile; 
-        if (sdpFilePath.size() > 0)
+        std::string dtnSdpFile;
+        if (sdpFilePath.size() > 0) {
             sdpFile = ReadSdpFile(sdpFilePath);
 
-        BpSendStream bpSendStream(maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, numCircularBufferVectors, maxBundleSizeBytes, enableRtpConcatenation, sdpFile);
+            dtnSdpFile = TranslateSdpToBp(sdpFile, std::to_string(myEid.nodeId), std::to_string(myEid.serviceId));
+            }
+
+        LOG_INFO(subprocess) << "Got SDP File\n" << dtnSdpFile;
+
+        BpSendStream bpSendStream(maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, numCircularBufferVectors, maxBundleSizeBytes, enableRtpConcatenation, dtnSdpFile, 5000);
         
-        std::cout << sdpFile << std::endl;
 
 
         bpSendStream.Start(

@@ -5,13 +5,14 @@
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
 BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, size_t numCircularBufferVectors, 
-        size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, std::string sdpFile) : BpSourcePattern(),
+        size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, std::string sdpFile, uint64_t sdpInterval_ms) : BpSourcePattern(),
     m_running(true),
     m_maxIncomingUdpPacketSizeBytes(maxIncomingUdpPacketSizeBytes),
     m_incomingRtpStreamPort(incomingRtpStreamPort),
     m_maxOutgoingBundleSizeBytes(maxOutgoingBundleSizeBytes),
     m_enableRtpConcatentation(enableRtpConcatentation),
-    m_sdpFileStr(sdpFile)
+    m_sdpFileStr(sdpFile),
+    m_sdpInterval_ms(sdpInterval_ms)
 {
     m_currentFrame.reserve(m_maxOutgoingBundleSizeBytes);
 
@@ -27,7 +28,8 @@ BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomi
     m_outgoingDtnRtpPtr = std::make_shared<DtnRtp>(m_maxOutgoingBundleSizeBytes);
 
     m_processingThread = boost::make_unique<boost::thread>(boost::bind(&BpSendStream::ProcessIncomingBundlesThread, this)); 
-    
+    m_sdpThread = boost::make_unique<boost::thread>(boost::bind(&BpSendStream::SdpTimerThread, this)); 
+
     // processing will begin almost immediately, so call this when our callback and rtp session objects are already initialized
     m_bundleSinkPtr = std::make_shared<UdpBundleSink>(m_ioService, m_incomingRtpStreamPort, 
         boost::bind(&BpSendStream::WholeBundleReadyCallback, this, boost::placeholders::_1),
@@ -227,10 +229,11 @@ void BpSendStream::DeleteCallback()
 
 uint64_t BpSendStream::GetNextPayloadLength_Step1() 
 {
-    // if (!m_sentSdpFile) {
-    //     return m_sdpFileStr.size() + sizeof(uint8_t);
-    // }
-
+    // m_sdpMutex.lock();
+    if (m_sendSdp) {
+        LOG_INFO(subprocess) << "Sending SDP file size " << m_sdpFileStr.size();
+        return m_sdpFileStr.size() + sizeof(SDP_FILE_STR_HEADER);
+    }
 
     m_outgoingQueueMutex.lock();
 
@@ -246,14 +249,17 @@ uint64_t BpSendStream::GetNextPayloadLength_Step1()
 
 bool BpSendStream::CopyPayload_Step2(uint8_t * destinationBuffer) 
 {
-    // if (!m_sentSdpFile) {
-    //     uint8_t header = SDP_FILE_STR_HEADER;
-    //     memcpy(destinationBuffer, &header, sizeof(header));
-    //     memcpy(destinationBuffer + sizeof(header), m_sdpFileStr.data(), m_sdpFileStr.size());
-    //     m_sentSdpFile = true;
-    //     LOG_INFO(subprocess) << "Sent SDP information";
-    //     return true;
-    // }
+    if (m_sendSdp) 
+    {
+        m_sendSdp = false;
+        uint8_t header = SDP_FILE_STR_HEADER;
+        memcpy(destinationBuffer, &header, sizeof(uint8_t));
+        memcpy(destinationBuffer + sizeof(uint8_t), m_sdpFileStr.data(), m_sdpFileStr.size());
+        m_sdpMutex.unlock();
+        m_sdpCv.notify_one();
+        LOG_INFO(subprocess) << "Sent SDP information";
+        return true;
+    }
     
     
     // LOG_DEBUG(subprocess) << "Popping outgoing queue seq";
@@ -303,7 +309,9 @@ bool BpSendStream::TryWaitForIncomingDataAvailable(const boost::posix_time::time
     }
     return true; 
 }
-bool BpSendStream::GetNextIncomingPacketTimeout(const boost::posix_time::time_duration& timeout)
+
+
+bool BpSendStream::GetNextIncomingPacketTimeout(const boost::posix_time::time_duration &timeout)
 {
     boost::mutex::scoped_lock lock(m_incomingQueueMutex);
     if ((m_incomingCircularPacketQueue.size() == 0)) {
@@ -312,4 +320,31 @@ bool BpSendStream::GetNextIncomingPacketTimeout(const boost::posix_time::time_du
     }
     
     return true;
+}
+
+bool BpSendStream::SdpTimerThread()
+{
+    static const boost::posix_time::time_duration timeout(boost::posix_time::milliseconds(250));
+
+
+    while (1)
+    {
+        {
+            // boost::mutex::scoped_lock lock(m_sdpMutex);
+            
+            if (m_sendSdp == false)
+            {
+                // LOG_DEBUG(subprocess) << "sleeping SDP";
+                boost::this_thread::sleep_for(boost::chrono::milliseconds(5000));
+            // } else {
+                // m_sdpCv.timed_wait(lock, timeout);
+                m_sendSdp = true;
+            }
+            // LOG_DEBUG(subprocess) << "waiting for sdp to send";
+            boost::this_thread::sleep_for(boost::chrono::milliseconds(250));
+
+        }
+
+    }
+    return false;
 }

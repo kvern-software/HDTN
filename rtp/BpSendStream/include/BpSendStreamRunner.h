@@ -10,6 +10,8 @@ public:
     ~BpSendStreamRunner();
 
     std::string ReadSdpFile(const boost::filesystem::path sdpFilePath);
+    std::string TranslateSdpToBp(std::string sdp, std::string uriCbheNumber, std::string bpEID);
+    
     bool Run(int argc, const char* const argv[], volatile bool & running, bool useSignalHandler);
     uint64_t m_bundleCount;
     uint64_t m_totalBundlesAcked;

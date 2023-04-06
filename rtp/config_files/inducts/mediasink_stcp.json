@@ -5,7 +5,7 @@
             "name": "localhost bpsink",
             "convergenceLayer": "stcp",
             "boundPort": 5002,
-            "numRxCircularBufferElements": 500,
+            "numRxCircularBufferElements": 4000,
             "keepAliveIntervalSeconds": 15
         }
     ]

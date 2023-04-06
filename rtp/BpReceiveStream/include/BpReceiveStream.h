@@ -9,13 +9,15 @@ class BpReceiveStream : public BpSinkPattern {
 public:
     BpReceiveStream(size_t numCircularBufferVectors, const std::string& rtpDestHostname, const uint16_t rtpDestPort, uint16_t maxOutgoingRtpPacketSizeByte, std::string ffmpegCommand);
     virtual ~BpReceiveStream() override;
-    void ProcessIncomingBundlesThread(); // worker thread 
 
 protected:
     virtual bool ProcessPayload(const uint8_t * data, const uint64_t size) override;
     
 private:
-    int ReadSdpFileFromString(std::string sdpFileString);
+    void ProcessIncomingBundlesThread(); // worker thread 
+    void SdpPacketHandle(const padded_vector_uint8_t& vec);
+
+    int TranslateBpSdpToInSdp(std::string sdp);
     int ExecuteFFmpegInstance();
 
     bool TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration& timeout);
@@ -45,7 +47,8 @@ private:
 	boost::asio::io_service io_service;
     boost::asio::ip::udp::socket socket;
     std::string m_ffmpegCommand;
-    
+    bool m_executedFfmpeg = false;
+
     boost::asio::ip::udp::endpoint m_udpEndpoint;
     std::shared_ptr<UdpBatchSender> m_udpBatchSenderPtr;
     boost::mutex m_sentPacketsMutex;

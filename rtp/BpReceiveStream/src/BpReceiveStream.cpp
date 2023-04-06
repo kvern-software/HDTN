@@ -4,7 +4,7 @@
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
-#define FFMPEG_SDP_HEADER "data:application/sdp;charset=UTF-8,"
+#define FFMPEG_SDP_HEADER "data:application/sdp;"
 
 BpReceiveStream::BpReceiveStream(size_t numCircularBufferVectors, const std::string& rtpDestHostname, const uint16_t rtpDestPort, uint16_t maxOutgoingRtpPacketSizeBytes, std::string ffmpegCommand) : BpSinkPattern(), 
         m_numCircularBufferVectors(numCircularBufferVectors),
@@ -148,23 +148,43 @@ void BpReceiveStream::ProcessIncomingBundlesThread()
     }
 }
 
+void BpReceiveStream::SdpPacketHandle(const padded_vector_uint8_t& vec)
+{
+    LOG_INFO(subprocess) << "Got SDP File information";
+    std::string sdpFile((char * )&vec[1], vec.size() - 1);
+    LOG_INFO(subprocess) << "Sdp File: \n" << sdpFile;
+
+    if (TranslateBpSdpToInSdp(sdpFile) == 0) 
+    {
+        if (m_ffmpegCommand.length() == 0) 
+        {
+            // Save sdp to text file for input to ffmpeg later on in runscript
+            boost::filesystem::ofstream file("HDTN_TO_IN_SDP.sdp");
+            file << m_sdpFileString;
+            file.close();
+        } 
+        else 
+        { // we want to execute ffmpeg in our program, not externally
+            if (m_executedFfmpeg == false) 
+            {
+                ExecuteFFmpegInstance();
+                m_executedFfmpeg = true;
+            } 
+        } 
+    }
+}
+
 // Data from BpSourcePattern comes in through here
 bool BpReceiveStream::ProcessPayload(const uint8_t *data, const uint64_t size)
 {
     padded_vector_uint8_t vec(size);
     memcpy(vec.data(), data, size);
-//    if (vec.at(0) == SDP_FILE_STR_HEADER) 
-//     {
-//         LOG_INFO(subprocess) << "Got SDP File information";
-//         std::string sdpFile((char * )&vec[1], size - sizeof(uint8_t));
-//         LOG_INFO(subprocess) << "Sdp File: \n" << sdpFile;
-        
-//         if (ReadSdpFileFromString(sdpFile) == 0) 
-//         {
-//             ExecuteFFmpegInstance();
-//         }
- 
-//     }
+
+    if (vec.at(0) == SDP_FILE_STR_HEADER) {
+        SdpPacketHandle(vec);
+        return true;
+    } 
+
 
     {
         boost::mutex::scoped_lock lock(m_incomingQueueMutex); // lock mutex 
@@ -174,41 +194,44 @@ bool BpReceiveStream::ProcessPayload(const uint8_t *data, const uint64_t size)
     m_incomingQueueCv.notify_one();
     m_totalRtpPacketsReceived++;
 
-    // rtp_frame * frame= (rtp_frame *) data;
-    // LOG_DEBUG(subprocess) << "Got bundle of size " << size;
-    // frame->print_header();
     return true;
 }
 
 // we need to change the port number to the outgoing rtp port
-int BpReceiveStream::ReadSdpFileFromString(std::string sdpFileString)
+int BpReceiveStream::TranslateBpSdpToInSdp(std::string sdp)
 {
-    size_t mediaDescriptorLocation;
-    size_t rtpDescriptorLocation = sdpFileString.find("RTP"); // sdp protocol
+    std::string newSdp;
     
-    // check for video stream first
-    mediaDescriptorLocation = sdpFileString.find("m=video"); // this is sdp protocol
-    if (mediaDescriptorLocation == std::string::npos) // if no video stream found, check for audio stream
+    // "c" field
+    newSdp.append("c=IN IP4 ");
+    newSdp.append(m_udpEndpoint.address().to_string());
+    newSdp.append("\n");
+
+    // "m" field
+    newSdp.append("m=");
+    if (sdp.find("m=video") != std::string::npos)
+        newSdp.append("video ");
+    if (sdp.find("m=audio") != std::string::npos)
+        newSdp.append("audio ");
+    newSdp.append(std::to_string(m_udpEndpoint.port()));
+    newSdp.append(" ");
+    
+    // append the rest of the original SDP message
+    size_t rtpLocation = sdp.find("RTP/AVP 96"); // sdp protocol for RTP
+    if (rtpLocation == std::string::npos) 
     {
-        mediaDescriptorLocation = sdpFileString.find("m=audio");
+        LOG_ERROR(subprocess) << "Invalid SDP file";
+        return -1;
     }
 
-    LOG_DEBUG(subprocess) << "location:" << mediaDescriptorLocation;
+    std::string sdpSubString = sdp.substr(rtpLocation, UINT64_MAX);
+    newSdp.append(sdpSubString);
+    
+    m_sdpFileString = newSdp;
 
-    if ((mediaDescriptorLocation!=std::string::npos) && (rtpDescriptorLocation != std::string::npos))
-    {
-        size_t portLeftBound = mediaDescriptorLocation + sizeof("m=video") ; // m=audio and m=video have the same length 
-
-        // replace the port with our outgoing port
-        std::string newSdpFileString = std::string(&sdpFileString[0], &sdpFileString[portLeftBound]); // first half
-        newSdpFileString.append(std::to_string(m_outgoingRtpPort) + " "); // add new port and space
-        newSdpFileString.append(std::string(&sdpFileString[rtpDescriptorLocation], &sdpFileString[sdpFileString.size()])); // remaining half
-        m_sdpFileString = newSdpFileString;
-        LOG_INFO(subprocess) << "New SDP String:\n" << m_sdpFileString;
-        return 0;
-    }
-
-    return -1;
+    LOG_INFO(subprocess) << "Translated IN SDP:\n" << m_sdpFileString;
+    
+    return 0;
 }
 
 int BpReceiveStream::ExecuteFFmpegInstance()
