@@ -1,4 +1,4 @@
-
+# run this on gateway
 # path variables
 config_files=$HDTN_RTP_DIR/config_files/ltp_egress_node_sink_test
 gen_config=$config_files/bpgen_node_1.json

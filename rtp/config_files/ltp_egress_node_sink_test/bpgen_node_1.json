@@ -7,7 +7,7 @@
             "nextHopNodeId": 2,
             "remoteHostname": "madrid.local",
             "remotePort": 5001,
-            "maxNumberOfBundlesInPipeline": 5,
+            "maxNumberOfBundlesInPipeline": 10000,
             "maxSumOfBundleBytesInPipeline": 50000000,
             "finalDestinationEidUris": ["ipn:2.1"],
             "thisLtpEngineId": 1,

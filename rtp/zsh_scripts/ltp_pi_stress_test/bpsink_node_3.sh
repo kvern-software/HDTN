@@ -1,5 +1,5 @@
 #!/bin/sh
-
+#run this on terminal
 # path variables
 config_files=$HDTN_RTP_DIR/config_files/ltp_egress_node_sink_test
 sink1_config=$config_files/bpsink_node_3.json

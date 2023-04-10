@@ -1,5 +1,5 @@
 #!/bin/sh
-
+#run this on madrid
 # path variables
 config_files=$HDTN_RTP_DIR/config_files/ltp_egress_node_sink_test/
 hdtn_config=$config_files/hdtn_one_process_node_2.json
