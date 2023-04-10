@@ -1,0 +1,100 @@
+{"contacts":[
+ {"contact": 0,
+"source": Gateway,
+"dest": DSN,
+"finalDestination":DSN,
+"startTime": 0,
+"endTime": 86400,
+"rate": 1000 ,
+"owlt": 1 
+},
+
+ {"contact": 1,
+"source": Gateway,
+"dest": LEGS,
+"finalDestination":LEGS,
+"startTime": 0,
+"endTime": 77498,
+"rate": 1000 ,
+"owlt": 1 
+},
+
+ {"contact": 2,
+"source": Gateway,
+"dest": LEGS,
+"finalDestination":LEGS,
+"startTime": 79613,
+"endTime": 86400,
+"rate": 1000 ,
+"owlt": 1 
+},
+
+ {"contact": 3,
+"source": IOAGSouth,
+"dest": LEGS,
+"finalDestination":LEGS,
+"startTime": 0,
+"endTime": 75933,
+"rate": 1000 ,
+"owlt": 1 
+},
+
+ {"contact": 4,
+"source": IOAGSouth,
+"dest": LEGS,
+"finalDestination":LEGS,
+"startTime": 77563,
+"endTime": 86400,
+"rate": 1000 ,
+"owlt": 1 
+},
+
+ {"contact": 5,
+"source": MoonBase,
+"dest": DSN,
+"finalDestination":DSN,
+"startTime": 0,
+"endTime": 86400,
+"rate": 1000 ,
+"owlt": 1 
+},
+
+ {"contact": 6,
+"source": MoonBase,
+"dest": Gateway,
+"finalDestination":Gateway,
+"startTime": 0,
+"endTime": 86400,
+"rate": 1000 ,
+"owlt": 1 
+},
+
+ {"contact": 7,
+"source": MoonBase,
+"dest": IOAGSouth,
+"finalDestination":IOAGSouth,
+"startTime": 0,
+"endTime": 21735,
+"rate": 1000 ,
+"owlt": 1 
+},
+
+ {"contact": 8,
+"source": MoonBase,
+"dest": IOAGSouth,
+"finalDestination":IOAGSouth,
+"startTime": 31570,
+"endTime": 64965,
+"rate": 1000 ,
+"owlt": 1 
+},
+
+ {"contact": 9,
+"source": MoonBase,
+"dest": IOAGSouth,
+"finalDestination":IOAGSouth,
+"startTime": 74801,
+"endTime": 86400,
+"rate": 1000 ,
+"owlt": 1 
+},]}

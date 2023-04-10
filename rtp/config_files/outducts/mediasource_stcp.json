@@ -5,7 +5,7 @@
             "name": "to hdtn local",
             "convergenceLayer": "stcp",
             "nextHopNodeId": 10,
-            "remoteHostname": "localhost",
+            "remoteHostname": "kyle",
             "remotePort": 5002,
             "maxNumberOfBundlesInPipeline": 10000,
             "maxSumOfBundleBytesInPipeline": 500000000,
