@@ -8,7 +8,7 @@ file=$test_media_folder/lucia.mp4
 hdtn_config=$config_files/hdtn_one_process_node_1.json
 contact_plan=$HDTN_RTP_DIR/config_files/contact_plans/LunaNetContactPlanNodeIDs.json
 
-rtp_port=20000
+incoming_rtp_port=20000
 
 cd $HDTN_RTP_DIR
 

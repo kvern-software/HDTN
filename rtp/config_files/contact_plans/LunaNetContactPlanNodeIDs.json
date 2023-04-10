@@ -5,7 +5,7 @@
    "finalDestination":4,
    "startTime": 0,
    "endTime": 86400,
-   "rate": 1000 ,
+   "rateBitsPerSec": 1000 ,
    "owlt": 1 
    },
    
@@ -15,7 +15,7 @@
    "finalDestination":5,
    "startTime": 0,
    "endTime": 77498,
-   "rate": 1000 ,
+   "rateBitsPerSec": 1000 ,
    "owlt": 1 
    },
    
@@ -25,7 +25,7 @@
    "finalDestination":5,
    "startTime": 79613,
    "endTime": 86400,
-   "rate": 1000 ,
+   "rateBitsPerSec": 1000 ,
    "owlt": 1 
    },
    
@@ -35,7 +35,7 @@
    "finalDestination":5,
    "startTime": 0,
    "endTime": 75933,
-   "rate": 1000 ,
+   "rateBitsPerSec": 1000 ,
    "owlt": 1 
    },
    
@@ -45,7 +45,7 @@
    "finalDestination":5,
    "startTime": 77563,
    "endTime": 86400,
-   "rate": 1000 ,
+   "rateBitsPerSec": 1000 ,
    "owlt": 1 
    },
    
@@ -55,7 +55,7 @@
    "finalDestination":4,
    "startTime": 0,
    "endTime": 86400,
-   "rate": 1000 ,
+   "rateBitsPerSec": 1000 ,
    "owlt": 1 
    },
    
@@ -65,7 +65,7 @@
    "finalDestination":2,
    "startTime": 0,
    "endTime": 86400,
-   "rate": 1000 ,
+   "rateBitsPerSec": 1000 ,
    "owlt": 1 
    },
    
@@ -75,7 +75,7 @@
    "finalDestination":3,
    "startTime": 0,
    "endTime": 21735,
-   "rate": 1000 ,
+   "rateBitsPerSec": 1000 ,
    "owlt": 1 
    },
    
@@ -85,7 +85,7 @@
    "finalDestination":3,
    "startTime": 31570,
    "endTime": 64965,
-   "rate": 1000 ,
+   "rateBitsPerSec": 1000 ,
    "owlt": 1 
    },
    
@@ -95,6 +95,6 @@
    "finalDestination":3,
    "startTime": 74801,
    "endTime": 86400,
-   "rate": 1000 ,
+   "rateBitsPerSec": 1000 ,
    "owlt": 1 
    }]}
