@@ -52,8 +52,8 @@ ffmpeg -y -i water_bubble.mp4 -map 0:v -c:v libx264 -crf 18 -c:a copy water_bubb
 ffmpeg -y -r 60000/1001  -threads 0 -i water_bubble.mp4 -map 0:v -c:v libx264 -no-scenecut true -g 60  -crf 18 -c:a copy water_bubbles_h264_cbr_hq.mp4
 
 # h265 to h254 variable bit rate 10 bit twoo pass
-ffmpeg -y -r 60000/1001  -threads 0 -i water_bubble.mp4 -c:v libx264 -b:v 1M -maxrate 11.0M -bufsize 10M -pass 1 -f mp4 /dev/null && \
-ffmpeg -y -r 60000/1001  -threads 0 -i water_bubble.mp4 -c:v libx264 -b:v 1M -maxrate 11.0M -bufsize 10M -pass 2 water_bubble_h264_vbr.mp4
+ffmpeg -y -r 60000/1001  -threads 0 -i water_bubble.mp4 -c:v libx264 -b:v 110M -maxrate 130.0M -bufsize 100M -pass 1 -f mp4 /dev/null && \
+ffmpeg -y -r 60000/1001  -threads 0 -i water_bubble.mp4 -c:v libx264 -b:v 110M -maxrate 130.0M -bufsize 100M -pass 2 water_bubble_h264_vbr.mp4
 
 
 ffmpeg h264_nvenc -h
