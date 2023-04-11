@@ -6,7 +6,7 @@ gen_config=$config_files/bpgen_node_1.json
 cd $HDTN_SOURCE_ROOT
 
 #bpgen
-./build/common/bpcodec/apps/bpgen-async --bundle-size=100000 --bundle-rate=0 --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --outducts-config-file=$gen_config &
+./build/common/bpcodec/apps/bpgen-async --bundle-size=100000 --bundle-rate=0 --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:3.1 --outducts-config-file=$gen_config &
 pid_gen=$!
 sleep 8
 

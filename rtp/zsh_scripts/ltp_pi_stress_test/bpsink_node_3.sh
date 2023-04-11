@@ -7,7 +7,7 @@ sink1_config=$config_files/bpsink_node_3.json
 cd $HDTN_SOURCE_ROOT
 
 # bpsink1
-./build/common/bpcodec/apps/bpsink-async --my-uri-eid=ipn:2.1 --inducts-config-file=$sink1_config &
+./build/common/bpcodec/apps/bpsink-async --my-uri-eid=ipn:3.1 --inducts-config-file=$sink1_config &
 bpsink_PID=$!
 sleep 3
 
