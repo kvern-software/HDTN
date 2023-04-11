@@ -24,7 +24,7 @@
                 "name": "ltp induct from bpgen",
                 "convergenceLayer": "ltp_over_udp",
                 "boundPort": 5001,
-                "numRxCircularBufferElements": 10000,
+                "numRxCircularBufferElements": 50000,
                 "thisLtpEngineId": 2,
                 "remoteLtpEngineId": 1,
                 "ltpReportSegmentMtu": 1360,
