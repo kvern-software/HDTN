@@ -54,7 +54,7 @@
                 "convergenceLayer": "ltp_over_udp",
                 "nextHopNodeId": 3,
                 "remoteHostname": "terminal.local",
-                "remotePort": 40000,
+                "remotePort": 40005,
                 "maxNumberOfBundlesInPipeline": 10000,
                 "maxSumOfBundleBytesInPipeline": 50000000,
                 "finalDestinationEidUris": ["ipn:3.1"],
