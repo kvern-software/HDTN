@@ -32,18 +32,18 @@
 #ifdef _MSC_VER
 #include <intrin.h> // __cpuid
 #else
-//#include <cpuid.h>  // __get_cpuid
+#include <cpuid.h>  // __get_cpuid
 #endif
 
 static void CpuIdCrossPlatform(int * eaxThrougEdxRegisters, int id) {
 #ifdef _MSC_VER
     __cpuid(eaxThrougEdxRegisters, id);
 #else
-//    __get_cpuid(static_cast<unsigned int>(id),
-  //      reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[0]),
-    //    reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[1]),
-    //    reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[2]),
-     //   reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[3]));
+    __get_cpuid(static_cast<unsigned int>(id),
+        reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[0]),
+        reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[1]),
+        reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[2]),
+        reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[3]));
 #endif
 }
 
@@ -51,11 +51,11 @@ static void CpuIdExCrossPlatform(int * eaxThrougEdxRegisters, int id, int subId)
 #ifdef _MSC_VER
     __cpuidex(eaxThrougEdxRegisters, id, subId);
 #else
-//    __get_cpuid_count(static_cast<unsigned int>(id), static_cast<unsigned int>(subId),
-  //      reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[0]),
-    //    reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[1]),
-      //  reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[2]),
-    //    reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[3]));
+    __get_cpuid_count(static_cast<unsigned int>(id), static_cast<unsigned int>(subId),
+        reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[0]),
+        reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[1]),
+        reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[2]),
+        reinterpret_cast<unsigned int*>(&eaxThrougEdxRegisters[3]));
 #endif
 }
 

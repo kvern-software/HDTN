@@ -36,7 +36,7 @@ python3 easyVmaf.py -d  $distorted_file -r $reference_file \
 -subsample 10 \
 -sw $window_time \
 -model 4K \
--threads 16 \
+-threads 15 \
 -progress  \
 -endsync  \
 -output_fmt json 
