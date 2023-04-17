@@ -12,15 +12,11 @@ class BpSendStream : public BpSourcePattern
 public:
 
     BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, 
-            size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, std::string sdpFile,  uint64_t sdpInterval_ms);
+            size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, 
+            std::string sdpFile,  uint64_t sdpInterval_ms, uint16_t numRtpPacketsPerBundle);
     ~BpSendStream();
 
-    void ProcessIncomingBundlesThread(); // worker thread that calls RTP packet handler
-    void WholeBundleReadyCallback(padded_vector_uint8_t & wholeBundleVec); // incoming udp packets come in here
-    void DeleteCallback(); // gets called on socket shutdow, optional to do anything with it
-    void Concatenate(padded_vector_uint8_t &incomingRtpFrame);
-    void CreateFrame();
-    void PushFrame();
+
  
     boost::asio::io_service m_ioService; // socket uses this to grab data from incoming rtp stream
     
@@ -29,7 +25,8 @@ public:
     std::shared_ptr<DtnRtp> m_incomingDtnRtpPtr;
 
     boost::circular_buffer<padded_vector_uint8_t> m_incomingCircularPacketQueue; // consider making this a pre allocated vector
-    boost::circular_buffer<padded_vector_uint8_t> m_outgoingCircularFrameQueue;
+    std::queue<padded_vector_uint8_t> m_outgoingRtpPacketQueue; // these buffers get placed into m_outgoingCircularBundleQueue when we have packed in the requested RTP packets 
+    boost::circular_buffer<std::vector<uint8_t>> m_outgoingCircularBundleQueue;
 
 protected:
     virtual bool TryWaitForDataAvailable(const boost::posix_time::time_duration& timeout) override;
@@ -41,6 +38,14 @@ private:
     bool SdpTimerThread();
     bool GetNextIncomingPacketTimeout(const boost::posix_time::time_duration& timeout);
     bool GetNextOutgoingPacketTimeout(const boost::posix_time::time_duration& timeout);
+    
+    void ProcessIncomingBundlesThread(); // worker thread that calls RTP packet handler
+    void WholeBundleReadyCallback(padded_vector_uint8_t & wholeBundleVec); // incoming udp packets come in here
+    void DeleteCallback(); // gets called on socket shutdow, optional to do anything with it
+    void Concatenate(padded_vector_uint8_t &incomingRtpFrame);
+    void CreateFrame();
+    void PushFrame();
+    void PushBundle();
 
     padded_vector_uint8_t m_currentFrame;  
     size_t m_offset = 0;
@@ -53,6 +58,7 @@ private:
     uint64_t m_bpGenSequenceNumber;
 
     bool m_enableRtpConcatentation;
+    uint64_t m_rtpBytesInQueue = 0;
 
     boost::mutex m_outgoingQueueMutex;   
     boost::mutex m_incomingQueueMutex;     
@@ -66,10 +72,11 @@ private:
     std::unique_ptr<boost::thread> m_ioServiceThreadPtr;
     std::unique_ptr<boost::thread> m_sdpThread;
 
-    bool m_sendSdp = true;
+    volatile bool m_sendSdp = true;
     std::string m_sdpFileStr;
     uint64_t m_sdpInterval_ms;
     
+    uint16_t m_numRtpPacketsPerBundle;
 
     uint64_t m_totalRtpPacketsReceived = 0; // counted when received from udp sink
     uint64_t m_totalRtpPacketsSent = 0; // counted when send to bundler

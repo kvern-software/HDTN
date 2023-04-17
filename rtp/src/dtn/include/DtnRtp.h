@@ -17,7 +17,8 @@
 #define USE_INCOMING_SEQ true
 #define USE_OUTGOING_SEQ false
 
-#define SDP_FILE_STR_HEADER 0x77
+#define SDP_FILE_STR_HEADER 0x00
+
 
 /**
  * This class effectively acts as a tracker for all the

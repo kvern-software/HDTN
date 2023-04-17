@@ -20,7 +20,7 @@ cd $HDTN_RTP_DIR
 #         -i stream_file.sdp -vcodec copy -acodec copy -f mp4 test_output_LTP.mp4 & 
 
 
-./build/bprecv_stream  --my-uri-eid=ipn:2.1 --inducts-config-file=$sink_config  --outgoing-rtp-hostname=127.0.0.1 \
+./build/bprecv_stream  --my-uri-eid=ipn:7.1 --inducts-config-file=$sink_config  --outgoing-rtp-hostname=127.0.0.1 \
         --outgoing-rtp-port=$outgoing_rtp_port --num-circular-buffer-vectors=500 --max-outgoing-rtp-packet-size-bytes=1472 \
         --ffmpeg-command="\
         ffmpeg -y -protocol_whitelist file,udp,rtp,data \

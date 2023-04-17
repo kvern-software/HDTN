@@ -8,7 +8,6 @@
    "rateBitsPerSec": 1000 ,
    "owlt": 1 
    },
-   
     {"contact": 1,
    "source": 2,
    "dest": 5,

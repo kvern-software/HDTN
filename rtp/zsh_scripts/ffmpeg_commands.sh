@@ -49,7 +49,10 @@ ffmpeg -ss 00:04:18 -i A012C002H2201038S_CANON_01-Surface_Tension.MXF -t 60 -c c
 ffmpeg -y -i water_bubble.mp4 -map 0:v -c:v libx264 -crf 18 -c:a copy water_bubbles_h264_cbr_hq.mp4
 
 # h265 to h264 constant bit rate 10 bit
-ffmpeg -y -r 60000/1001  -threads 0 -i water_bubble.mp4 -map 0:v -c:v libx264 -no-scenecut true -g 60  -crf 18 -c:a copy water_bubbles_h264_cbr_hq.mp4
+ffmpeg -y -r 60000/1001  -threads 0 -i water_bubble.mp4 -map 0:v -c:v libx264 -slice-max-size 1460 -no-scenecut  true -g 60  -crf 18 -c:a copy water_bubble_h264_crf_18.mp4
+
+# crf h264
+ffmpeg -i lucia.mp4 -c:v libx264 -slice-max-size 1460  -no-scenecut  true -g 60  -crf 18  -c:a copy lucia_crf18.mp4      
 
 # h265 to h254 variable bit rate 10 bit twoo pass
 ffmpeg -y -r 60000/1001  -threads 0 -i water_bubble.mp4 -c:v libx264 -b:v 110M -maxrate 130.0M -bufsize 100M -pass 1 -f mp4 /dev/null && \
@@ -187,3 +190,9 @@ h264_nvenc AVOptions:
   -single-slice-intra-refresh <boolean>    E..V....... Use single slice intra refresh (default false)
   -constrained-encoding <boolean>    E..V....... Enable constrainedFrame encoding where each slice in the constrained picture is independent of other slices (default false)
 
+
+
+# get length of video in seconds
+ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 input.mp4
+
+ffmpeg -i transmitted.mp4 -ss DELTA_TIME -i original.mp4 -lavfi psnr=stats_file=psnr_logfile.txt -f null - 

@@ -32,7 +32,7 @@ private:
     int SendUdpPacket(const std::vector<uint8_t>& message);
     volatile bool m_running; // exit condition
     
-    boost::circular_buffer<padded_vector_uint8_t> m_incomingCircularPacketQueue; // incoming rtp frames from HDTN put here
+    boost::circular_buffer<padded_vector_uint8_t> m_incomingBundleQueue; // incoming rtp frames from HDTN put here
     std::shared_ptr<DtnRtp> m_outgoingDtnRtpPtr; // export our rtp frames using this object
     
     // inbound config
@@ -43,6 +43,7 @@ private:
     uint16_t m_maxOutgoingRtpPacketSizeBytes;
     uint16_t m_maxOutgoingRtpPayloadSizeBytes;
     std::string m_sdpFileString;
+
     // outbound udp
 	boost::asio::io_service io_service;
     boost::asio::ip::udp::socket socket;
@@ -67,7 +68,6 @@ private:
     uint64_t m_totalRtpPacketsSent = 0; 
     uint64_t m_totalRtpPacketsFailedToSend = 0;
     uint64_t m_totalRtpBytesSent = 0;
-    uint64_t m_totalRtpPacketsQueued = 0;
 
 
 };

@@ -5,14 +5,15 @@
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
 BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, size_t numCircularBufferVectors, 
-        size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, std::string sdpFile, uint64_t sdpInterval_ms) : BpSourcePattern(),
+        size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, std::string sdpFile, uint64_t sdpInterval_ms, uint16_t numRtpPacketsPerBundle) : BpSourcePattern(),
     m_running(true),
     m_maxIncomingUdpPacketSizeBytes(maxIncomingUdpPacketSizeBytes),
     m_incomingRtpStreamPort(incomingRtpStreamPort),
     m_maxOutgoingBundleSizeBytes(maxOutgoingBundleSizeBytes),
     m_enableRtpConcatentation(enableRtpConcatentation),
     m_sdpFileStr(sdpFile),
-    m_sdpInterval_ms(sdpInterval_ms)
+    m_sdpInterval_ms(sdpInterval_ms),
+    m_numRtpPacketsPerBundle(numRtpPacketsPerBundle)
 {
     m_currentFrame.reserve(m_maxOutgoingBundleSizeBytes);
 
@@ -40,7 +41,7 @@ BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomi
     ThreadNamer::SetIoServiceThreadName(m_ioService, "ioServiceBpUdpSink");
 
     m_incomingCircularPacketQueue.set_capacity(numCircularBufferVectors);
-    m_outgoingCircularFrameQueue.set_capacity(numCircularBufferVectors);    
+    m_outgoingCircularBundleQueue.set_capacity(numCircularBufferVectors);    
 }
 
 BpSendStream::~BpSendStream()
@@ -57,9 +58,9 @@ BpSendStream::~BpSendStream()
     Stop();
 
     LOG_INFO(subprocess) << "m_incomingCircularPacketQueue.size(): " << m_incomingCircularPacketQueue.size();
-    LOG_INFO(subprocess) << "m_outgoingCircularFrameQueue.size(): " << m_outgoingCircularFrameQueue.size();
-    LOG_INFO(subprocess) << "m_totalRtpPacketsReceived: " << m_totalRtpPacketsReceived - 1;
-    LOG_INFO(subprocess) << "m_totalRtpPacketsSent: " << m_totalRtpPacketsSent - 1;
+    LOG_INFO(subprocess) << "m_outgoingCircularBundleQueue.size(): " << m_outgoingCircularBundleQueue.size();
+    LOG_INFO(subprocess) << "m_totalRtpPacketsReceived: " << m_totalRtpPacketsReceived;
+    LOG_INFO(subprocess) << "m_totalRtpPacketsSent: " << m_totalRtpPacketsSent ;
     LOG_INFO(subprocess) << "m_totalRtpPacketsQueued: " << m_totalRtpPacketsQueued;
     LOG_INFO(subprocess) << "m_totalConcatenationsPerformed" << m_totalConcatenationsPerformed;
     LOG_INFO(subprocess) << "m_totalIncomingCbOverruns: " << m_totalIncomingCbOverruns;
@@ -195,81 +196,102 @@ void BpSendStream::Concatenate(padded_vector_uint8_t &incomingRtpFrame)
 // Add current frame to the outgoing queue to be bundled and sent
 void BpSendStream::PushFrame()
 {
-    // LOG_DEBUG(subprocess) 
-    //     // << m_outgoingDtnRtpPtr->GetNumConcatenated() << " concatenated RTP packets\n"
-    //     << ntohs(m_outgoingDtnRtpPtr->GetSequence()) << "=seq & " 
-    //     // << ntohl(m_outgoingDtnRtpPtr->GetTimestamp()) << "=ts\n"
-    //     << m_currentFrame.size() << "=size into outgoing queue";
-    
-    {
-        boost::mutex::scoped_lock lock(m_outgoingQueueMutex);    // lock mutex 
-        if (m_outgoingCircularFrameQueue.full())
-            m_totalOutgoingCbOverruns++;
+    // prepend the payload size to the payload here
+    size_t rtpFrameSize = m_currentFrame.size();
+    padded_vector_uint8_t rtpPacketSizeAndPacket(m_currentFrame.size() + sizeof(size_t));
+    memcpy(rtpPacketSizeAndPacket.data(), &rtpFrameSize, sizeof(size_t));
+    memcpy(rtpPacketSizeAndPacket.data() + sizeof(size_t), m_currentFrame.data(), m_currentFrame.size());
+    m_currentFrame.resize(0);
 
-        m_outgoingCircularFrameQueue.push_back(std::move(m_currentFrame));
-    } 
-    m_outgoingQueueCv.notify_one();
-    
+
+    // move into rtp packet group. note that the payload size is 4 bytes in front of the data() pointer
+    m_outgoingRtpPacketQueue.push(std::move(rtpPacketSizeAndPacket)); // new element at end 
+    m_rtpBytesInQueue += rtpFrameSize + sizeof(size_t);
+
+    // LOG_DEBUG(subprocess) << "Inserted " << rtpFrameSize << " byte rtp packet into queue";
+    // LOG_DEBUG(subprocess) << "m_rtpBytesInQueue = " <<  m_rtpBytesInQueue;
+
     // Outgoing DtnRtp session needs to update seq status since we just sent an RTP frame. This is the seq number used for the next packet
     m_outgoingDtnRtpPtr->IncSequence();
     m_outgoingDtnRtpPtr->ResetNumConcatenated();
     m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) m_incomingCircularPacketQueue.front().data(), USE_OUTGOING_SEQ); // updates our next header to have the correct ts, fmt, ext, m ect.
 
-    m_currentFrame.resize(0);
     m_offset = 0;
     
-
     m_totalRtpPacketsQueued++;
+
+    if (m_outgoingRtpPacketQueue.size() == m_numRtpPacketsPerBundle) // we should move this packet group into the bundle queue
+    {
+        PushBundle();
+    }
+}
+
+void BpSendStream::PushBundle()
+{
+    // LOG_DEBUG(subprocess) << "pushing bundle";
+
+    // determine how much memory we need to allocate for this final bundle (rtp packets + payload_size * num payloads)
+    size_t bundleSize = m_rtpBytesInQueue;
+    
+    std::vector<uint8_t> outgoingBundle(bundleSize);
+    // LOG_DEBUG(subprocess) << "allocated  bundle size " << bundleSize;
+
+    size_t offset = 0;
+    
+    uint64_t count = 0;
+    while (m_outgoingRtpPacketQueue.size() != 0)
+    {
+        // copy the packet size and rtp packet into our bundle
+        memcpy(outgoingBundle.data() + offset, m_outgoingRtpPacketQueue.front().data(), m_outgoingRtpPacketQueue.front().size());
+        offset +=  m_outgoingRtpPacketQueue.front().size();
+
+        // size_t * length = (size_t * ) m_outgoingRtpPacketQueue.front().data();
+        // std::cout << *length;
+        // rtp_frame * frame = (rtp_frame *)  m_outgoingRtpPacketQueue.front().data() + sizeof(size_t);
+        // frame->print_header();
+
+        m_outgoingRtpPacketQueue.pop();
+        count ++;
+        // LOG_DEBUG(subprocess) << "copied rtp packet " << count << " into bundle";
+    }
+    
+    m_rtpBytesInQueue = 0;
+
+    {
+        boost::mutex::scoped_lock lock(m_outgoingQueueMutex);    // lock mutex 
+        if (m_outgoingCircularBundleQueue.full())
+            m_totalOutgoingCbOverruns++;
+        m_outgoingCircularBundleQueue.push_back(std::move(outgoingBundle)); 
+    }
+    m_outgoingQueueCv.notify_one();
 }
 
 void BpSendStream::DeleteCallback()
 {
 }
 
-
 uint64_t BpSendStream::GetNextPayloadLength_Step1() 
 {
-    // m_sdpMutex.lock();
-    if (m_sendSdp) {
-        LOG_INFO(subprocess) << "Sending SDP file size " << m_sdpFileStr.size();
-        return m_sdpFileStr.size() + sizeof(SDP_FILE_STR_HEADER);
-    }
-
     m_outgoingQueueMutex.lock();
 
-    if (m_outgoingCircularFrameQueue.size() == 0) {
+    if (m_outgoingCircularBundleQueue.size() == 0) {
         m_outgoingQueueMutex.unlock();
 
-        // LOG_DEBUG(subprocess) << "Circ Queue Size: " << m_outgoingCircularFrameQueue.size() << " waiting...";
+        // LOG_DEBUG(subprocess) << "Circ Queue Size: " << m_outgoingCircularBundleQueue.size() << " waiting...";
         return UINT64_MAX; // wait for data
     } 
 
-    return (uint64_t) m_outgoingCircularFrameQueue.front().size();
+    return (uint64_t) m_outgoingCircularBundleQueue.front().size();
 }
 
 bool BpSendStream::CopyPayload_Step2(uint8_t * destinationBuffer) 
 {
-    if (m_sendSdp) 
-    {
-        m_sendSdp = false;
-        uint8_t header = SDP_FILE_STR_HEADER;
-        memcpy(destinationBuffer, &header, sizeof(uint8_t));
-        memcpy(destinationBuffer + sizeof(uint8_t), m_sdpFileStr.data(), m_sdpFileStr.size());
-        m_sdpMutex.unlock();
-        m_sdpCv.notify_one();
-        LOG_INFO(subprocess) << "Sent SDP information";
-        return true;
-    }
-    
-    
-    // LOG_DEBUG(subprocess) << "Popping outgoing queue seq";
-    memcpy(destinationBuffer, m_outgoingCircularFrameQueue.front().data(), m_outgoingCircularFrameQueue.front().size());
-    m_outgoingCircularFrameQueue.pop_front(); 
+    memcpy(destinationBuffer, m_outgoingCircularBundleQueue.front().data(), m_outgoingCircularBundleQueue.front().size());
+    m_outgoingCircularBundleQueue.pop_front(); 
     m_outgoingQueueMutex.unlock();
     m_outgoingQueueCv.notify_one();
-    // LOG_DEBUG(subprocess) << "Succesesful pop of outgoing queue - new size:" << m_outgoingCircularFrameQueue.size();;
-    
-    m_totalRtpPacketsSent++;
+    m_totalRtpPacketsSent++; 
+
     return true;
 }
 
@@ -278,7 +300,7 @@ bool BpSendStream::CopyPayload_Step2(uint8_t * destinationBuffer)
  * If TryWaitForDataAvailable returns false, BpSourcePattern will recall this function after a timeout
 */
 bool BpSendStream::TryWaitForDataAvailable(const boost::posix_time::time_duration& timeout) {
-    if (m_outgoingCircularFrameQueue.size()==0) {
+    if (m_outgoingCircularBundleQueue.size()==0) {
         return GetNextOutgoingPacketTimeout(timeout);
     }
 
@@ -287,7 +309,7 @@ bool BpSendStream::TryWaitForDataAvailable(const boost::posix_time::time_duratio
 bool BpSendStream::GetNextOutgoingPacketTimeout(const boost::posix_time::time_duration& timeout)
 {
     boost::mutex::scoped_lock lock(m_outgoingQueueMutex);
-    bool inWaitForPacketState = (m_outgoingCircularFrameQueue.size() == 0);
+    bool inWaitForPacketState = (m_outgoingCircularBundleQueue.size() == 0);
 
     if (inWaitForPacketState) {
         m_outgoingQueueCv.timed_wait(lock, timeout); //lock mutex (above) before checking condition
@@ -325,26 +347,21 @@ bool BpSendStream::GetNextIncomingPacketTimeout(const boost::posix_time::time_du
 bool BpSendStream::SdpTimerThread()
 {
     static const boost::posix_time::time_duration timeout(boost::posix_time::milliseconds(250));
-
+    
+    std::vector<uint8_t> sdpBuffer(m_sdpFileStr.size() + sizeof(uint8_t));
+    uint8_t header = SDP_FILE_STR_HEADER;
+    memcpy(sdpBuffer.data(), &header, sizeof(uint8_t));
+    memcpy(sdpBuffer.data() + sizeof(uint8_t), m_sdpFileStr.data(), m_sdpFileStr.size());
 
     while (1)
-    {
+    {     
         {
-            // boost::mutex::scoped_lock lock(m_sdpMutex);
-            
-            if (m_sendSdp == false)
-            {
-                // LOG_DEBUG(subprocess) << "sleeping SDP";
-                boost::this_thread::sleep_for(boost::chrono::milliseconds(5000));
-            // } else {
-                // m_sdpCv.timed_wait(lock, timeout);
-                m_sendSdp = true;
-            }
-            // LOG_DEBUG(subprocess) << "waiting for sdp to send";
-            boost::this_thread::sleep_for(boost::chrono::milliseconds(250));
-
+            boost::mutex::scoped_lock lock(m_outgoingQueueMutex);
+            m_outgoingCircularBundleQueue.push_back(sdpBuffer);
         }
 
+        m_outgoingQueueCv.notify_one();
+        boost::this_thread::sleep_for(boost::chrono::milliseconds(m_sdpInterval_ms));
     }
     return false;
 }
