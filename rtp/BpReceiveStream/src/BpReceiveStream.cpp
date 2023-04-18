@@ -223,7 +223,7 @@ int BpReceiveStream::ExecuteFFmpegInstance()
     sdp.pop_back(); // remove new line
     sdp.append("\"");
 
-    size_t inputParamLocation = finalCommand.find("-i") + 3 ; // offest from -i 
+    size_t inputParamLocation = finalCommand.find("-re -i") + 7 ; // offest from -i 
 
     if (inputParamLocation != std::string::npos)
     {
