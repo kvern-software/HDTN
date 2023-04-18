@@ -1,6 +1,6 @@
 # !/bin/zsh 
 
-config_files=$HDTN_RTP_DIR/config_files/point_to_point/test_3_point_to_point
+config_files=$HDTN_RTP_DIR/config_files/test_3_point_to_point
 source_config=$config_files/mediasource_ltp.json
 
 test_files=/home/$USER/test_media/official_test_media

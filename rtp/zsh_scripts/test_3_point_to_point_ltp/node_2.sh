@@ -1,4 +1,4 @@
-config_files=$HDTN_RTP_DIR/config_files/point_to_point/test_3_point_to_point
+config_files=$HDTN_RTP_DIR/config_files/test_3_point_to_point
 sink_config=$config_files/mediasink_ltp.json
 
 outgoing_rtp_port=40004 
