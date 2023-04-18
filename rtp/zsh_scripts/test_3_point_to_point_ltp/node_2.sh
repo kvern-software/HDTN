@@ -3,10 +3,10 @@ sink_config=$config_files/mediasink_ltp.json
 
 outgoing_rtp_port=40004 
 
-filename=lucia_crf18
+filename=ammonia_trimmed
 output_path=/home/$USER/test_outputs/test_3
 
-mkdir $output_path
+mkdir $output_path/$filename
 
 cd $HDTN_RTP_DIR 
 
@@ -23,7 +23,8 @@ cd $HDTN_RTP_DIR
         -fflags nobuffer+fastseek+flush_packets -flags low_delay \
         -re -i  \
         -vcodec copy -acodec copy \
-        -f mp4 $output_path/$filename/$filename.mp4" &
+        -f flv $output_path/$filename/$filename.flv" & 
+        # -f mp4 $output_path/$filename/$filename.mp4" &
 
 recv_pid=$!
 
