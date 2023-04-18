@@ -290,7 +290,7 @@ bool BpSendStream::CopyPayload_Step2(uint8_t * destinationBuffer)
     m_outgoingCircularBundleQueue.pop_front(); 
     m_outgoingQueueMutex.unlock();
     m_outgoingQueueCv.notify_one();
-    m_totalRtpPacketsSent++; 
+    // m_totalRtpPacketsSent++; 
 
     return true;
 }
@@ -348,10 +348,10 @@ bool BpSendStream::SdpTimerThread()
 {
     static const boost::posix_time::time_duration timeout(boost::posix_time::milliseconds(250));
     
-    std::vector<uint8_t> sdpBuffer(m_sdpFileStr.size() + sizeof(uint8_t));
-    uint8_t header = SDP_FILE_STR_HEADER;
-    memcpy(sdpBuffer.data(), &header, sizeof(uint8_t));
-    memcpy(sdpBuffer.data() + sizeof(uint8_t), m_sdpFileStr.data(), m_sdpFileStr.size());
+    std::vector<uint8_t> sdpBuffer(m_sdpFileStr.size() + sizeof(uint64_t));
+    uint64_t header = SDP_FILE_STR_HEADER;
+    memcpy(sdpBuffer.data(), &header, sizeof(uint64_t));
+    memcpy(sdpBuffer.data() + sizeof(uint64_t), m_sdpFileStr.data(), m_sdpFileStr.size());
 
     while (1)
     {     

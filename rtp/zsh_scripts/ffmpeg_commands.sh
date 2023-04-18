@@ -196,3 +196,6 @@ h264_nvenc AVOptions:
 ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 input.mp4
 
 ffmpeg -i transmitted.mp4 -ss DELTA_TIME -i original.mp4 -lavfi psnr=stats_file=psnr_logfile.txt -f null - 
+
+# convert flv to flac
+ffmpeg -i AmmoniaLeak.flv AmmoniaLeak.flac

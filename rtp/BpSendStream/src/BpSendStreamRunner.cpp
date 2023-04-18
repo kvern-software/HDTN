@@ -43,7 +43,7 @@ std::string BpSendStreamRunner::TranslateSdpToBp(std::string sdp, std::string ur
     newSdp.append(" ");
 
     // append the rest of the original SDP message
-    size_t rtpLocation = sdp.find("RTP/AVP 96"); // sdp protocol for RTP
+    size_t rtpLocation = sdp.find("RTP/AVP"); // sdp protocol for RTP
     if (rtpLocation == std::string::npos) 
     {
         LOG_ERROR(subprocess) << "Invalid SDP file";

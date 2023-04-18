@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import sys, getopt
+from savitzky_golay_filter import savitzky_golay
 
 logfile_prefix="/home/kyle/nasa/dev/test_outputs"
 
@@ -26,9 +27,10 @@ def main(argv):
     for i in range(len(ssim)):
        ssim[i] = ssim[i][4:]
 
-    ssim = ssim.astype(np.float)
+    ssim = ssim.astype(float)
     
     #plot
+    # plt.plot(savitzky_golay(ssim, 11, 5), "b", linewidth=0.7)
     plt.plot(ssim, "b", linewidth=0.7)
     plt.title("Structural Similarity Index")
     plt.ylabel("SSIM")
@@ -36,6 +38,7 @@ def main(argv):
     plt.savefig(output_file_name, dpi=300)
 
     # plt.show()
+    print("Saved SSIM plot")
 
 
 

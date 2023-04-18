@@ -17,7 +17,7 @@
 #define USE_INCOMING_SEQ true
 #define USE_OUTGOING_SEQ false
 
-#define SDP_FILE_STR_HEADER 0x00
+#define SDP_FILE_STR_HEADER 0xffffffffffffffff // 8 bytes
 
 
 /**

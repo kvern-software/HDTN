@@ -15,7 +15,7 @@ protected:
     
 private:
     void ProcessIncomingBundlesThread(); // worker thread 
-    void SdpPacketHandle(const padded_vector_uint8_t& vec);
+    int SdpPacketHandle(const padded_vector_uint8_t& vec);
 
     int TranslateBpSdpToInSdp(std::string sdp);
     int ExecuteFFmpegInstance();

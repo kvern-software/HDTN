@@ -3,13 +3,19 @@
 config_files=$HDTN_RTP_DIR/config_files
 video_sink_config=$config_files/two_hop_ltp/node_3_video_sink.json
 hdtn_node_3_config=$config_files/two_hop_ltp/node_3.json
-
-filename="lucia_crf18_two_hop_ltp"
-
-
 contact_plan=$HDTN_RTP_DIR/config_files/two_hop_ltp/contact_plan.json
 
+
+output_path=/home/$USER/test_outputs/test_4
+filename=lucia_crf18
+mkdir $output_path
+
+
+
 outgoing_rtp_port=60000
+
+
+
 
 # HDTN one process
 ./build/module/hdtn_one_process/hdtn-one-process  --contact-plan-file=$contact_plan --hdtn-config-file=$hdtn_node_3_config &

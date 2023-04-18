@@ -116,11 +116,12 @@ void BpReceiveStream::ProcessIncomingBundlesThread()
     }
 }
 
-void BpReceiveStream::SdpPacketHandle(const padded_vector_uint8_t& vec)
+int BpReceiveStream::SdpPacketHandle(const padded_vector_uint8_t& vec)
 {
     static bool printedSdp = false;
     LOG_INFO(subprocess) << "Got SDP File information";
-    std::string sdpFile((char * )&vec[1], vec.size() - 1);
+    std::string sdpFile((char * )&vec[sizeof(uint64_t)], vec.size() - sizeof(uint64_t));
+    
     if (printedSdp == false) {
         printedSdp = true;
         LOG_INFO(subprocess) << "Sdp File: \n" << sdpFile;
@@ -143,7 +144,12 @@ void BpReceiveStream::SdpPacketHandle(const padded_vector_uint8_t& vec)
                 m_executedFfmpeg = true;
             } 
         } 
+    } else {
+        return -1;
     }
+
+    return 0;
+
 }
 
 // Data from BpSourcePattern comes in through here
@@ -151,9 +157,13 @@ bool BpReceiveStream::ProcessPayload(const uint8_t *data, const uint64_t size)
 {
     padded_vector_uint8_t vec(size);
     memcpy(vec.data(), data, size);
-    if (*vec.data() == SDP_FILE_STR_HEADER) {
-        SdpPacketHandle(vec);
-        return true;
+    uint64_t flag ;
+    memcpy(&flag, vec.data(), sizeof(uint64_t));
+
+    if (flag == SDP_FILE_STR_HEADER) {
+        std::cout << flag << std::endl; 
+        if (SdpPacketHandle(vec) == 0) 
+            return true;
     } 
 
 
@@ -186,7 +196,7 @@ int BpReceiveStream::TranslateBpSdpToInSdp(std::string sdp)
     newSdp.append(" ");
     
     // append the rest of the original SDP message
-    size_t rtpLocation = sdp.find("RTP/AVP 96"); // sdp protocol for RTP
+    size_t rtpLocation = sdp.find("RTP/AVP"); // sdp protocol for RTP
     if (rtpLocation == std::string::npos) 
     {
         LOG_ERROR(subprocess) << "Invalid SDP file";

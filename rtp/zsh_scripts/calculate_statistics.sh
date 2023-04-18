@@ -10,12 +10,13 @@
     # plot the data using python scripts
 
 # step one
-test_name=water_bubble_h264_crf_18
+test_number=test_1
+test_name=water_bubble_h264_crf_21
 
 test_media_folder=/home/kyle/nasa/dev/test_media/official_test_media 
 reference_file=$test_media_folder/$test_name.mp4
 
-distorted_media_folder=/home/kyle/nasa/dev/test_outputs/$test_name
+distorted_media_folder=/home/kyle/nasa/dev/test_outputs/$test_number/$test_name
 distorted_filename=$test_name
 distorted_file=$distorted_media_folder/$distorted_filename.mp4
 
@@ -30,7 +31,7 @@ margin=0.2
 window_time=$(echo "$delta_time + $margin"|bc)
 echo $window_time
 
-# step three
+# # step three
 cd /home/kyle/third_party/easyVmaf
 python3 easyVmaf.py -d  $distorted_file -r $reference_file \
 -subsample 10 \
@@ -42,16 +43,15 @@ python3 easyVmaf.py -d  $distorted_file -r $reference_file \
 -output_fmt json 
 
 cd $distorted_media_folder
-
 # step four
-# ffmpeg -i $distorted_file -ss 0.950955 -i $reference_file -lavfi psnr=stats_file=psnr_logfile.txt -f null - 
-# ffmpeg -i $distorted_file -ss 0.950955 -i $reference_file -lavfi ssim=stats_file=ssim_logfile.txt -f null - 
+ffmpeg -i $distorted_file -ss 0$delta_time -i $reference_file -lavfi psnr=stats_file=psnr_logfile.txt -f null - 
+ffmpeg -i $distorted_file -ss 0$delta_time -i $reference_file -lavfi ssim=stats_file=ssim_logfile.txt -f null - 
 
 # step five
 cd $HDTN_RTP_DIR/python
-python3 plot_ssim.py $test_name
-python3 plot_psnr.py $test_name
-python3 plot_vmaf.py $test_name
+python3 plot_ssim.py $test_number/$test_name
+python3 plot_psnr.py $test_number/$test_name
+python3 plot_vmaf.py $test_number/$test_name $test_name 
 
 
  
@@ -70,9 +70,9 @@ python3 plot_vmaf.py $test_name
 #     --model version="vmaf_4k_v0.6.1" \
 #     --feature psnr \
 #     --feature float_ssim"
+# ffmpeg -ss 0.9509500000000001  -i $reference_file -c:v copy  -f mp4 test_trim.mp4
 
-
-# vmaf -r $reference_file -d $reference_file \
+# vmaf -r $reference_file -d test_trim.mp4 \
 #     --pixel_format 420 \
 #     -w 3840 -h 2160 \
 #     --bitdepth 8 \

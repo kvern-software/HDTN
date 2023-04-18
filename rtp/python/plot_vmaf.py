@@ -3,7 +3,7 @@ import numpy as np
 import sys, getopt
 import json
 import csv
-
+from savitzky_golay_filter import savitzky_golay
 logfile_prefix="/home/kyle/nasa/dev/test_outputs"
 
 # function to add value labels
@@ -17,15 +17,13 @@ def addlabels(x,y):
 """
 def main(argv):
     test_folder_name=argv[1]
-    # test_folder_name="lucia_loopback_outputs"
+    file_name=argv[2] + "_vmaf"
 
-    file_name="vmaf_filename" 
-
-    full_filepath = logfile_prefix + "/" +test_folder_name + "/" + file_name + ".json"
+    full_filepath = logfile_prefix + "/" + test_folder_name + "/" + file_name + ".json"
     output_file_name=logfile_prefix + "/" + test_folder_name + "/" + file_name + ".png"
     output_file_name_2=logfile_prefix + "/" + test_folder_name + "/" + file_name + "_stats.png"
-
     output_csv_file_name=logfile_prefix + "/" + test_folder_name + "/" + file_name + ".csv"
+
 
 
 
@@ -41,9 +39,13 @@ def main(argv):
     vmaf_scores = []
     for frame in data["frames"]:
         vmaf_scores.append(frame["metrics"]["vmaf_4k"])
+    
+    #package nicely
+    vmaf_scores = np.array(vmaf_scores).astype(float)
     vmaf_averages = [avg_vmaf_scores["min"], avg_vmaf_scores["max"], avg_vmaf_scores["mean"], avg_vmaf_scores["harmonic_mean"]]
+    
     #plot
-    plt.plot(vmaf_scores, "b", linewidth=0.7)
+    plt.plot(vmaf_scores, "g", linewidth=0.7)
     plt.title("VMAF Index")
     plt.ylabel("VMAF")
     plt.xlabel("Frame Number / 10")
@@ -66,6 +68,8 @@ def main(argv):
     csv_writer.writerow(header)
     csv_writer.writerow(vmaf_averages)
     data_file.close()
+
+    print("Saved VMAF plot")
 
 
 
