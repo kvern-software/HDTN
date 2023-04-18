@@ -3,8 +3,9 @@ sink_config=$config_files/mediasink_ltp.json
 
 outgoing_rtp_port=40004 
 
-filename=ammonia_trimmed
-output_path=/home/$USER/test_outputs/test_3
+output_file_path="/home/$USER/test_outputs/test_3"
+filename=lucia_crf18                 # change this for whatever file you want to name
+file=$output_file_path/$filename
 
 mkdir -p  $output_path/$filename
 
@@ -23,8 +24,7 @@ cd $HDTN_RTP_DIR
         -fflags nobuffer+fastseek+flush_packets -flags low_delay \
         -re -i  \
         -vcodec copy -acodec copy \
-        -f flv $output_path/$filename/$filename.flv" & 
-        # -f mp4 $output_path/$filename/$filename.mp4" &
+        -f mp4 $file/$filename.mp4" & 
 
 recv_pid=$!
 
