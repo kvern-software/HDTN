@@ -6,7 +6,7 @@ outgoing_rtp_port=40004
 filename=ammonia_trimmed
 output_path=/home/$USER/test_outputs/test_3
 
-mkdir $output_path/$filename
+mkdir -p  $output_path/$filename
 
 cd $HDTN_RTP_DIR 
 

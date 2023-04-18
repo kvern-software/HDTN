@@ -7,7 +7,7 @@ output_file_path="/home/kyle/nasa/dev/test_outputs/test_2"
 filename=lucia_vbr                   # change this for whatever file you want to name
 file=$output_file_path/$filename
 
-mkdir $file
+mkdir -p  $file
 
 outgoing_rtp_port=45553
 

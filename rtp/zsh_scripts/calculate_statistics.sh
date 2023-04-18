@@ -10,8 +10,8 @@
     # plot the data using python scripts
 
 # step one
-test_number=test_1
-test_name=water_bubble_h264_crf_21
+test_number=test_2
+test_name=lucia_crf18
 
 test_media_folder=/home/kyle/nasa/dev/test_media/official_test_media 
 reference_file=$test_media_folder/$test_name.mp4
