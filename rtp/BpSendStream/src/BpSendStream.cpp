@@ -358,6 +358,7 @@ bool BpSendStream::SdpTimerThread()
         {
             boost::mutex::scoped_lock lock(m_outgoingQueueMutex);
             m_outgoingCircularBundleQueue.push_back(sdpBuffer);
+            LOG_INFO(subprocess) << "Sending SDP Packet";
         }
 
         m_outgoingQueueCv.notify_one();

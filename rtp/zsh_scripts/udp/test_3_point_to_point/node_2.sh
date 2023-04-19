@@ -15,17 +15,17 @@ cd $HDTN_RTP_DIR
         --outgoing-rtp-port=$outgoing_rtp_port --num-circular-buffer-vectors=10000 --max-outgoing-rtp-packet-size-bytes=1560 \
         --ffmpeg-command="\
         ffmpeg -y -protocol_whitelist file,udp,rtp,data \
-        -strict experimental \
-        -fflags +genpts \
-        -seek2any 1 \
-        -avoid_negative_ts +make_zero \
-        -reorder_queue_size 0 \
         -loglevel verbose \
-        -fflags nobuffer+fastseek+flush_packets -flags low_delay \
-        -re -i  \
+        -fflags +genpts \
+        -reorder_queue_size 0 \
+        -i  \
         -vcodec copy -acodec copy \
         -f mp4 $file/$filename.mp4" & 
 
+        # -fflags nobuffer+fastseek+flush_packets -flags low_delay \
+        # -strict experimental \
+        # -seek2any 1 \
+        # -avoid_negative_ts +make_zero \
 recv_pid=$!
 
 

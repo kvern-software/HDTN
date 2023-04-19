@@ -214,17 +214,19 @@ int BpReceiveStream::TranslateBpSdpToInSdp(std::string sdp)
 
 int BpReceiveStream::ExecuteFFmpegInstance()
 {
+    std::string input("-i ");
+    std::string newline("\n");
     std::string finalCommand;
     finalCommand = m_ffmpegCommand;
 
-    std::string sdp = "\"";
+    std::string sdp = " -i \"";
     sdp.append(FFMPEG_SDP_HEADER);
     sdp.append(m_sdpFileString);
     sdp.pop_back(); // remove new line
-    sdp.append("\"");
-
-    size_t inputParamLocation = finalCommand.find("-re -i") + 7 ; // offest from -i 
-
+    sdp.pop_back(); // remove new line
+    sdp.append("\" ");
+    
+    size_t inputParamLocation = finalCommand.find("-vcodec") ;
     if (inputParamLocation != std::string::npos)
     {
         finalCommand.insert(inputParamLocation, sdp);
