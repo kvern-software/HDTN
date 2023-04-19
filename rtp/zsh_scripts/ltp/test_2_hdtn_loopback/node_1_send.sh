@@ -29,10 +29,10 @@ kill -s STOP $ffmpeg_process
 ####################################################### HDTN 
 cd $HDTN_RTP_DIR
 mkdir /home/kyle/nasa/dev/test_outputs/$filename
-./build/bpsend_stream  --bundle-size=2000 --bundle-rate=0 --use-bp-version-7 \
+./build/bpsend_stream  --bundle-size=2000  --bundle-rate=0 --use-bp-version-7 \
         --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --outducts-config-file=$source_config \
         --max-incoming-udp-packet-size-bytes=1800 --incoming-rtp-stream-port=$incoming_rtp_port --num-circular-buffer-vectors=3000 \
-        --enable-rtp-concatenation=false --sdp-filepath="zsh_scripts/ltp/test_2_hdtn_loopback/HDTN.sdp" --sdp-sending-interval-ms=5000 --rtp-packets-per-bundle=5 &
+        --enable-rtp-concatenation=false --sdp-filepath="zsh_scripts/ltp/test_2_hdtn_loopback/HDTN.sdp" --sdp-sending-interval-ms=5000 --rtp-packets-per-bundle=2000 &
 media_source_process=$!
 ####################################################### HDTN 
 

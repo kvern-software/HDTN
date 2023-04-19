@@ -6,7 +6,7 @@
             "convergenceLayer": "udp",
             "boundPort": 5000,
             "numRxCircularBufferElements": 10000,
-            "numRxCircularBufferBytesPerElement": 2000
+            "numRxCircularBufferBytesPerElement":100000
         }
     ]
 }

@@ -107,35 +107,35 @@ void BpSendStream::ProcessIncomingBundlesThread()
                 rtp_packet_status_t packetStatus = m_incomingDtnRtpPtr->PacketHandler(incomingRtpFrame, (rtp_header *) m_currentFrame.data());
                 
                 switch(packetStatus) {
-            //         /**
-            //          * For the first valid frame we receive assign the CSRC, sequence number, and generic status bits by copying in the first header
-            //          * Note - after this point, it is likely and intended that the sequence of the incoming and outgoing DtnRtp objects diverge.
-            //         */
+            // //         /**
+            // //          * For the first valid frame we receive assign the CSRC, sequence number, and generic status bits by copying in the first header
+            // //          * Note - after this point, it is likely and intended that the sequence of the incoming and outgoing DtnRtp objects diverge.
+            // //         */
                     case RTP_FIRST_FRAME:
                         m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) incomingRtpFrame.data(), USE_INCOMING_SEQ);
                         CreateFrame();
                         break;
 
-                    case RTP_CONCATENATE:
-                        if (m_enableRtpConcatentation) {
-                            // concatenation may fail if the bundle size is less than requested rtp frame, if so RTP_PUSH_PREVIOUS_FRAME is performed 
-                            Concatenate(incomingRtpFrame); 
-                            break;
-                        } else {
-                            PushFrame();
-                            CreateFrame();
-                            break;
-                        }
+            //         case RTP_CONCATENATE:
+            //             if (m_enableRtpConcatentation) {
+            //                 // concatenation may fail if the bundle size is less than requested rtp frame, if so RTP_PUSH_PREVIOUS_FRAME is performed 
+            //                 Concatenate(incomingRtpFrame); 
+            //                 break;
+            //             } else {
+            //                 PushFrame();
+            //                 CreateFrame();
+            //                 break;
+            //             }
                         
                     case RTP_PUSH_PREVIOUS_FRAME: // push current frame and make incoming frame the current frame
                         PushFrame();
                         CreateFrame();
                         break;
 
-                    case RTP_OUT_OF_SEQ: 
-                        PushFrame(); 
-                        CreateFrame();
-                        break;
+            //         case RTP_OUT_OF_SEQ: 
+            //             PushFrame(); 
+            //             CreateFrame();
+            //             break;
 
                     case RTP_INVALID_HEADER: // discard incoming data
                     case RTP_MISMATCH_SSRC: // discard incoming data
@@ -204,7 +204,7 @@ void BpSendStream::PushFrame()
     m_currentFrame.resize(0);
 
 
-    // move into rtp packet group. note that the payload size is 4 bytes in front of the data() pointer
+    // move into rtp packet group
     m_outgoingRtpPacketQueue.push(std::move(rtpPacketSizeAndPacket)); // new element at end 
     m_rtpBytesInQueue += rtpFrameSize + sizeof(size_t);
 
@@ -212,9 +212,9 @@ void BpSendStream::PushFrame()
     // LOG_DEBUG(subprocess) << "m_rtpBytesInQueue = " <<  m_rtpBytesInQueue;
 
     // Outgoing DtnRtp session needs to update seq status since we just sent an RTP frame. This is the seq number used for the next packet
-    m_outgoingDtnRtpPtr->IncSequence();
-    m_outgoingDtnRtpPtr->ResetNumConcatenated();
-    m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) m_incomingCircularPacketQueue.front().data(), USE_OUTGOING_SEQ); // updates our next header to have the correct ts, fmt, ext, m ect.
+    // m_outgoingDtnRtpPtr->IncSequence();
+    // m_outgoingDtnRtpPtr->ResetNumConcatenated();
+    // m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) m_incomingCircularPacketQueue.front().data(), USE_OUTGOING_SEQ); // updates our next header to have the correct ts, fmt, ext, m ect.
 
     m_offset = 0;
     
@@ -238,7 +238,7 @@ void BpSendStream::PushBundle()
 
     size_t offset = 0;
     
-    uint64_t count = 0;
+    // uint64_t count = 0;
     while (m_outgoingRtpPacketQueue.size() != 0)
     {
         // copy the packet size and rtp packet into our bundle
@@ -251,7 +251,7 @@ void BpSendStream::PushBundle()
         // frame->print_header();
 
         m_outgoingRtpPacketQueue.pop();
-        count ++;
+        // count ++;
         // LOG_DEBUG(subprocess) << "copied rtp packet " << count << " into bundle";
     }
     

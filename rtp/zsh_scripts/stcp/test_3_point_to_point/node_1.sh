@@ -1,18 +1,16 @@
-# !/bin/sh 
+# !/bin/zsh 
 
-####################################################### Config Variables
-config_files=$HDTN_RTP_DIR/config_files
-source_config=$config_files/udp/test_2_hdtn_loopback/mediasource_udp.json
+config_files=$HDTN_RTP_DIR/config_files/stcp/test_3_point_to_point
+source_config=$config_files/mediasource_stcp.json
 
-test_media_folder=/home/kyle/nasa/dev/test_media/official_test_media
-file=$test_media_folder/lucia_crf18.mp4 
-# filename=ammonia_trimmed
-# file=$test_media_folder/$filename.wav
-####################################################### Config Variables
+test_files=/home/$USER/test_media/official_test_media
+file=$test_files/lucia_crf18.mp4
+# file=$test_files/ammonia_trimmed.wav
 
-incoming_rtp_port=30000
+cd $HDTN_RTP_DIR
 
 
+incoming_rtp_port=29999
 ####################################################### FFMPEG 
 
 # change this if sending video or audio
@@ -26,21 +24,19 @@ ffmpeg_process=$!
 kill -s STOP $ffmpeg_process
 ####################################################### FFMPEG 
 
-####################################################### HDTN 
-cd $HDTN_RTP_DIR
-mkdir /home/kyle/nasa/dev/test_outputs/$filename
 ./build/bpsend_stream  --bundle-size=2000 --bundle-rate=0 --use-bp-version-7 \
         --my-uri-eid=ipn:1.1 --dest-uri-eid=ipn:2.1 --outducts-config-file=$source_config \
         --max-incoming-udp-packet-size-bytes=1800 --incoming-rtp-stream-port=$incoming_rtp_port --num-circular-buffer-vectors=3000 \
-        --enable-rtp-concatenation=false --sdp-filepath="zsh_scripts/udp/test_2_hdtn_loopback/HDTN.sdp" --sdp-sending-interval-ms=5000 --rtp-packets-per-bundle=5 &
+        --enable-rtp-concatenation=false --sdp-filepath="HDTN.sdp" --sdp-sending-interval-ms=2000 --rtp-packets-per-bundle=1 &
 media_source_process=$!
-####################################################### HDTN 
 
 sleep 3
 
 # resume ffmpeg
 kill -s CONT $ffmpeg_process
 
+
 sleep 400
+
 echo "\nkilling video process ..." && kill -2 $media_source_process
 kill -2 $ffmpeg_process
