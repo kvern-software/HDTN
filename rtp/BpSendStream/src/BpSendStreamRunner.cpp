@@ -227,9 +227,10 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
             sdpFile = ReadSdpFile(sdpFilePath);
 
             dtnSdpFile = TranslateSdpToBp(sdpFile, std::to_string(myEid.nodeId), std::to_string(myEid.serviceId));
+            
+            LOG_INFO(subprocess) << "Got SDP File\n" << dtnSdpFile;
             }
 
-        LOG_INFO(subprocess) << "Got SDP File\n" << dtnSdpFile;
 
         BpSendStream bpSendStream(maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, 
                 numCircularBufferVectors, maxBundleSizeBytes, enableRtpConcatenation, dtnSdpFile, sdpIntervalMs, rtpPacketsPerBundle);

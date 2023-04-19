@@ -199,3 +199,13 @@ ffmpeg -i transmitted.mp4 -ss DELTA_TIME -i original.mp4 -lavfi psnr=stats_file=
 
 # convert flv to flac
 ffmpeg -i AmmoniaLeak.flv AmmoniaLeak.flac
+
+# gst rtp stream
+gst-launch-1.0 -v filesrc location=water_bubble_h264_vbr.mp4 ! qtdemux ! h264parse ! rtph264pay config-interval=4 ! udpsink host=127.0.0.1 port=5000
+
+# gst save to file
+ gst-launch-1.0 -v -e udpsrc port=5000 ! "application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" \
+! rtph264depay ! h264parse !  mp4mux ! filesink location=xyz.mp4
+
+# gst play file 
+gst-launch-1.0 filesrc location=xyz.mp4 ! decodebin name=dec ! videoconvert ! autovideosink dec. ! audioconvert ! audioresample ! alsasink

@@ -346,8 +346,10 @@ bool BpSendStream::GetNextIncomingPacketTimeout(const boost::posix_time::time_du
 
 bool BpSendStream::SdpTimerThread()
 {
-    static const boost::posix_time::time_duration timeout(boost::posix_time::milliseconds(250));
+    if (m_sdpFileStr.size() == 0)
+        return true;
     
+    static const boost::posix_time::time_duration timeout(boost::posix_time::milliseconds(250));
     std::vector<uint8_t> sdpBuffer(m_sdpFileStr.size() + sizeof(uint64_t));
     uint64_t header = SDP_FILE_STR_HEADER;
     memcpy(sdpBuffer.data(), &header, sizeof(uint64_t));

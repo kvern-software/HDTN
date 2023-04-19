@@ -4,7 +4,7 @@
         {
             "name": "induct from localhost",
             "convergenceLayer": "udp",
-            "boundPort": 5000,
+            "boundPort": 60000,
             "numRxCircularBufferElements": 10000,
             "numRxCircularBufferBytesPerElement":100000
         }
