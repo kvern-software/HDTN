@@ -22,7 +22,6 @@ cd $HDTN_RTP_DIR
         -reorder_queue_size 0 \
         -loglevel verbose \
         -fflags nobuffer+fastseek+flush_packets -flags low_delay \
-        -re -i  \
         -vcodec copy -acodec copy \
         -f mp4 $file/$filename.mp4" & 
 

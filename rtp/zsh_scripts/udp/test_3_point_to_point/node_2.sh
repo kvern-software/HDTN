@@ -18,14 +18,10 @@ cd $HDTN_RTP_DIR
         -loglevel verbose \
         -fflags +genpts \
         -reorder_queue_size 0 \
-        -i  \
         -vcodec copy -acodec copy \
         -f mp4 $file/$filename.mp4" & 
 
-        # -fflags nobuffer+fastseek+flush_packets -flags low_delay \
-        # -strict experimental \
-        # -seek2any 1 \
-        # -avoid_negative_ts +make_zero \
+
 recv_pid=$!
 
 

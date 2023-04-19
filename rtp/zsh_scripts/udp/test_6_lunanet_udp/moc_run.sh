@@ -26,12 +26,8 @@ cd $HDTN_RTP_DIR
         ffmpeg -y -protocol_whitelist file,udp,rtp,data \
         -strict experimental \
         -fflags +genpts \
-        -seek2any 1 \
-        -avoid_negative_ts +make_zero \
         -reorder_queue_size 0 \
         -loglevel verbose \
-        -fflags nobuffer+fastseek+flush_packets -flags low_delay \
-        -re -i  \
         -vcodec copy -acodec copy \
         -f sap sap://224.0.0.255?same_port=1" &
        
