@@ -7,7 +7,7 @@ output_file_path="/home/$USER/test_outputs/test_3"
 filename=lucia_crf18                 # change this for whatever file you want to name
 file=$output_file_path/$filename
 
-mkdir -p  $output_path/$filename
+mkdir -p  $output_file_path/$filename
 
 cd $HDTN_RTP_DIR 
 
