@@ -53,6 +53,12 @@ ffmpeg -y -r 60000/1001  -threads 0 -i water_bubble.mp4 -map 0:v -c:v libx264 -s
 
 # crf h264
 ffmpeg -i lucia.mp4 -c:v libx264 -slice-max-size 1460  -no-scenecut  true -g 60  -crf 18  -c:a copy lucia_crf18.mp4      
+#crf h264 smaller g
+ffmpeg -i lucia.mp4 -c:v libx264 -slice-max-size 1460  -no-scenecut  true -g 15  -crf 18  -c:a copy lucia_crf18_g_15.mp4      
+
+# vbr h264
+ffmpeg -y -r 60000/1001  -threads 0 -i lucia_vbr.mp4 -c:v libx264 -g 15 -slice-max-size 1460  -no-scenecut  true -b:v 110M -maxrate 50.0M -bufsize 100M lucia_vbr_g_15.mp4
+
 
 # h265 to h254 variable bit rate 10 bit twoo pass
 ffmpeg -y -r 60000/1001  -threads 0 -i water_bubble.mp4 -c:v libx264 -b:v 110M -maxrate 130.0M -bufsize 100M -pass 1 -f mp4 /dev/null && \

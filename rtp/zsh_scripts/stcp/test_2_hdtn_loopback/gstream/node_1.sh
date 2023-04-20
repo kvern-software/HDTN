@@ -1,13 +1,14 @@
 # !/bin/zsh 
 
-config_files=$HDTN_RTP_DIR/config_files/udp/test_3_point_to_point
-source_config=$config_files/mediasource_udp.json
+config_files=$HDTN_RTP_DIR/config_files/stcp/test_2_hdtn_loopback
+source_config=$config_files/mediasource_stcp.json
 
-test_files=/home/$USER/test_media/official_test_media
-file=$test_files/lucia_crf18_g_15.mp4
+test_files=/home/$USER/nasa/dev/test_media/official_test_media
+file=$test_files/water_bubble_h264_vbr.mp4
 # file=$test_files/ammonia_trimmed.wav
 
 cd $HDTN_RTP_DIR
+
 
 incoming_rtp_port=29999
 
