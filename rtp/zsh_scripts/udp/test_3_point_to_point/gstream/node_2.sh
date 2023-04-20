@@ -3,7 +3,7 @@ sink_config=$config_files/mediasink_udp.json
 
 outgoing_rtp_port=40004 
 
-output_file_path="/home/$USER/nasa/dev/test_outputs/gstream/test_3"
+output_file_path="/home/$USER/test_outputs/test_3_jetson_to_gateway"
 filename=lucia_crf18_g_15                 # change this for whatever file you want to name
 file=$output_file_path/$filename
 
@@ -21,6 +21,6 @@ gst-launch-1.0 -v udpsrc port=$outgoing_rtp_port ! "application/x-rtp, media=(st
 recv_pid=$!
 
 
-sleep 70
+sleep 80
 
 kill -2 $recv_pid
