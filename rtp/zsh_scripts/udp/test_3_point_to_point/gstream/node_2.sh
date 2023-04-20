@@ -7,7 +7,7 @@ output_file_path="/home/$USER/test_outputs/test_3_jetson_to_gateway"
 filename=lucia_crf18_g_15                 # change this for whatever file you want to name
 file=$output_file_path/$filename
 
-mkdir -p  $output_file_path/$filename
+mkdir -p  $output_file_path/$filename/$filename
 
 cd $HDTN_RTP_DIR 
 
