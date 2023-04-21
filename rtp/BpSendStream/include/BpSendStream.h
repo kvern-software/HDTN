@@ -43,7 +43,7 @@ private:
     void WholeBundleReadyCallback(padded_vector_uint8_t & wholeBundleVec); // incoming udp packets come in here
     void DeleteCallback(); // gets called on socket shutdow, optional to do anything with it
     void Concatenate(padded_vector_uint8_t &incomingRtpFrame);
-    void CreateFrame();
+    void CreateFrame(padded_vector_uint8_t &incomingRtpFrame);
     void PushFrame();
     void PushBundle();
 

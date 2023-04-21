@@ -83,7 +83,6 @@ void BpSendStream::WholeBundleReadyCallback(padded_vector_uint8_t &wholeBundleVe
         // rtp_header * header = (rtp_header *) wholeBundleVec.data();
     }
     m_incomingQueueCv.notify_one();
-    m_totalRtpPacketsReceived++;
 }
 
 
@@ -100,11 +99,13 @@ void BpSendStream::ProcessIncomingBundlesThread()
         if (notInWaitForNewBundlesState) {
             // LOG_DEBUG(subprocess) << "Processing front of incoming queue"; 
             // boost::this_thread::sleep_for(boost::chrono::milliseconds(250));
-            {
-                boost::mutex::scoped_lock lock(m_incomingQueueMutex);
+            
+            m_incomingQueueMutex.lock();
+            padded_vector_uint8_t incomingRtpFrame(std::move(m_incomingCircularPacketQueue.front()));
+            m_incomingCircularPacketQueue.pop_front();
+            m_incomingQueueMutex.unlock();
 
-                padded_vector_uint8_t &incomingRtpFrame = m_incomingCircularPacketQueue.front(); 
-                rtp_packet_status_t packetStatus = m_incomingDtnRtpPtr->PacketHandler(incomingRtpFrame, (rtp_header *) m_currentFrame.data());
+            rtp_packet_status_t packetStatus = m_incomingDtnRtpPtr->PacketHandler(incomingRtpFrame, (rtp_header *) m_currentFrame.data());
                 
                 switch(packetStatus) {
             // //         /**
@@ -113,7 +114,7 @@ void BpSendStream::ProcessIncomingBundlesThread()
             // //         */
                     case RTP_FIRST_FRAME:
                         m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) incomingRtpFrame.data(), USE_INCOMING_SEQ);
-                        CreateFrame();
+                        CreateFrame(incomingRtpFrame);
                         break;
 
             //         case RTP_CONCATENATE:
@@ -129,7 +130,7 @@ void BpSendStream::ProcessIncomingBundlesThread()
                         
                     case RTP_PUSH_PREVIOUS_FRAME: // push current frame and make incoming frame the current frame
                         PushFrame();
-                        CreateFrame();
+                        CreateFrame(incomingRtpFrame);
                         break;
 
             //         case RTP_OUT_OF_SEQ: 
@@ -144,29 +145,25 @@ void BpSendStream::ProcessIncomingBundlesThread()
                         LOG_ERROR(subprocess) << "Unknown return type " << packetStatus;
                 }
 
-                // LOG_DEBUG(subprocess) << "Popping front of incoming queue";
-                m_incomingCircularPacketQueue.pop_front(); // already locked, safe to pop
-                // LOG_DEBUG(subprocess) << "Successful pop of incoming queue";
-
-            }
+                m_totalRtpPacketsReceived++;
         }
     }
 }
 // Copy in our outgoing Rtp header and the next rtp frame payload
-void BpSendStream::CreateFrame()
+void BpSendStream::CreateFrame(padded_vector_uint8_t &incomingRtpFrame)
 {
-    m_currentFrame.resize(m_incomingCircularPacketQueue.front().size()); 
+    m_currentFrame.resize(incomingRtpFrame.size()); 
 
-    memcpy(&m_currentFrame.front(), m_incomingCircularPacketQueue.front().data(), m_incomingCircularPacketQueue.front().size());
+    memcpy(&m_currentFrame.front(), incomingRtpFrame.data(), incomingRtpFrame.size());
     
     // fill header with outgoing Dtn Rtp header information
     // this is tranlating from incoming DtnRtp session to outgoing DtnRtp session
     // memcpy(&m_currentFrame.front(), m_outgoingDtnRtpPtr->GetHeader(), sizeof(rtp_header));
     // memcpy(&m_currentFrame.front() + sizeof(rtp_header), 
-            // &m_incomingCircularPacketQueue.front() + sizeof(rtp_header),  // skip the incoming header for our outgoing header instead
-            // m_incomingCircularPacketQueue.front().size() - sizeof(rtp_header));
+            // &incomingRtpFrame + sizeof(rtp_header),  // skip the incoming header for our outgoing header instead
+            // incomingRtpFrame.size() - sizeof(rtp_header));
 
-    m_offset = m_incomingCircularPacketQueue.front().size(); // assumes that this had a header that we skipped
+    m_offset = incomingRtpFrame.size(); // assumes that this had a header that we skipped
 
     m_outgoingDtnRtpPtr->IncNumConcatenated();
 }
@@ -189,7 +186,7 @@ void BpSendStream::Concatenate(padded_vector_uint8_t &incomingRtpFrame)
     } else { // not enough space to concatenate, send separately
         // LOG_DEBUG(subprocess) << "Not enough space to concatenate, sending as separate bundle.";
         PushFrame();
-        CreateFrame();
+        CreateFrame(incomingRtpFrame);
     }
 }
 
@@ -214,7 +211,7 @@ void BpSendStream::PushFrame()
     // Outgoing DtnRtp session needs to update seq status since we just sent an RTP frame. This is the seq number used for the next packet
     // m_outgoingDtnRtpPtr->IncSequence();
     // m_outgoingDtnRtpPtr->ResetNumConcatenated();
-    // m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) m_incomingCircularPacketQueue.front().data(), USE_OUTGOING_SEQ); // updates our next header to have the correct ts, fmt, ext, m ect.
+    // m_outgoingDtnRtpPtr->UpdateHeader((rtp_header *) incomingRtpFrame.data(), USE_OUTGOING_SEQ); // updates our next header to have the correct ts, fmt, ext, m ect.
 
     m_offset = 0;
     
