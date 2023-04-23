@@ -215,3 +215,16 @@ gst-launch-1.0 -v filesrc location=water_bubble_h264_vbr.mp4 ! qtdemux ! h264par
 
 # gst play file 
 gst-launch-1.0 filesrc location=xyz.mp4 ! decodebin name=dec ! videoconvert ! autovideosink dec. ! audioconvert ! audioresample ! alsasink
+
+
+# gst to gst 
+# gst-launch-1.0 filesrc location=$file ! qtdemux ! h264parse ! rtph264pay config-interval=4 ! rtph264depay ! h264parse !  mp4mux !  filesink location=$filename.mp4  -e  # ! udpsink sync=true host=127.0.0.1 port=6000
+
+# gst rtp loopback
+gst-launch-1.0 filesrc location=$file ! qtdemux ! h264parse !\
+rtph264pay config-interval=4   !\
+rtpstreampay ! rtpstreamdepay !\
+rtph264depay  ! h264parse ! appsink !  mp4mux !  filesink location=$filename.mp4  -e 
+
+# gst tcp to bp send
+# gst-launch-1.0 filesrc location=$file ! qtdemux ! h264parse ! rtph264pay config-interval=4 !  rtpstreampay !  tcpserversink sync=true port=$incoming_rtp_port  &

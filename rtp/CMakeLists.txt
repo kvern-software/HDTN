@@ -50,16 +50,16 @@ set(DTN_SOURCES
 	src/dtn/DtnRtp.cpp
 )
 
-set(GUI_SOURCES 
-	# gui library backend files
-	MediaGui/include/imgui/imgui.cpp
-	MediaGui/include/imgui/imgui_demo.cpp
-	MediaGui/include/imgui/imgui_draw.cpp
-	MediaGui/include/imgui/imgui_widgets.cpp
-	MediaGui/include/imgui/imgui_tables.cpp
-	MediaGui/include/imgui/backends/imgui_impl_glfw.cpp
-	MediaGui/include/imgui/backends/imgui_impl_opengl3.cpp
-)
+# set(GUI_SOURCES 
+# 	# gui library backend files
+# 	MediaGui/include/imgui/imgui.cpp
+# 	MediaGui/include/imgui/imgui_demo.cpp
+# 	MediaGui/include/imgui/imgui_draw.cpp
+# 	MediaGui/include/imgui/imgui_widgets.cpp
+# 	MediaGui/include/imgui/imgui_tables.cpp
+# 	MediaGui/include/imgui/backends/imgui_impl_glfw.cpp
+# 	MediaGui/include/imgui/backends/imgui_impl_opengl3.cpp
+# )
 
 ##### SINK
 # add_executable(dtn_rtp_stream_sink   
@@ -166,12 +166,14 @@ add_executable(bpsend_stream
 	BpSendStream/src/BpSendStream.cpp
 	BpSendStream/src/BpSendStreamMain.cpp
 	BpSendStream/src/BpSendStreamRunner.cpp
-
+	TcpPacketSink/src/TcpPacketSink.cpp
 	${DTN_SOURCES}
 )
 target_include_directories(bpsend_stream PUBLIC 
 		BpSendStream/include 
 		src/dtn/include
+		TcpPacketSink/include
+
 )
 target_link_libraries(bpsend_stream   
 	#HDTN

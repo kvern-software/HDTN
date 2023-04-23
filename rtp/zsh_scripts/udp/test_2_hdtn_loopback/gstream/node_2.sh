@@ -3,8 +3,8 @@ sink_config=$config_files/mediasink_udp.json
 
 outgoing_rtp_port=40004 
 
-output_file_path="/home/$USER/gstream/test_2/udp_bufCheck"
-filename=lucia_crf18_g_15                 # change this for whatever file you want to name
+output_file_path="/home/$USER/gstream/test_2/udp_rate_limiting"
+filename=water_bubble_h264_vbr_g_15                 # change this for whatever file you want to name
 file=$output_file_path/$filename
 
 mkdir -p  $output_file_path/$filename

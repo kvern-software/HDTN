@@ -1,12 +1,82 @@
 #include "BpSendStream.h"
 #include "Logger.h"
 #include "ThreadNamer.h"
+#include <boost/process.hpp>
+
+
+
+
+
+
+#include <stddef.h>
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+
+int
+make_named_socket (const char *filename)
+{
+  struct sockaddr_un name;
+  int sock;
+  size_t size;
+
+  /* Create the socket. */
+  sock = socket (AF_LOCAL, SOCK_DGRAM, 0);
+  if (sock < 0)
+    {
+      perror ("socket");
+      exit (EXIT_FAILURE);
+    }
+
+    int enable = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
+        perror("setsockopt(SO_REUSEADDR) failed");
+
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(int)) < 0)
+        perror("setsockopt(SO_REUSEPORT) failed");
+  
+  
+  
+  /* Bind a name to the socket. */
+  name.sun_family = AF_LOCAL;
+  strncpy (name.sun_path, filename, sizeof (name.sun_path));
+  name.sun_path[sizeof (name.sun_path) - 1] = '\0';
+
+  /* The size of the address is
+     the offset of the start of the filename,
+     plus its length (not including the terminating null byte).
+     Alternatively you can just do:
+     size = SUN_LEN (&name);
+ */
+  size = (offsetof (struct sockaddr_un, sun_path)
+          + strlen (name.sun_path));
+
+    // this is potentially unsafe
+    unlink(filename);
+
+
+  if (bind (sock, (struct sockaddr *) &name, size) < 0)
+    {
+      perror ("bind");
+      exit (EXIT_FAILURE);
+    }
+
+  return sock;
+}
+
+
+
+
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
 BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, size_t numCircularBufferVectors, 
         size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, std::string sdpFile, uint64_t sdpInterval_ms, uint16_t numRtpPacketsPerBundle) : BpSourcePattern(),
     m_running(true),
+    m_numCircularBufferVectors(numCircularBufferVectors),
     m_maxIncomingUdpPacketSizeBytes(maxIncomingUdpPacketSizeBytes),
     m_incomingRtpStreamPort(incomingRtpStreamPort),
     m_maxOutgoingBundleSizeBytes(maxOutgoingBundleSizeBytes),
@@ -37,11 +107,27 @@ BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomi
         numCircularBufferVectors, 
         maxIncomingUdpPacketSizeBytes, 
         boost::bind(&BpSendStream::DeleteCallback, this));
+
+
     m_ioServiceThreadPtr = boost::make_unique<boost::thread>(boost::bind(&boost::asio::io_service::run, &m_ioService));
     ThreadNamer::SetIoServiceThreadName(m_ioService, "ioServiceBpUdpSink");
 
     m_incomingCircularPacketQueue.set_capacity(numCircularBufferVectors);
-    m_outgoingCircularBundleQueue.set_capacity(numCircularBufferVectors);    
+    m_outgoingCircularBundleQueue.set_capacity(numCircularBufferVectors);   
+
+    /**
+     * File descriptor input
+    */
+    // InitFdSink();
+    // m_fdThread = boost::make_unique<boost::thread>(boost::bind(&BpSendStream::FdSinkThread, this)); 
+    // ExecuteGst("test");
+
+    /**
+     * TCP
+    */
+    // boost::asio::ip::tcp::endpoint ep(boost::asio::ip::address_v4::from_string("127.0.0.1"), m_incomingRtpStreamPort);
+    // m_tcpAcceptorPtr = boost::make_unique<boost::asio::ip::tcp::acceptor>(m_ioService, ep);
+    // StartTcpAccept();
 }
 
 BpSendStream::~BpSendStream()
@@ -49,11 +135,23 @@ BpSendStream::~BpSendStream()
     m_running = false;
 
     m_bundleSinkPtr.reset();
-    
+
+    if (m_tcpAcceptorPtr->is_open()) {
+        try {
+            m_tcpAcceptorPtr->close();
+        }
+        catch (const boost::system::system_error & e) {
+            LOG_ERROR(subprocess) << "Error closing TCP Acceptor in StcpInduct::~StcpInduct:  " << e.what();
+        }
+    }
+
+
     if (m_ioServiceThreadPtr) {
         m_ioServiceThreadPtr->join();   
         m_ioServiceThreadPtr.reset(); //delete it
     }
+
+
 
     Stop();
 
@@ -68,6 +166,8 @@ BpSendStream::~BpSendStream()
 
     // LOG_INFO(subprocess) << "m_totalMarkerBits" << m_totalMarkerBits;
     // LOG_INFO(subprocess) << "m_totalTimestampChanged" << m_totalTimestampChanged;
+
+    shutdown(m_fd, 2);
 
 }
 
@@ -364,4 +464,135 @@ bool BpSendStream::SdpTimerThread()
         boost::this_thread::sleep_for(boost::chrono::milliseconds(m_sdpInterval_ms));
     }
     return false;
+}
+
+
+
+
+void BpSendStream::StartTcpAccept() {
+    LOG_INFO(subprocess) << "waiting for  tcp connections";
+    boost::asio::ip::tcp::endpoint ep(boost::asio::ip::address_v4::from_string("127.0.0.1"), 50000);
+
+    m_tcpSocketPtr = std::make_shared<boost::asio::ip::tcp::socket>(m_ioService); //get_io_service() is deprecated: Use get_executor()
+    m_tcpAcceptorPtr->async_accept(*m_tcpSocketPtr, 
+            boost::bind(&BpSendStream::HandleTcpAccept, this, m_tcpSocketPtr, boost::asio::placeholders::error));
+}
+
+void BpSendStream::HandleTcpAccept(std::shared_ptr<boost::asio::ip::tcp::socket> & newTcpSocketPtr, const boost::system::error_code& error) {
+    if (!error) {
+        LOG_INFO(subprocess) << "tcp connection: " << newTcpSocketPtr->remote_endpoint().address() << ":" << newTcpSocketPtr->remote_endpoint().port();
+        
+        m_tcpPacketSinkPtr = std::make_shared<TcpPacketSink>(m_tcpSocketPtr, m_ioService, 
+        boost::bind(&BpSendStream::WholeBundleReadyCallback, this, boost::placeholders::_1),
+        m_numCircularBufferVectors, 
+        m_maxIncomingUdpPacketSizeBytes, 
+        boost::bind(&BpSendStream::DeleteCallback, this));
+        // StartTcpAccept(); //only accept if there was no error
+    }
+    else if (error != boost::asio::error::operation_aborted) {
+        LOG_ERROR(subprocess) << "tcp accept error: " << error.message();
+    }
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void BpSendStream::InitFdSink()
+{
+    // m_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    m_fd = make_named_socket("/tmp/mysocket5");
+
+    if (m_fd < 0)
+    {
+        LOG_ERROR(subprocess) << "Could not create FD";
+    }
+
+}
+
+void BpSendStream::FdSinkThread()
+{
+    // connect to socket
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, "/tmp/mysocket5", sizeof(addr.sun_path)-1);
+
+    if (connect(m_fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
+        perror("connect error");
+        exit(-1);
+    }
+
+    LOG_INFO(subprocess) << "Connected";
+
+    int nbytes;
+    char buf[2000];
+    while (1)
+    {
+
+    nbytes = recvfrom (m_fd, buf, 2000, 0, NULL, 0);
+    
+    if (nbytes < 0)
+        {
+        perror ("recfrom (client)");
+        exit (EXIT_FAILURE);
+        }
+
+    if (nbytes  > 0)
+        FdPushToQueue(buf, nbytes);
+  /* Print a diagnostic message. */
+//   fprintf (stderr, "Client: got message: %s\n", buf);
+//  LOG_INFO(subprocess) << "Size of message=" << nbytes;
+
+    // read data from fd sink
+
+    }
+
+}
+
+void BpSendStream::FdPushToQueue(void * buf, size_t size)
+{
+    padded_vector_uint8_t vec(size);
+    memcpy(vec.data(), buf, size);
+
+    {
+        boost::mutex::scoped_lock lock(m_incomingQueueMutex);// lock mutex 
+        // LOG_DEBUG(subprocess) << "Pushing frame into incoming queue";
+        if (m_incomingCircularPacketQueue.full())
+            m_totalIncomingCbOverruns++;
+
+        m_incomingCircularPacketQueue.push_back(std::move(vec));  // copy out bundle to local queue for processing
+        // rtp_header * header = (rtp_header *) wholeBundleVec.data();
+    }
+    m_incomingQueueCv.notify_one();
+}
+
+void BpSendStream::ExecuteGst(std::string gstCommand)
+{
+    gstCommand = "gst-launch-1.0 filesrc location=/home/kyle/nasa/dev/test_media/official_test_media/lucia_crf18_g_15.mp4 ! qtdemux ! h264parse ! rtph264pay config-interval=4 ! fdsink max-bitrate=10000 sync=true fd=";
+    gstCommand.append(std::to_string(m_fd));
+
+
+    LOG_INFO(subprocess) << "GST Command:\n" << gstCommand;
+
+    boost::this_thread::sleep_for(boost::chrono::microseconds(3000));
+
+    boost::process::child gstProcess(gstCommand);
+    gstProcess.detach();
 }

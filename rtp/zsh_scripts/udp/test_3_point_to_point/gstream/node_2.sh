@@ -4,7 +4,7 @@ sink_config=$config_files/mediasink_udp.json
 outgoing_rtp_port=40004 
 
 output_file_path="/home/$USER/test_outputs/test_3_jetson_to_pc"
-filename=lucia_crf18_g_15_newQueue           # change this for whatever file you want to name
+filename=water_bubble_h264_vbr_g_15_newQueue           # change this for whatever file you want to name
 file=$output_file_path/$filename
 
 mkdir -p  $output_file_path/$filename/$filename
