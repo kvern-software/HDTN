@@ -15,7 +15,7 @@ cd $HDTN_RTP_DIR
         --outgoing-rtp-port=$outgoing_rtp_port --num-circular-buffer-vectors=10000 --max-outgoing-rtp-packet-size-bytes=1800 & 
 
 gst-launch-1.0 -v udpsrc port=$outgoing_rtp_port ! "application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" \
-! rtph264depay ! h264parse !  mp4mux ! filesink location=$file/$filename.mp4  -e 
+! rtph264depay ! h264parse !  mp4mux ! filesink location=$file/$filename.mp4  -e  &
 # queue max-size-buffers=500 ! rtpjitterbuffer max-misorder-time=5000 latency=1000 max-dropout-time=10000 ! 
 
 recv_pid=$!

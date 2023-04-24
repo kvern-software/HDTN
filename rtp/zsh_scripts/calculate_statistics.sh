@@ -11,12 +11,12 @@
 
 # step one
 test_number=test_3
-test_name=lucia_crf18
-
+test_name=water_bubble_h264_crf_18_g_15_100MB_bitrate
+reference_name=water_bubble_h264_crf_18_g_15
 test_media_folder=/home/kyle/nasa/dev/test_media/official_test_media 
-reference_file=$test_media_folder/$test_name.mp4
+reference_file=$test_media_folder/$reference_name.mp4
 
-distorted_media_folder=/home/kyle/nasa/dev/test_outputs/$test_number/$test_name
+distorted_media_folder=/home/kyle/nasa/dev/test_outputs/$test_number/test_3_jetson_to_PC/$test_name
 distorted_filename=$test_name
 distorted_file=$distorted_media_folder/$distorted_filename.mp4
 

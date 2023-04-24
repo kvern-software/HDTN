@@ -3,15 +3,15 @@ sink_config=$config_files/mediasink_udp.json
 
 outgoing_rtp_port=40004 
 
-output_file_path="/home/$USER/gstream/test_3_jetson_to_PC"
-filename=water_bubble_h264_crf23_g15           # change this for whatever file you want to name
+output_file_path="/home/$USER/gstream/test_4_two_hop"
+filename=water_bubbles_h264_crf30_g_15           # change this for whatever file you want to name
 file=$output_file_path/$filename
 
 mkdir -p  $output_file_path/$filename
 
 cd $HDTN_RTP_DIR 
 
-./build/bprecv_stream  --my-uri-eid=ipn:2.1 --inducts-config-file=$sink_config  --outgoing-rtp-hostname=127.0.0.1 \
+./build/bprecv_stream  --my-uri-eid=ipn:3.1 --inducts-config-file=$sink_config  --outgoing-rtp-hostname=127.0.0.1 \
         --outgoing-rtp-port=$outgoing_rtp_port --num-circular-buffer-vectors=2000 --max-outgoing-rtp-packet-size-bytes=1460 & 
 recv_pid=$!
 
