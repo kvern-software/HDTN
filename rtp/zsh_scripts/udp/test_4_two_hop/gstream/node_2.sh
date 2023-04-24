@@ -1,5 +1,4 @@
 #!/bin/sh
-#run this on madrid 
 # path variables
 config_files=$HDTN_RTP_DIR/config_files/udp/test_4_two_hop
 hdtn_config=$config_files/hdtn_one_process.json

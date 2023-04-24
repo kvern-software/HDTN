@@ -1,4 +1,4 @@
-config_files=$HDTN_RTP_DIR/config_files/udp/test_3_point_to_point
+config_files=$HDTN_RTP_DIR/config_files/udp/test_4_two_hop
 sink_config=$config_files/mediasink_udp.json
 
 outgoing_rtp_port=40004 

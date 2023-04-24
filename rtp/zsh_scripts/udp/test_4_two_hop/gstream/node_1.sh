@@ -1,6 +1,6 @@
 # !/bin/zsh 
 
-config_files=$HDTN_RTP_DIR/config_files/udp/test_3_point_to_point
+config_files=$HDTN_RTP_DIR/config_files/udp/test_4_two_hop
 source_config=$config_files/mediasource_udp.json
 
 test_files=/home/$USER/test_media/official_test_media
