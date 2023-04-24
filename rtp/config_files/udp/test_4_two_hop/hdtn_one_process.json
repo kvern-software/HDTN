@@ -1,6 +1,3 @@
-
- 
-
 {
     "hdtnConfigName": "my hdtn config",
     "userInterfaceOn": true,
@@ -24,11 +21,11 @@
         "inductConfigName": "myconfig",
         "inductVector": [
             {
-                "name": "stcp ingress",
-                "convergenceLayer": "stcp",
-                "boundPort": 4556,
-                "numRxCircularBufferElements": 200,
-                "keepAliveIntervalSeconds": 15
+                "name": "induct from jetson",
+                "convergenceLayer": "udp",
+                "boundPort": 5000,
+                "numRxCircularBufferElements": 10000,
+                "numRxCircularBufferBytesPerElement": 20000
             }
         ]
     },
@@ -36,32 +33,15 @@
         "outductConfigName": "myconfig",
         "outductVector": [
             {
-                "name": "stcp egress1",
-                "convergenceLayer": "stcp",
+                "name": "to bprecv stream to desktop",
+                "convergenceLayer": "udp",
                 "nextHopNodeId": 3,
-                "remoteHostname": "node3",
-                "remotePort": 4558,
-                "maxNumberOfBundlesInPipeline": 500,
+                "remoteHostname": "kyle.local",
+                "remotePort": 5010,
+                "maxNumberOfBundlesInPipeline": 10000,
                 "maxSumOfBundleBytesInPipeline": 50000000,
-                "finalDestinationEidUris": [
-                    "ipn:200.*",
-                    "ipn:3.*",
-                    "ipn:4.*",
-                    "ipn:1.*"
-                ],
-                "keepAliveIntervalSeconds": 17
-            },
-            {
-                "name": "stcp egress2",
-                "convergenceLayer": "stcp",
-                "nextHopNodeId": 2,
-                "remoteHostname": "node2",
-                "remotePort": 4558,
-                "maxNumberOfBundlesInPipeline": 500,
-                "maxSumOfBundleBytesInPipeline": 50000000,
-                "finalDestinationEidUris": [
-                ],
-                "keepAliveIntervalSeconds": 17
+                "finalDestinationEidUris":["ipn:3.1"],
+                "udpRateBps": 5000000000
             }
         ]
     },
