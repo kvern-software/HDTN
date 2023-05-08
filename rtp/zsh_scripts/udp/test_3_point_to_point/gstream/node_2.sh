@@ -3,8 +3,8 @@ sink_config=$config_files/mediasink_udp.json
 
 outgoing_rtp_port=40004 
 
-output_file_path="/home/$USER/gstream/test_3_jetson_to_PC"
-filename=water_bubble_h264_crf23_g15           # change this for whatever file you want to name
+output_file_path="/home/$USER/nasa/dev/test_outputs/test_3"
+filename=water_bubble_cbr21           # change this for whatever file you want to name
 file=$output_file_path/$filename
 
 mkdir -p  $output_file_path/$filename

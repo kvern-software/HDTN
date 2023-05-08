@@ -1,16 +1,15 @@
 test_media_folder=/home/kyle/nasa/dev/test_media/official_test_media
-filename=water_bubble_h264_crf_18_g_15
+filename=lucia_cbr21
 file=$test_media_folder/$filename.mp4
 
-output_file=/home/kyle/gstream/no_hdtn/test_1_gst_loopback
+output_file=/home/kyle/nasa/dev/test_outputs/test_1
 mkdir -p $output_file/$filename
 
 outgoing_rtp_port=5000
 
 #receiver
 gst-launch-1.0 -v udpsrc port=$outgoing_rtp_port ! "application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" \
-! queue max-size-buffers=500 ! rtpjitterbuffer max-misorder-time=5000 latency=1000 max-dropout-time=10000 \
-! rtph264depay ! h264parse !  mp4mux ! filesink location=$output_file/$filename/$filename.mp4  -e &
+! rtph264depay ! h264parse !  mp4mux ! queue2 ! filesink location=$output_file/$filename/$filename.mp4  -e &
 pid_recv=$!
 
 sleep 1

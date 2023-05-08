@@ -20,8 +20,8 @@ def main(argv):
     file_name=argv[2] + "_vmaf"
 
     full_filepath = logfile_prefix + "/" + test_folder_name + "/" + file_name + ".json"
-    output_file_name=logfile_prefix + "/" + test_folder_name + "/" + file_name + ".png"
-    output_file_name_2=logfile_prefix + "/" + test_folder_name + "/" + file_name + "_stats.png"
+    output_file_name=logfile_prefix + "/" + test_folder_name + "/" + "vmaf" + ".png"
+    output_file_name_2=logfile_prefix + "/" + test_folder_name + "/" + "vmaf_stats.png"
     output_csv_file_name=logfile_prefix + "/" + test_folder_name + "/" + file_name + ".csv"
 
 

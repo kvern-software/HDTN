@@ -110,3 +110,22 @@ If we specify a smaller -bufsize, ffmpeg will more frequently check for the
 output bit rate and constrain it to the specified average bit rate from the 
 command line. Hence, lowering -bufsize lowers the bitrate variation that the 
 encoder can produce."
+
+
+# bitrate over time where c is the time interval
+ffmpeg-bitrate-stats -v -a time -of csv -c 0.5 -s video water_bubble.mp4 > water_bubble_bitrate.csv
+
+
+
+# constant quality (variable bit rate)
+ffmpeg -i lucia_original.mp4 -c:v libx264 -slice-max-size 1460  -no-scenecut  true -g 15 -crf 18 lucia_crf18.mp4
+
+# constant bitrate (constrained encoding)
+ffmpeg -i lucia_original.mp4 -c:v libx264 -slice-max-size 1460  -no-scenecut  true -g 15 -crf 21 -maxrate 20M -bufsize 2M lucia_cbr21.mp4
+
+
+# constant quality (variable bit rate)
+ffmpeg -i water_bubble.mp4 -c:v libx264 -slice-max-size 1460  -no-scenecut  true -g 15 -crf 18 water_bubble_crf18.mp4
+
+# constant bitrate (constrained encoding)
+ffmpeg -i lucia_original.mp4 -c:v libx264 -slice-max-size 1460  -no-scenecut  true -g 15 -crf 21 -maxrate 30M -bufsize 2M water_bubble_cbr21.mp4
