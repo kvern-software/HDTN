@@ -127,7 +127,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
 
 
         LOG_INFO(subprocess) << "starting..";
-        BpReceiveStream BpReceiveStream(numCircularBufferVectors, remoteHostname, remotePort, maxOutgoingRtpPacketSizeBytes, ffmpegCommand);
+        BpReceiveStream BpReceiveStream(numCircularBufferVectors, remoteHostname, remotePort, maxOutgoingRtpPacketSizeBytes, ffmpegCommand, 1, "test.mp4");
         BpReceiveStream.Init(inductsConfigPtr, outductsConfigPtr, isAcsAware, myEid, 0, maxBundleSizeBytes);
 
 
@@ -144,7 +144,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
 
 
         LOG_INFO(subprocess) << "Exiting cleanly..";
-        // BpReceiveStream.Stop();
+        BpReceiveStream.Stop();
         //safe to get any stats now if needed
     }
     LOG_INFO(subprocess) << "Exited cleanly";

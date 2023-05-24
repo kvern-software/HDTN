@@ -36,8 +36,13 @@ find_package(UdpLib REQUIRED)
 find_package(UdpDelaySimLib REQUIRED)
 find_package(Boost "1.67.0" REQUIRED timer unit_test_framework)
 
-# add_subdirectory(libsdptransform)
-# add_subdirectory(uvgRTP)
+
+find_package(PkgConfig REQUIRED)
+pkg_search_module(gstreamer REQUIRED IMPORTED_TARGET gstreamer-1.0>=1.4)
+pkg_search_module(gstreamer-sdp REQUIRED IMPORTED_TARGET gstreamer-sdp-1.0>=1.4)
+pkg_search_module(gstreamer-app REQUIRED IMPORTED_TARGET gstreamer-app-1.0>=1.4)
+pkg_search_module(gstreamer-video REQUIRED IMPORTED_TARGET gstreamer-video-1.0>=1.4)
+
 
 set(DTN_SOURCES 
 	# src/dtn/DtnContext.cpp
@@ -50,131 +55,26 @@ set(DTN_SOURCES
 	src/dtn/DtnRtp.cpp
 )
 
-# set(GUI_SOURCES 
-# 	# gui library backend files
-# 	MediaGui/include/imgui/imgui.cpp
-# 	MediaGui/include/imgui/imgui_demo.cpp
-# 	MediaGui/include/imgui/imgui_draw.cpp
-# 	MediaGui/include/imgui/imgui_widgets.cpp
-# 	MediaGui/include/imgui/imgui_tables.cpp
-# 	MediaGui/include/imgui/backends/imgui_impl_glfw.cpp
-# 	MediaGui/include/imgui/backends/imgui_impl_opengl3.cpp
-# )
-
-##### SINK
-# add_executable(dtn_rtp_stream_sink   
-# 	#gui
-# 	MediaGui/MediaGui.cpp
-# 	${GUI_SOURCES}
-
-# 	src/video_driver/VideoDriver.cpp
-# 	# dtn related items such as streams 
-# 	${DTN_SOURCES}
-
-# 	MediaSink/MediaSink.cpp
-# 	MediaSink/MediaSinkMain.cpp
-# 	MediaSink/MediaSinkRunner.cpp)
-
-# target_include_directories(dtn_rtp_stream_sink PUBLIC
-# 	src/dtn/include
-# 	src/video_driver
-# 	MediaGui/
-# 	MediaGui/include/imgui
-# 	MediaGui/include/imgui/backends #gui
-# 	MediaGui/include/stb #quick file loader
-# )
-# target_link_libraries(dtn_rtp_stream_sink
-# 	#gui
-# 	glfw 
-# 	OpenGL::GL 
-# 	${CMAKE_DL_LIBS}	
-	
-# 	#HDTN
-# 	HDTN::HDTNUtil
-# 	HDTN::TelemetryDefinitions
-# 	HDTN::LtpLib
-# 	HDTN::BpAppPatternsLib
-# 	HDTN::Bpcodec
-# 	HDTN::EgressLib
-# 	HDTN::HDTNConfigLib
-# 	HDTN::HDTNCgrLib
-# 	HDTN::InductManagerLib
-# 	HDTN::IngressLib
-# 	HDTN::LoggerLib
-# 	HDTN::OutductManagerLib
-# 	HDTN::StcpLib
-# 	HDTN::StorageLib
-# 	HDTN::TcpclLib
-# 	HDTN::UdpLib
-# 	HDTN::UdpDelaySimLib
-
-# 	Boost::unit_test_framework
-# 	Boost::timer
-#     Boost::program_options 
-# 	Boost::thread
-# 	Boost::log
-# 	${AVCODEC_LIBRARY}
-# ) 
-
-# ##### SOURCE
-# add_executable(dtn_rtp_stream_source   	
-# 	# dtn related items such as streams 
-# 	MediaSource/MediaSource.cpp
-# 	MediaSource/MediaSourceMain.cpp
-#     MediaSource/MediaSourceRunner.cpp
-	
-# 	# dtn related items such as streams 
-# 	${DTN_SOURCES}
-	
-# 	src/video_driver/VideoDriver.cpp
-# )
-# target_include_directories(dtn_rtp_stream_source PUBLIC
-# 	src/dtn/include
-# 	src/video_driver
-# )
-# target_link_libraries(dtn_rtp_stream_source   
-# 	#HDTN
-# 	HDTN::HDTNUtil
-# 	HDTN::TelemetryDefinitions
-# 	HDTN::LtpLib
-# 	HDTN::BpAppPatternsLib
-# 	HDTN::Bpcodec
-# 	HDTN::EgressLib
-# 	HDTN::HDTNConfigLib
-# 	HDTN::HDTNCgrLib
-# 	HDTN::InductManagerLib
-# 	HDTN::IngressLib
-# 	HDTN::LoggerLib
-# 	HDTN::OutductManagerLib
-# 	HDTN::StcpLib
-# 	HDTN::StorageLib
-# 	HDTN::TcpclLib
-# 	HDTN::UdpLib
-# 	HDTN::UdpDelaySimLib
-
-# 	Boost::unit_test_framework
-# 	Boost::timer
-#     Boost::program_options 
-# 	Boost::thread
-# 	Boost::log
-# 	${AVCODEC_LIBRARY}
-# ) 
-
-
 ##### STREAM
 add_executable(bpsend_stream
 	BpSendStream/src/BpSendStream.cpp
 	BpSendStream/src/BpSendStreamMain.cpp
 	BpSendStream/src/BpSendStreamRunner.cpp
 	TcpPacketSink/src/TcpPacketSink.cpp
+	BpIntakes/src/GStreamerAppSinkIntake.cpp
+	BpIntakes/src/FdIntake.cpp
+	BpIntakes/src/UdpIntake.cpp
+	BpOutduct/src/GStreamerAppSrcOutduct.cpp
 	${DTN_SOURCES}
 )
 target_include_directories(bpsend_stream PUBLIC 
 		BpSendStream/include 
 		src/dtn/include
 		TcpPacketSink/include
-
+		BpIntakes/include
+		BpOutduct/include
 )
+
 target_link_libraries(bpsend_stream   
 	#HDTN
 	HDTN::HDTNUtil
@@ -200,7 +100,11 @@ target_link_libraries(bpsend_stream
     Boost::program_options 
 	Boost::thread
 	Boost::log
-	# ${AVCODEC_LIBRARY}
+
+    PkgConfig::gstreamer
+    PkgConfig::gstreamer-sdp
+    PkgConfig::gstreamer-app
+    PkgConfig::gstreamer-video
 ) 
 
 
@@ -209,12 +113,13 @@ add_executable(bprecv_stream
 	BpReceiveStream/src/BpReceiveStreamMain.cpp
 	BpReceiveStream/src/BpReceiveStreamRunner.cpp
 	BpReceiveStream/src/BpReceiveStream.cpp
-
+	BpOutduct/src/GStreamerAppSrcOutduct.cpp
 	${DTN_SOURCES}
 )
 target_include_directories(bprecv_stream PUBLIC 
 		BpReceiveStream/include 
 		src/dtn/include
+		BpOutduct/include
 )
 target_link_libraries(bprecv_stream   
 	#HDTN
@@ -241,4 +146,9 @@ target_link_libraries(bprecv_stream
     Boost::program_options 
 	Boost::thread
 	Boost::log
+
+	PkgConfig::gstreamer
+    PkgConfig::gstreamer-sdp
+    PkgConfig::gstreamer-app
+    PkgConfig::gstreamer-video
 ) 

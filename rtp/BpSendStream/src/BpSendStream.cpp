@@ -73,8 +73,10 @@ make_named_socket (const char *filename)
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 
-BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, size_t numCircularBufferVectors, 
-        size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, std::string sdpFile, uint64_t sdpInterval_ms, uint16_t numRtpPacketsPerBundle) : BpSourcePattern(),
+BpSendStream::BpSendStream(uint8_t intakeType, size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, size_t numCircularBufferVectors, 
+        size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, std::string sdpFile, uint64_t sdpInterval_ms, uint16_t numRtpPacketsPerBundle,
+        std::string fileToStream) : BpSourcePattern(),
+    m_intakeType(intakeType),
     m_running(true),
     m_numCircularBufferVectors(numCircularBufferVectors),
     m_maxIncomingUdpPacketSizeBytes(maxIncomingUdpPacketSizeBytes),
@@ -83,7 +85,8 @@ BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomi
     m_enableRtpConcatentation(enableRtpConcatentation),
     m_sdpFileStr(sdpFile),
     m_sdpInterval_ms(sdpInterval_ms),
-    m_numRtpPacketsPerBundle(numRtpPacketsPerBundle)
+    m_numRtpPacketsPerBundle(numRtpPacketsPerBundle),
+    m_fileToStream(fileToStream)
 {
     m_currentFrame.reserve(m_maxOutgoingBundleSizeBytes);
 
@@ -101,26 +104,37 @@ BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomi
     m_processingThread = boost::make_unique<boost::thread>(boost::bind(&BpSendStream::ProcessIncomingBundlesThread, this)); 
     m_sdpThread = boost::make_unique<boost::thread>(boost::bind(&BpSendStream::SdpTimerThread, this)); 
 
-    // processing will begin almost immediately, so call this when our callback and rtp session objects are already initialized
-    m_bundleSinkPtr = std::make_shared<UdpBundleSink>(m_ioService, m_incomingRtpStreamPort, 
-        boost::bind(&BpSendStream::WholeBundleReadyCallback, this, boost::placeholders::_1),
-        numCircularBufferVectors, 
-        maxIncomingUdpPacketSizeBytes, 
-        boost::bind(&BpSendStream::DeleteCallback, this));
-
-
     m_ioServiceThreadPtr = boost::make_unique<boost::thread>(boost::bind(&boost::asio::io_service::run, &m_ioService));
     ThreadNamer::SetIoServiceThreadName(m_ioService, "ioServiceBpUdpSink");
 
     m_incomingCircularPacketQueue.set_capacity(numCircularBufferVectors);
     m_outgoingCircularBundleQueue.set_capacity(numCircularBufferVectors);   
 
+    if (m_intakeType == HDTN_APPSINK_INTAKE) {
+        SetCallbackFunction(boost::bind(&BpSendStream::WholeBundleReadyCallback, this, boost::placeholders::_1));
+        m_gstreamerAppSinkIntakePtr = boost::make_unique<GStreamerAppSinkIntake>(m_fileToStream);
+    } else if (m_intakeType == HDTN_UDP_INTAKE) {
+        m_bundleSinkPtr = std::make_shared<UdpBundleSink>(m_ioService, m_incomingRtpStreamPort, 
+        boost::bind(&BpSendStream::WholeBundleReadyCallback, this, boost::placeholders::_1),
+        numCircularBufferVectors, 
+        maxIncomingUdpPacketSizeBytes, 
+        boost::bind(&BpSendStream::DeleteCallback, this));
+    } else if (m_intakeType == HDTN_FD_INTAKE) {
     /**
      * File descriptor input
     */
-    // InitFdSink();
-    // m_fdThread = boost::make_unique<boost::thread>(boost::bind(&BpSendStream::FdSinkThread, this)); 
-    // ExecuteGst("test");
+        // InitFdSink();
+        // m_fdThread = boost::make_unique<boost::thread>(boost::bind(&BpSendStream::FdSinkThread, this)); 
+        // ExecuteGst("test");
+
+    } else if (m_intakeType == HDTN_TCP_INTAKE) {
+
+    } else {
+        // LOG_ERROR(subprocess) << "Unrecognized intake option. Aborting";
+        // exit(-1);
+    }
+
+
 
     /**
      * TCP
@@ -133,6 +147,9 @@ BpSendStream::BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomi
 BpSendStream::~BpSendStream()
 {
     m_running = false;
+
+    // shut down whatever sink is running
+    m_gstreamerAppSinkIntakePtr.reset();
 
     m_bundleSinkPtr.reset();
 
@@ -377,7 +394,7 @@ uint64_t BpSendStream::GetNextPayloadLength_Step1()
         // LOG_DEBUG(subprocess) << "Circ Queue Size: " << m_outgoingCircularBundleQueue.size() << " waiting...";
         return UINT64_MAX; // wait for data
     } 
-
+    
     return (uint64_t) m_outgoingCircularBundleQueue.front().size();
 }
 

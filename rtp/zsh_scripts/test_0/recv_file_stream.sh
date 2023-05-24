@@ -24,15 +24,15 @@ ffmpeg -y -protocol_whitelist file,udp,rtp,data,sdp \
 
 sleep 5
 
-# ffmpeg -y -protocol_whitelist file,udp,rtp \
-# -loglevel verbose \
-# -strict experimental \
-# -fflags +genpts \
-# -seek2any 1 \
-# -avoid_negative_ts +make_zero \
-# # -max_delay 0 \
-# # -reorder_queue_size 0 \
-# -i HDTN_TO_IN_SDP.sdp -vcodec copy -acodec copy -f mp4 test_output.mp4 & 
+ffmpeg -y -protocol_whitelist file,udp,rtp \
+-loglevel verbose \
+-strict experimental \
+-fflags +genpts \
+-seek2any 1 \
+-avoid_negative_ts +make_zero \
+-max_delay 0 \
+-reorder_queue_size 0 \
+-i HDTN.sdp -vcodec copy -acodec copy -f mp4 test_output.mp4 
        
 
 

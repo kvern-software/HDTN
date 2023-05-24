@@ -5,9 +5,17 @@
 
 #include "DtnRtp.h"
 
+#include "GStreamerAppSrcOutduct.h"
+
+typedef enum {
+    UDP_OUTDUCT = 0,
+    GSTREAMER_APPSRC_OUTDUCT = 1
+} BpRecvStreamOutductTypes;
+
+
 class BpReceiveStream : public BpSinkPattern {
 public:
-    BpReceiveStream(size_t numCircularBufferVectors, const std::string& rtpDestHostname, const uint16_t rtpDestPort, uint16_t maxOutgoingRtpPacketSizeByte, std::string ffmpegCommand);
+    BpReceiveStream(size_t numCircularBufferVectors, const std::string& rtpDestHostname, const uint16_t rtpDestPort, uint16_t maxOutgoingRtpPacketSizeByte, std::string ffmpegCommand, uint8_t outductMode, std::string fileNameToSave);
     virtual ~BpReceiveStream() override;
 
 protected:
@@ -29,7 +37,7 @@ private:
     void OnSentRtpPacketCallback(bool success, std::shared_ptr<std::vector<UdpSendPacketInfo> >& udpSendPacketInfoVecSharedPtr, const std::size_t numPacketsSent);
 
 
-    int SendUdpPacket(const std::vector<uint8_t>& message);
+    int SendUdpPacket(padded_vector_uint8_t & message);
     volatile bool m_running; // exit condition
     
     boost::circular_buffer<padded_vector_uint8_t> m_incomingBundleQueue; // incoming rtp frames from HDTN put here
@@ -44,10 +52,11 @@ private:
     uint16_t m_maxOutgoingRtpPayloadSizeBytes;
     std::string m_sdpFileString;
 
-    // outbound udp
+    // outbound udp outduct
 	boost::asio::io_service io_service;
     boost::asio::ip::udp::socket socket;
     std::string m_ffmpegCommand;
+    uint8_t m_outductMode;
     bool m_executedFfmpeg = false;
 
     boost::asio::ip::udp::endpoint m_udpEndpoint;
@@ -55,6 +64,10 @@ private:
     boost::mutex m_sentPacketsMutex;
     boost::condition_variable m_cvSentPacket; // notify when UdpBatchSender has sent out our RTP frames to network
     volatile bool m_sentPacketsSuccess;
+
+    // outbound gstreamer outduct
+    std::unique_ptr<GStreamerAppSrcOutduct> m_gstreamerAppSrcOutductPtr;
+
 
     // multithreading 
     boost::condition_variable m_incomingQueueCv;

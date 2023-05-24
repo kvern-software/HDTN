@@ -232,8 +232,9 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
             }
 
 
-        BpSendStream bpSendStream(maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, 
-                numCircularBufferVectors, maxBundleSizeBytes, enableRtpConcatenation, dtnSdpFile, sdpIntervalMs, rtpPacketsPerBundle);
+        BpSendStream bpSendStream(0, maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, 
+                numCircularBufferVectors, maxBundleSizeBytes, enableRtpConcatenation, dtnSdpFile, sdpIntervalMs, rtpPacketsPerBundle, 
+                "/home/kyle/nasa/dev/test_media/official_test_media/lucia_cbr21.mp4");
         
 
 

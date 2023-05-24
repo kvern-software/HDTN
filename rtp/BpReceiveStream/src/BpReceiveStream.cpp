@@ -6,34 +6,49 @@ static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess:
 
 #define FFMPEG_SDP_HEADER "data:application/sdp;,"
 
-BpReceiveStream::BpReceiveStream(size_t numCircularBufferVectors, const std::string& rtpDestHostname, const uint16_t rtpDestPort, uint16_t maxOutgoingRtpPacketSizeBytes, std::string ffmpegCommand) : BpSinkPattern(), 
-        m_numCircularBufferVectors(numCircularBufferVectors),
-        m_outgoingRtpPort(rtpDestPort),
-        m_maxOutgoingRtpPacketSizeBytes(maxOutgoingRtpPacketSizeBytes),
-        socket(io_service),
-        m_ffmpegCommand(ffmpegCommand)
+BpReceiveStream::BpReceiveStream(size_t numCircularBufferVectors, const std::string& rtpDestHostname, const uint16_t rtpDestPort,
+        uint16_t maxOutgoingRtpPacketSizeBytes, std::string ffmpegCommand, uint8_t outductMode, std::string fileNameToSave) 
+    : BpSinkPattern(), 
+    m_numCircularBufferVectors(numCircularBufferVectors),
+    m_outgoingRtpPort(rtpDestPort),
+    m_maxOutgoingRtpPacketSizeBytes(maxOutgoingRtpPacketSizeBytes),
+    socket(io_service),
+    m_ffmpegCommand(ffmpegCommand),
+    m_outductMode(outductMode)
 {
+    
     m_maxOutgoingRtpPayloadSizeBytes = m_maxOutgoingRtpPacketSizeBytes - sizeof(rtp_header);
     m_outgoingDtnRtpPtr = std::make_shared<DtnRtp>(UINT64_MAX);
     m_processingThread = boost::make_unique<boost::thread>(boost::bind(&BpReceiveStream::ProcessIncomingBundlesThread, this)); 
     
     m_incomingBundleQueue.set_capacity(m_numCircularBufferVectors);
 
-    m_udpBatchSenderPtr = std::make_shared<UdpBatchSender>();
-    m_udpBatchSenderPtr->SetOnSentPacketsCallback(boost::bind(&BpReceiveStream::OnSentRtpPacketCallback, this, 
-            boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
-    m_udpBatchSenderPtr->Init(rtpDestHostname, rtpDestPort);
-    m_udpEndpoint = m_udpBatchSenderPtr->GetCurrentUdpEndpoint();
-   
-    socket.open(boost::asio::ip::udp::v4());
+    
+    if (m_outductMode == UDP_OUTDUCT)
+    {
+        m_udpBatchSenderPtr = std::make_shared<UdpBatchSender>();
+        m_udpBatchSenderPtr->SetOnSentPacketsCallback(boost::bind(&BpReceiveStream::OnSentRtpPacketCallback, this, 
+                boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3));
+        m_udpBatchSenderPtr->Init(rtpDestHostname, rtpDestPort);
+        m_udpEndpoint = m_udpBatchSenderPtr->GetCurrentUdpEndpoint();
+    
+        socket.open(boost::asio::ip::udp::v4());
+    } else if (m_outductMode == GSTREAMER_APPSRC_OUTDUCT)
+    {
+        m_gstreamerAppSrcOutductPtr = boost::make_unique<GStreamerAppSrcOutduct>(fileNameToSave);
+        SetGStreamerAppSrcOutductInstance(m_gstreamerAppSrcOutductPtr.get());
+    }
 
 }
 
 BpReceiveStream::~BpReceiveStream()
 {
+    LOG_INFO(subprocess) << "Calling BpReceiveStream deconstructor";
     m_running = false;
-
+    
+    m_gstreamerAppSrcOutductPtr.reset();
     m_udpBatchSenderPtr->Stop();
+
     Stop();
 
     LOG_INFO(subprocess) << "m_totalRtpPacketsReceived: " << m_totalRtpPacketsReceived;
@@ -48,7 +63,7 @@ void BpReceiveStream::ProcessIncomingBundlesThread()
     static const boost::posix_time::time_duration timeout(boost::posix_time::milliseconds(250));
     static bool firstPacket = true;
 
-    std::vector<uint8_t> rtpFrame;
+    padded_vector_uint8_t rtpFrame;
     rtpFrame.reserve(m_maxOutgoingRtpPacketSizeBytes);
 
     while (m_running) 
@@ -97,8 +112,11 @@ void BpReceiveStream::ProcessIncomingBundlesThread()
                 // rtp_frame * frame = (rtp_frame *)  rtpPacketLocation;
                 // frame->print_header();
 
-
-                SendUdpPacket(rtpFrame);
+                if (m_outductMode == UDP_OUTDUCT) {
+                    SendUdpPacket(rtpFrame);
+                } else if (m_outductMode == GSTREAMER_APPSRC_OUTDUCT) {
+                    m_gstreamerAppSrcOutductPtr->PushRtpPacketToGStreamer(rtpFrame); // gets taken
+                }
 
                 m_outgoingDtnRtpPtr->IncSequence(); // for next frame
 
@@ -298,7 +316,7 @@ void BpReceiveStream::OnSentRtpPacketCallback(bool success, std::shared_ptr<std:
 }
 
 
-int BpReceiveStream::SendUdpPacket(const std::vector<uint8_t>& message) {
+int BpReceiveStream::SendUdpPacket(padded_vector_uint8_t& message) {
 
 
     m_totalRtpBytesSent += socket.send_to(boost::asio::buffer(message), m_udpEndpoint);

@@ -1,44 +1,35 @@
 #pragma once
 
-#include "UdpBundleSink.h"
-// #include "StcpBundleSink.h"
-#include "TcpPacketSink.h"
-
 #include "app_patterns/BpSourcePattern.h"
+
+#include "UdpBundleSink.h"
+#include "StcpBundleSink.h"
+#include "TcpPacketSink.h"
+#include "GStreamerAppSinkIntake.h"
+
 #include "DtnRtp.h"
 
 #include <boost/asio.hpp>
 #include <sys/socket.h>
 
+typedef enum {
+    HDTN_APPSINK_INTAKE = 0,
+    HDTN_UDP_INTAKE = 1,
+    HDTN_FD_INTAKE = 2,
+    HDTN_TCP_INTAKE = 3
+} BpSendStreamIntakeTypes;
 
-// typedef boost::function<void(padded_vector_uint8_t & wholeBundleVec)> WholeBundleReadyCallbackUdp_t;
-// typedef boost::function<void()> NotifyReadyToDeleteCallback_t;
 
 class BpSendStream : public BpSourcePattern
 {
 public:
 
-    BpSendStream(size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, 
+    BpSendStream(uint8_t intakeType, size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, 
             size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, 
-            std::string sdpFile,  uint64_t sdpInterval_ms, uint16_t numRtpPacketsPerBundle);
+            std::string sdpFile,  uint64_t sdpInterval_ms, uint16_t numRtpPacketsPerBundle, std::string fileToStream);
     ~BpSendStream();
 
-
- 
     boost::asio::io_service m_ioService; // socket uses this to grab data from incoming rtp stream
-    
-    std::shared_ptr<UdpBundleSink> m_bundleSinkPtr; 
-    // experimental stcp sink
-    // std::shared_ptr<StcpBundleSink> m_stcpBundleSinkPtr; 
-    // std::shared_ptr<boost::asio::ip::tcp::socket> m_stcpSocketPtr;
-    // void StartTcpAccept();
-    // void HandleTcpAccept(std::shared_ptr<boost::asio::ip::tcp::socket> &newTcpSocketPtr, const boost::system::error_code & error);
-    std::unique_ptr<boost::asio::ip::tcp::acceptor> m_tcpAcceptorPtr;
-    std::shared_ptr<boost::asio::ip::tcp::socket> m_tcpSocketPtr;
-    std::shared_ptr<TcpPacketSink> m_tcpPacketSinkPtr; 
-    void StartTcpAccept();
-    void HandleTcpAccept(std::shared_ptr<boost::asio::ip::tcp::socket> & newTcpSocketPtr, const boost::system::error_code& error);
-
     
     std::shared_ptr<DtnRtp> m_outgoingDtnRtpPtr;
     std::shared_ptr<DtnRtp> m_incomingDtnRtpPtr;
@@ -65,8 +56,25 @@ private:
     void CreateFrame(padded_vector_uint8_t &incomingRtpFrame);
     void PushFrame();
     void PushBundle();
+
+    /* Gstreamer App Sink Intake */
+    std::unique_ptr<GStreamerAppSinkIntake> m_gstreamerAppSinkIntakePtr;
+    /* Udp Intake*/
+    std::shared_ptr<UdpBundleSink> m_bundleSinkPtr; 
+
+    /* Tcp Intake*/
+    // experimental stcp sink
+    // std::shared_ptr<StcpBundleSink> m_stcpBundleSinkPtr; 
+    // std::shared_ptr<boost::asio::ip::tcp::socket> m_stcpSocketPtr;
+    // void StartTcpAccept();
+    // void HandleTcpAccept(std::shared_ptr<boost::asio::ip::tcp::socket> &newTcpSocketPtr, const boost::system::error_code & error);
+    std::unique_ptr<boost::asio::ip::tcp::acceptor> m_tcpAcceptorPtr;
+    std::shared_ptr<boost::asio::ip::tcp::socket> m_tcpSocketPtr;
+    std::shared_ptr<TcpPacketSink> m_tcpPacketSinkPtr; 
+    void StartTcpAccept();
+    void HandleTcpAccept(std::shared_ptr<boost::asio::ip::tcp::socket> & newTcpSocketPtr, const boost::system::error_code& error);
     
-    // experimental read from FD instead of UDP
+    /* FD intake*/
     void InitFdSink();
     void FdSinkThread();
     void ExecuteGst(std::string gstCommand);
@@ -77,6 +85,7 @@ private:
     padded_vector_uint8_t m_currentFrame;  
     size_t m_offset = 0;
 
+    uint8_t m_intakeType;
     volatile bool m_running;
     
     uint64_t m_numCircularBufferVectors;
@@ -105,6 +114,8 @@ private:
     uint64_t m_sdpInterval_ms;
     
     uint16_t m_numRtpPacketsPerBundle;
+    
+    std::string m_fileToStream;
 
     uint64_t m_totalRtpPacketsReceived = 0; // counted when received from udp sink
     uint64_t m_totalRtpPacketsSent = 0; // counted when send to bundler

@@ -21,7 +21,7 @@ media_source_process=$!
 sleep 3
 
 ####################################################### gst 
-gst-launch-1.0 filesrc location=$file ! qtdemux ! h264parse ! rtph264pay config-interval=4 ! udpsink host=127.0.0.1 port=$incoming_rtp_port
+# gst-launch-1.0 filesrc location=$file ! qtdemux ! h264parse ! rtph264pay config-interval=4 ! udpsink host=127.0.0.1 port=$incoming_rtp_port
 ####################################################### gst 
 
 
