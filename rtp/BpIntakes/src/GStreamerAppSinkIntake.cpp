@@ -35,7 +35,7 @@ void OnPadAdded(GstElement *element, GstPad *pad, GStreamerAppSinkIntake *gStrea
         return;
     }
 
-      /* Check the new pad's type */
+    /* Check the new pad's type */
     newPadCaps = gst_pad_get_current_caps (pad);
     newPadStruct = gst_caps_get_structure (newPadCaps, 0);
     newPadType = gst_structure_get_name (newPadStruct);
@@ -85,16 +85,10 @@ void OnNewSampleFromSink(GstElement *element, GStreamerAppSinkIntake *GStreamerA
     s_wholeBundleReadyCallback(bufferToForward);
 }
 
-
-
-
-
 GStreamerAppSinkIntake::GStreamerAppSinkIntake(std::string fileToStream) : 
     m_fileToStream(fileToStream), m_running(true)
 {
-    
-    // Initialize gstreamer first
-    gst_init(NULL, NULL);
+    gst_init(NULL, NULL);     // Initialize gstreamer first
 
     CreateElements();
     BuildPipeline();
@@ -118,7 +112,6 @@ void GStreamerAppSinkIntake::OnBusMessages()
 {
     while (m_running) 
     {
-        // LOG_DEBUG(subprocess) << "Waiting for bus messages";
         GstMessage * msg = gst_bus_timed_pop(m_bus, -1);
         switch (GST_MESSAGE_TYPE (msg)) 
         {
@@ -160,13 +153,10 @@ void GStreamerAppSinkIntake::OnBusMessages()
 
 int GStreamerAppSinkIntake::CreateElements()
 {
-    // m_loop = g_main_loop_new(NULL, FALSE);
-
     m_source         =  gst_element_factory_make("filesrc", NULL);
     m_qtdemux        =  gst_element_factory_make("qtdemux", NULL);
     m_h264parse      =  gst_element_factory_make("h264parse", NULL);
     m_rtph264pay     =  gst_element_factory_make("rtph264pay", NULL);
-    // m_queue       =  gst_element_factory_make("queue", NULL);
     m_sink           =  gst_element_factory_make("appsink", NULL);
     m_progressreport =  gst_element_factory_make("progressreport", NULL);
     m_pipeline       =  gst_pipeline_new(NULL);
@@ -199,14 +189,18 @@ int GStreamerAppSinkIntake::BuildPipeline()
      * function here to link the two halves of the pipeline together when the pad is added
     */
     g_signal_connect(m_qtdemux, "pad-added", G_CALLBACK(OnPadAdded), m_h264parse);
-
+    
+    /* we use appsink in push mode, it sends us a signal when data is available
+    * and we pull out the data in the signal callback. Also, enable sync so the data is livestreamed 
+    and not all sent in a single instant */
+    g_object_set(G_OBJECT(m_sink), "emit-signals", TRUE, "sync", TRUE, NULL);
+    g_signal_connect(m_sink, "new-sample", G_CALLBACK(OnNewSampleFromSink), NULL);
+    
     /**
      * Register callback function to be notified of bus messages
     */
     m_bus = gst_element_get_bus(m_pipeline);
-    // gst_bus_add_signal_watch(m_bus);
-    // g_signal_connect(m_bus, "message", G_CALLBACK(OnBusMessages), NULL);
-
+   
     LOG_INFO(subprocess) << "Succesfully built pipeline";
 
     return 0;
@@ -219,25 +213,11 @@ int GStreamerAppSinkIntake::StartPlaying()
         LOG_ERROR(subprocess) << "Unable to set the pipeline to the playing state";
         return -1;
     }
-    
-    LOG_INFO(subprocess) << "Capture bin launched";
-
-
-    
-    /* we use appsink in push mode, it sends us a signal when data is available
-    * and we pull out the data in the signal callback. Also, enable sync so the data is livestreamed 
-    and not all sent in a single instant */
-    g_object_set(G_OBJECT(m_sink), "emit-signals", TRUE, "sync", TRUE, NULL);
-    g_signal_connect(m_sink, "new-sample", G_CALLBACK(OnNewSampleFromSink), NULL);
-    
-
-    LOG_INFO(subprocess) << "Play bin launched";   
+        
     LOG_INFO(subprocess) << "Going to set state to play";
     /* launching things */
     gst_element_set_state(m_sink, GST_STATE_PLAYING);
     gst_element_set_state(m_source, GST_STATE_PLAYING);
-
-    // g_main_loop_run(m_loop);
 
     return 0;
 }

@@ -63,7 +63,6 @@ add_executable(bpsend_stream
 	TcpPacketSink/src/TcpPacketSink.cpp
 	BpIntakes/src/GStreamerAppSinkIntake.cpp
 	BpIntakes/src/FdIntake.cpp
-	BpIntakes/src/UdpIntake.cpp
 	BpOutduct/src/GStreamerAppSrcOutduct.cpp
 	${DTN_SOURCES}
 )

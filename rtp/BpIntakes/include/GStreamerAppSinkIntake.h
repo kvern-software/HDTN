@@ -47,7 +47,6 @@ private:
     GstElement *m_qtdemux;
     GstElement *m_h264parse;
     GstElement *m_rtph264pay;
-    GstElement *m_queue;
     GstElement *m_sink;
     GstElement *m_progressreport;
 };
