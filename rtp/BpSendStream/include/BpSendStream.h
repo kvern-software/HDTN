@@ -10,7 +10,16 @@
 #include "DtnRtp.h"
 
 #include <boost/asio.hpp>
+#include <boost/process.hpp>
+
+#include <stddef.h>
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
+#include <sys/un.h>
+
 
 typedef enum {
     HDTN_APPSINK_INTAKE = 0,
@@ -127,4 +136,3 @@ private:
     uint64_t m_totalOutgoingCbOverruns = 0;
 
 };
-

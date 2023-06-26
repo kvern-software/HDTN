@@ -3,7 +3,7 @@
 config_files=$HDTN_RTP_DIR/config_files/udp/test_2_hdtn_loopback
 source_config=$config_files/mediasource_udp.json
 
-test_files=/home/$USER/nasa/dev/test_media/official_test_media
+test_files=/home/$USER/test_media/official_test_media
 filename=water_bubble_cbr21
 file=$test_files/$filename.mp4
 
