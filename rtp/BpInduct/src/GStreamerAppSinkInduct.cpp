@@ -128,7 +128,9 @@ int GStreamerAppSinkInduct::CreateElements()
     g_object_set(G_OBJECT(m_progressreport), "update-freq", 1, NULL);
     
     /* config-interval is absolutely critical, stream can not be decoded on otherside without it. -1 = with every IDR frame */
-    g_object_set(G_OBJECT(m_rtph264pay), "mtu", 1400, "config-interval", -1,  NULL); 
+    /* https://gstreamer.freedesktop.org/documentation/rtp/rtph264pay.html?gi-language=c#GstRtpH264AggregateMode */ // "aggregate-mode", 0,
+    g_object_set(G_OBJECT(m_rtph264pay), "mtu", 1400, "config-interval", -1,  NULL);
+    
     return 0;
 }
 
@@ -143,7 +145,23 @@ int GStreamerAppSinkInduct::BuildPipeline()
         return -1;
     }
 
-    if (gst_element_link_many(m_h264parse, m_rtph264pay, m_progressreport, m_appsink, NULL) != TRUE) {
+    // byte stream vs avc (h264 packetized) ---> https://stackoverflow.com/questions/6342224/what-is-the-difference-between-byte-stream-and-packetized-stream-in-gstreamer-rt
+    // avc is packetized to the maximum transmission unit
+    GstCaps * caps = gst_caps_from_string("video/x-h264, stream-format=(string)avc, alignment=(string)au"); // au = output buffer contains the NALs for a whole frame
+    // GstCaps * caps = gst_caps_from_string("video/x-h264, stream-format=(string)byte-stream, alignment=(string)nal"); // nal = output buffer contains complete NALs, but those do not need to represent a whole frame.
+    // GstCaps * caps = gst_caps_from_string("video/x-h264, stream-format=(string)byte-stream, alignment=(string)au");
+    if (gst_element_link_filtered(m_h264parse, m_rtph264pay, caps) != TRUE) {
+        LOG_ERROR(subprocess) << "Filtered h264 elements could not be linked";
+        return -1;
+    }
+
+    if (gst_element_link_many(m_rtph264pay, m_progressreport, NULL) != true) {
+        LOG_ERROR(subprocess) << "Elements could not be linked";
+        return -1;
+    }
+    gst_caps_unref(caps);
+
+    if (gst_element_link_many(m_progressreport, m_appsink, NULL) != true) {
         LOG_ERROR(subprocess) << "Elements could not be linked";
         return -1;
     }
@@ -167,6 +185,7 @@ int GStreamerAppSinkInduct::BuildPipeline()
     m_bus = gst_element_get_bus(m_pipeline);
    
     LOG_INFO(subprocess) << "Succesfully built pipeline";
+    GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) m_pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "gst_induct");
 
     return 0;
 }

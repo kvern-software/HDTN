@@ -75,9 +75,13 @@ void GStreamerAppSrcOutduct::PushData()
 
             /* Push the buffer into the appsrc */
             gst_buffer_unmap(buffer, &map);
+
+            // code crashes if we get to push_buffer too quickly (too often?). Need to find a better solution. Crashes reguardless of the method used to push_buffer
+            boost::this_thread::sleep_for(boost::chrono::microseconds(20));
             ret = gst_app_src_push_buffer((GstAppSrc *) GetAppSrc(), buffer); // takes ownership of buffer we DO NOT deref
             // g_signal_emit_by_name((GstAppSrc *) GetAppSrc(), "push-buffer", buffer, &ret); // does not take ownership of buffer you must deref
-
+            // gst_buffer_unref(buffer);
+            
             if (ret != GST_FLOW_OK) { 
                 GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) m_pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "gst_error");
                 gst_event_new_flush_stop(0);
