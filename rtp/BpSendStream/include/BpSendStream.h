@@ -5,7 +5,7 @@
 #include "UdpBundleSink.h"
 #include "StcpBundleSink.h"
 #include "TcpPacketSink.h"
-#include "GStreamerAppSinkIntake.h"
+#include "GStreamerAppSinkInduct.h"
 
 #include "DtnRtp.h"
 
@@ -20,7 +20,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-
 typedef enum {
     HDTN_APPSINK_INTAKE = 0,
     HDTN_UDP_INTAKE = 1,
@@ -34,8 +33,7 @@ class BpSendStream : public BpSourcePattern
 public:
 
     BpSendStream(uint8_t intakeType, size_t maxIncomingUdpPacketSizeBytes, uint16_t incomingRtpStreamPort, 
-            size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes, bool enableRtpConcatentation, 
-            std::string sdpFile,  uint64_t sdpInterval_ms, uint16_t numRtpPacketsPerBundle, std::string fileToStream);
+            size_t numCircularBufferVectors, size_t maxOutgoingBundleSizeBytes, uint16_t numRtpPacketsPerBundle, std::string fileToStream);
     ~BpSendStream();
 
     boost::asio::io_service m_ioService; // socket uses this to grab data from incoming rtp stream
@@ -67,7 +65,7 @@ private:
     void PushBundle();
 
     /* Gstreamer App Sink Intake */
-    std::unique_ptr<GStreamerAppSinkIntake> m_gstreamerAppSinkIntakePtr;
+    std::unique_ptr<GStreamerAppSinkInduct> m_GStreamerAppSinkInductPtr;
     /* Udp Intake*/
     std::shared_ptr<UdpBundleSink> m_bundleSinkPtr; 
 
@@ -101,9 +99,7 @@ private:
     uint64_t m_maxIncomingUdpPacketSizeBytes; // passed in via config file, should be greater than or equal to the RTP stream source maximum packet size
     uint64_t m_incomingRtpStreamPort;
     uint64_t m_maxOutgoingBundleSizeBytes;
-    uint64_t m_bpGenSequenceNumber;
 
-    bool m_enableRtpConcatentation;
     uint64_t m_rtpBytesInQueue = 0;
 
     boost::mutex m_outgoingQueueMutex;   
@@ -116,12 +112,7 @@ private:
 
     std::unique_ptr<boost::thread> m_processingThread;
     std::unique_ptr<boost::thread> m_ioServiceThreadPtr;
-    std::unique_ptr<boost::thread> m_sdpThread;
 
-    volatile bool m_sendSdp = true;
-    std::string m_sdpFileStr;
-    uint64_t m_sdpInterval_ms;
-    
     uint16_t m_numRtpPacketsPerBundle;
     
     std::string m_fileToStream;

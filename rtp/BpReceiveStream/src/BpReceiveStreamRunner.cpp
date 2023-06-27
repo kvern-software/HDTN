@@ -40,7 +40,9 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
         std::string remoteHostname;
         size_t numCircularBufferVectors;
         uint16_t maxOutgoingRtpPacketSizeBytes;
-        std::string ffmpegCommand;
+        std::string shmSocketPath;
+
+        std::string outductType;
 
         boost::program_options::options_description desc("Allowed options");
         try {
@@ -55,7 +57,8 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
                 ("outgoing-rtp-hostname",  boost::program_options::value<std::string>()->default_value("127.0.0.1"), "Remote IP to forward rtp packets to")
                 ("num-circular-buffer-vectors", boost::program_options::value<size_t>()->default_value(50), "Number of circular buffer vector elements for incoming bundles")
                 ("max-outgoing-rtp-packet-size-bytes", boost::program_options::value<uint16_t>()->default_value(1400), "Max size in bytes of the outgoing rtp packets")
-                ("ffmpeg-command", boost::program_options::value<std::string>()->default_value(""), "FFmpeg full command")
+                ("shm-socket-path", boost::program_options::value<std::string>()->default_value(GST_HDTN_OUTDUCT_SOCKET_PATH), "Location of the socket for shared memory sink to gstreamer")
+                ("outduct-type", boost::program_options::value<std::string>()->default_value("udp"), "Outduct type to offboard RTP stream")
                 ;
 
             boost::program_options::variables_map vm;
@@ -109,7 +112,8 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
             remoteHostname                = vm["outgoing-rtp-hostname"].as<std::string>();
             numCircularBufferVectors      = vm["num-circular-buffer-vectors"].as<size_t>();
             maxOutgoingRtpPacketSizeBytes = vm["max-outgoing-rtp-packet-size-bytes"].as<uint16_t>();
-            ffmpegCommand = vm["ffmpeg-command"].as<std::string>();
+            shmSocketPath                 = vm["shm-socket-path"].as<std::string>();
+            outductType                   = vm["outduct-type"].as<std::string>();
         }
         catch (boost::bad_any_cast & e) {
             LOG_ERROR(subprocess) << "invalid data error: " << e.what() << "\n";
@@ -125,9 +129,30 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
             return false;
         }
 
+        uint8_t outductTypeInt = UDP_OUTDUCT; // default
+
+        if (strcmp(outductType.c_str(), "appsrc") == 0) {
+            outductTypeInt = GSTREAMER_APPSRC_OUTDUCT;
+            LOG_INFO(subprocess) << "Using GStreamer appsrc outduct with path " << shmSocketPath;
+        } else if (strcmp(outductType.c_str(), "udp") == 0) {
+            outductTypeInt = UDP_OUTDUCT;
+            LOG_INFO(subprocess) << "Using UDP outduct";
+        } else {
+            LOG_ERROR(subprocess) << "Unrecognized outduct type. Aborting!";
+            return false;
+        }
+
+        /* Set out parameters for bpRecvStream object */
+        bp_recv_stream_params_t bpRecvStreamParams;
+        bpRecvStreamParams.rtpDestHostname = remoteHostname;
+        bpRecvStreamParams.rtpDestPort = remotePort;
+        bpRecvStreamParams.maxOutgoingRtpPacketSizeBytes = maxOutgoingRtpPacketSizeBytes;
+        bpRecvStreamParams.shmSocketPath = shmSocketPath;
+        bpRecvStreamParams.outductType = outductTypeInt;
 
         LOG_INFO(subprocess) << "starting..";
-        BpReceiveStream BpReceiveStream(numCircularBufferVectors, remoteHostname, remotePort, maxOutgoingRtpPacketSizeBytes, ffmpegCommand, 1, "test.mp4");
+
+        BpReceiveStream BpReceiveStream(numCircularBufferVectors, bpRecvStreamParams);
         BpReceiveStream.Init(inductsConfigPtr, outductsConfigPtr, isAcsAware, myEid, 0, maxBundleSizeBytes);
 
 

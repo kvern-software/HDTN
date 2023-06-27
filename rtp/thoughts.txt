@@ -1,2 +1,0 @@
-- ltp struggles with FFmpeg RTP because the occasional retransmission puts RTP packets out of order.
-    -    This problem will be magnified greatly when any appreciable delay is introduced 

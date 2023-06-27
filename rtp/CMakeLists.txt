@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.12)  # CMake version check
 project(dtn_rtp_streaming)          
 set(CMAKE_CXX_STANDARD 11)   
 set(CMAKE_VERBOSE_MAKEFILE FALSE)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wformat -std=c++2a  -g -O3 -Werror") 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall -Wformat -std=c++2a  -g -O3 ")  #-Werror
 set(CMAKE_BUILD_TYPE Release)
 
 set(MIN_BOOST_VERSION 1.66.0)
@@ -61,8 +61,8 @@ add_executable(bpsend_stream
 	BpSendStream/src/BpSendStreamMain.cpp
 	BpSendStream/src/BpSendStreamRunner.cpp
 	TcpPacketSink/src/TcpPacketSink.cpp
-	BpIntakes/src/GStreamerAppSinkIntake.cpp
-	BpIntakes/src/FdIntake.cpp
+	BpInduct/src/GStreamerAppSinkInduct.cpp
+	BpInduct/src/FdIntake.cpp
 	BpOutduct/src/GStreamerAppSrcOutduct.cpp
 	${DTN_SOURCES}
 )
@@ -70,7 +70,7 @@ target_include_directories(bpsend_stream PUBLIC
 		BpSendStream/include 
 		src/dtn/include
 		TcpPacketSink/include
-		BpIntakes/include
+		BpInduct/include
 		BpOutduct/include
 )
 
