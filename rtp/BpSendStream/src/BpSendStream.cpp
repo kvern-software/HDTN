@@ -306,7 +306,7 @@ bool BpSendStream::CopyPayload_Step2(uint8_t * destinationBuffer)
     m_outgoingCircularBundleQueue.pop_front(); 
     m_outgoingQueueMutex.unlock();
     m_outgoingQueueCv.notify_one();
-    // m_totalRtpPacketsSent++; 
+    m_totalRtpPacketsSent++; 
 
     return true;
 }

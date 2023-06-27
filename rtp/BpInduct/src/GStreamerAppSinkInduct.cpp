@@ -104,8 +104,7 @@ GStreamerAppSinkInduct::~GStreamerAppSinkInduct()
     LOG_INFO(subprocess) << "Calling GStreamerAppSinkInduct deconstructor";   
     m_running = false;
     m_busMonitoringThread->join();
-    gst_element_set_state(m_filesrc, GST_STATE_NULL);
-    gst_element_set_state(m_appsink, GST_STATE_NULL);
+    gst_element_set_state(m_pipeline, GST_STATE_NULL);
 }
 
 
@@ -127,7 +126,9 @@ int GStreamerAppSinkInduct::CreateElements()
 
     g_object_set(G_OBJECT(m_filesrc), "location", m_fileToStream.c_str(), NULL);
     g_object_set(G_OBJECT(m_progressreport), "update-freq", 1, NULL);
-
+    
+    /* config-interval is absolutely critical, stream can not be decoded on otherside without it. -1 = with every IDR frame */
+    g_object_set(G_OBJECT(m_rtph264pay), "mtu", 1400, "config-interval", -1,  NULL); 
     return 0;
 }
 
@@ -193,7 +194,10 @@ void GStreamerAppSinkInduct::OnBusMessages()
 {
     while (m_running) 
     {
-        GstMessage * msg = gst_bus_timed_pop(m_bus, -1);
+        GstMessage * msg = gst_bus_timed_pop(m_bus, GST_MSECOND * 100);
+        if (!msg) 
+            continue;
+
         switch (GST_MESSAGE_TYPE (msg)) 
         {
             case GST_MESSAGE_ERROR: 

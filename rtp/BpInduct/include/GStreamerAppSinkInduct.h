@@ -34,7 +34,7 @@ private:
     int BuildPipeline();
     int StartPlaying();
 
-    bool m_running;
+    volatile bool m_running;
 
     // members
     GstBus *m_bus;

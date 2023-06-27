@@ -17,6 +17,9 @@
 
 #define GST_HDTN_OUTDUCT_SOCKET_PATH "/tmp/hdtn_gst_shm_outduct"
 
+#define MAX_NUM_BUFFERS_QUEUE2 (10000)
+#define MAX_SIZE_BYTES_QUEUE2 (0) // 0 = disable
+#define MAX_SIZE_TIME_QUEUE2 (0) // 0 = disable
 typedef boost::function<void(padded_vector_uint8_t & wholeBundleVec)> WholeBundleReadyCallback_t;
 void SetCallbackFunction(const WholeBundleReadyCallback_t& wholeBundleReadyCallback);
 
@@ -40,7 +43,7 @@ public:
     boost::mutex m_incomingQueueMutex;     
     boost::condition_variable m_incomingQueueCv;
 
-    uint64_t m_numSamples = 1;
+    uint64_t m_numSamples = 0;
 
 private:
     bool GetNextIncomingPacketTimeout(const boost::posix_time::time_duration &timeout);
@@ -50,7 +53,7 @@ private:
     std::unique_ptr<boost::thread> m_busMonitoringThread;
 
     std::string m_shmSocketPath;
-    bool m_running;
+    volatile bool m_running;
     void OnBusMessages();
     void PushData();
 
@@ -63,7 +66,6 @@ private:
     int CreateElements();
     int BuildPipeline();
     int StartPlaying();
-    GstFlowReturn PushDataCallback(GstElement *sink);
     
     GstElement *m_capsfilter;
 
@@ -104,3 +106,7 @@ void SetGStreamerAppSrcOutductInstance(GStreamerAppSrcOutduct * gStreamerAppSrcO
 // Use sync=false if:
     // You are using a live source
     // The pipeline is being post-processed, e.g. neural net
+
+//     alignment=au means that each output buffer contains the NALs for a whole
+// picture. alignment=nal just means that each output buffer contains
+// complete NALs, but those do not need to represent a whole frame.
