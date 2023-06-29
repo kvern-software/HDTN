@@ -5,8 +5,8 @@ config_files=$HDTN_RTP_DIR/config_files/stcp/test_2_hdtn_loopback
 source_config=$config_files/mediasource_stcp.json
 
 test_files=/home/$USER/test_media/official_test_media
-filename=lucia_cbr21
-# filename=lucia_crf18
+# filename=lucia_cbr21
+filename=lucia_crf18
 file=$test_files/$filename.mp4
 
 incoming_rtp_port=29999

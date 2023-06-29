@@ -17,6 +17,27 @@ void SetGStreamerAppSrcOutductInstance(GStreamerAppSrcOutduct * gStreamerAppSrcO
     s_gStreamerAppSrcOutduct = gStreamerAppSrcOutduct;
 }
 
+
+static void pad_added_handler (GstElement *src, GstPad *new_pad, GStreamerAppSrcOutduct *data) {
+    GstPad *sink_pad = gst_element_get_static_pad (s_gStreamerAppSrcOutduct->GetShmSink(), "sink");
+    GstPadLinkReturn ret;
+    GstCaps *new_pad_caps = NULL;
+    GstStructure *new_pad_struct = NULL;
+    const gchar *new_pad_type = NULL;
+
+    g_print ("Received new pad '%s' from '%s':\n", GST_PAD_NAME (new_pad), GST_ELEMENT_NAME (src));
+
+    /* If our converter is already linked, we have nothing to do here */
+    if (gst_pad_is_linked (sink_pad)) {
+        g_print ("We are already linked. Ignoring.\n");
+    } else {
+        if (gst_pad_link(new_pad, sink_pad) != GST_PAD_LINK_OK) {
+            g_print("err linking");
+        }
+        GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) s_gStreamerAppSrcOutduct->GetPipeline(), GST_DEBUG_GRAPH_SHOW_ALL, "gst_finished_linking");
+    }
+}
+
 /* This signal callback triggers when appsrc needs data. Here, we add an idle handler
  * to the mainloop to start pushing data into the appsrc */
 static void StartFeed(GstElement *source, guint size, GStreamerAppSrcOutduct *gStreamerAppSrcOutduct)
@@ -26,7 +47,7 @@ static void StartFeed(GstElement *source, guint size, GStreamerAppSrcOutduct *gS
         // g_sourceid = g_idle_add ((GSourceFunc) PushData, NULL);
     // }
     // LOG_DEBUG(subprocess) << "StartFeed";
-    blocked = false;
+    // blocked = false;
 }
 
 static void StopFeed(GstElement *source, GStreamerAppSrcOutduct *gStreamerAppSrcOutduct)
@@ -36,8 +57,8 @@ static void StopFeed(GstElement *source, GStreamerAppSrcOutduct *gStreamerAppSrc
         // g_source_remove (g_sourceid);
         // g_sourceid = 0;
     // }
-    LOG_WARNING(subprocess) << "StopFeed";
-    blocked = true;
+    // LOG_INFO(subprocess) << "StopFeed";
+    // blocked = true;
 }
 
 void GStreamerAppSrcOutduct::PushData()
@@ -49,8 +70,7 @@ void GStreamerAppSrcOutduct::PushData()
     static const boost::posix_time::time_duration timeout(boost::posix_time::milliseconds(250));
     static GstClockTime duration = 33333333; //.0333 seconds
 
-    while (m_running) 
-    {
+    while (m_running) {
         bool notInWaitForNewBundlesState = TryWaitForIncomingDataAvailable(timeout);
         if (notInWaitForNewBundlesState) {
             m_incomingQueueMutex.lock();
@@ -58,13 +78,10 @@ void GStreamerAppSrcOutduct::PushData()
             m_incomingRtpPacketQueue.pop_front();
             m_incomingQueueMutex.unlock();
 
-            // rtp_frame * frame = (rtp_frame *) incomingRtpFrame.data();
-            // frame->print_header();
-            
             /* Create a new empty buffer */
             buffer = gst_buffer_new_and_alloc(incomingRtpFrame.size());
 
-            // copy in from our local queue
+            /* copy in from our local queue */
             gst_buffer_map(buffer, &map, GST_MAP_WRITE);
             memcpy(map.data, incomingRtpFrame.data(), incomingRtpFrame.size());
          
@@ -72,32 +89,36 @@ void GStreamerAppSrcOutduct::PushData()
             GST_BUFFER_PTS(buffer) = gst_util_uint64_scale(m_numSamples, GST_SECOND, SAMPLE_RATE);
             GST_BUFFER_DURATION(buffer) = duration;
 
-
             /* Push the buffer into the appsrc */
             gst_buffer_unmap(buffer, &map);
 
             // code crashes if we get to push_buffer too quickly (too often?). Need to find a better solution. Crashes reguardless of the method used to push_buffer
-            boost::this_thread::sleep_for(boost::chrono::microseconds(20));
-            ret = gst_app_src_push_buffer((GstAppSrc *) GetAppSrc(), buffer); // takes ownership of buffer we DO NOT deref
-            // g_signal_emit_by_name((GstAppSrc *) GetAppSrc(), "push-buffer", buffer, &ret); // does not take ownership of buffer you must deref
-            // gst_buffer_unref(buffer);
-            
+            // boost::this_thread::sleep_for(boost::chrono::microseconds(50));
+            ret = gst_app_src_push_buffer((GstAppSrc *) m_appsrc, buffer); // takes ownership of buffer we DO NOT deref
+
             if (ret != GST_FLOW_OK) { 
                 GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) m_pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "gst_error");
-                gst_event_new_flush_stop(0);
                 /* We got some error */
                 std::cout << "WARNING: could not push data into app src. Err code: " << ret << std::endl;
                 continue;
-                // return;
             } 
             m_numSamples += 1;
 
         }   
 
-        // guint buffers_in_queue;
-        // g_object_get(G_OBJECT(m_shmQueue), "current-level-buffers", &buffers_in_queue, NULL);
-        // std::cout << "buffers_in_queue: " << buffers_in_queue << std::endl;
+        static guint buffers_in_queue;
+        static guint buffers_in_appsrc_queue;
+
+        g_object_get(G_OBJECT(m_appsrc), "current-level-buffers", &buffers_in_appsrc_queue, NULL);
+        g_object_get(G_OBJECT(m_shmQueue), "current-level-buffers", &buffers_in_queue, NULL);
+
+        // if ((m_numSamples % 5) == 0) {
+        //     printf("buffers_in_queue:%u\n", buffers_in_queue);
+        //     printf("buffers_in_appsrc_queue:%u\n", buffers_in_appsrc_queue);
+        // }
     }
+
+    LOG_INFO(subprocess) << "Exiting PushData processing thread";
 
     return; // get here only when shutting down
 }
@@ -110,7 +131,6 @@ GStreamerAppSrcOutduct::GStreamerAppSrcOutduct(std::string shmSocketPath) : m_sh
     
     gst_init(NULL, NULL); // Initialize gstreamer first
 
-    m_processingThread = boost::make_unique<boost::thread>(boost::bind(&GStreamerAppSrcOutduct::PushData, this)); 
 
     LOG_INFO(subprocess) << "Creating GStreamer appsrc pipeline. ShmSocketPath=" << m_shmSocketPath;
     CreateElements();
@@ -120,6 +140,8 @@ GStreamerAppSrcOutduct::GStreamerAppSrcOutduct(std::string shmSocketPath) : m_sh
         boost::bind(&GStreamerAppSrcOutduct::OnBusMessages, this)); 
 
     StartPlaying();
+    
+    m_processingThread = boost::make_unique<boost::thread>(boost::bind(&GStreamerAppSrcOutduct::PushData, this)); 
 }
 
 GStreamerAppSrcOutduct::~GStreamerAppSrcOutduct()
@@ -128,8 +150,6 @@ GStreamerAppSrcOutduct::~GStreamerAppSrcOutduct()
     LOG_INFO(subprocess) << "GStreamerAppSrcOutduct::m_totalIncomingCbOverruns: " << m_totalIncomingCbOverruns;
     LOG_INFO(subprocess) << "GStreamerAppSrcOutduct::m_numSamples " << m_numSamples;
     
-    gst_element_send_event(m_appsrc, gst_event_new_eos());
-    gst_app_src_end_of_stream((GstAppSrc *) m_appsrc);
     gst_element_set_state(m_pipeline, GST_STATE_NULL);
     m_running = false;
     m_busMonitoringThread->join();
@@ -145,18 +165,13 @@ int GStreamerAppSrcOutduct::CreateElements()
     m_h264parse = gst_element_factory_make("h264parse", NULL);
     m_tee = gst_element_factory_make("tee", NULL);
     
-    m_shmQueue = gst_element_factory_make("queue2", NULL);
+    m_shmQueue = gst_element_factory_make("queue", NULL);
     m_displayQueue = gst_element_factory_make("queue", NULL);
     
     m_shmsink = gst_element_factory_make("shmsink", NULL);
     
     m_decodebin = gst_element_factory_make("decodebin", NULL);
     m_videoconvert = gst_element_factory_make("videoconvert", NULL);
-    m_autovideosink = gst_element_factory_make("glimagesink", NULL);
-
-    // m_fakesink = gst_element_factory_make("fakesink", NULL);
-    // m_appsink = gst_element_factory_make("appsink", NULL);
-    // m_identity = gst_element_factory_make("identity", NULL);
 
     m_pipeline   =  gst_pipeline_new(NULL);
 
@@ -167,26 +182,22 @@ int GStreamerAppSrcOutduct::CreateElements()
         return -1;
     }
    
-    g_object_set(G_OBJECT(m_shmQueue), "max-size-buffers", MAX_NUM_BUFFERS_QUEUE2, "max-size-bytes", MAX_SIZE_BYTES_QUEUE2, "max-size-time", MAX_SIZE_TIME_QUEUE2, "use-buffering", true, NULL );
-    g_object_set(G_OBJECT(m_shmsink), "socket-path", m_shmSocketPath.c_str(), "wait-for-connection", false, "sync", false, "async", false, NULL);
-    // g_object_set(G_OBJECT(m_fakesink), "async", false, "sync", false, "dump", true, NULL);
-    // g_object_set(G_OBJECT(m_autovideosink), "async-handling", true, NULL);
+    g_object_set(G_OBJECT(m_shmQueue), "max-size-buffers", MAX_NUM_BUFFERS_QUEUE2, "max-size-bytes", MAX_SIZE_BYTES_QUEUE2, "max-size-time", MAX_SIZE_TIME_QUEUE2, NULL );
+    g_object_set(G_OBJECT(m_shmsink), "socket-path", m_shmSocketPath.c_str(), "wait-for-connection", false, "sync", false, "async", false, "shm-size", SHMSINK_SIZE, NULL);
+    g_object_set(G_OBJECT(m_fakesink), "async", false, "sync", false, "dump", false, NULL);
 
     /* set caps on the src element */
     GstCaps * caps = gst_caps_from_string("application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96");
-    g_object_set(G_OBJECT(m_appsrc), "min-latency", 20000000, "is-live", true, "do-timestamp", true, "max-bytes", 20000000, "caps", caps, "format", GST_FORMAT_TIME, "block", true, NULL);
-    // g_object_set (G_OBJECT(m_appsink), "async", false, "sync", false, "emit-signals", true, "caps", caps, NULL);
+    g_object_set(G_OBJECT(m_appsrc), "emit-signals", true, "min-latency", 20000000, "is-live", true, "do-timestamp", true, "max-bytes", 20000000, "caps", caps, "format", GST_FORMAT_TIME, "block", true, NULL);
     gst_caps_unref(caps);
 
     // connect signals to our app
     g_signal_connect (m_appsrc, "need-data", G_CALLBACK (StartFeed), &g_sourceid);
     g_signal_connect (m_appsrc, "enough-data", G_CALLBACK (StopFeed), &g_sourceid);
-    // g_signal_connect(m_appsink, "new-sample", G_CALLBACK (NewSample), 0);
+    g_signal_connect (m_decodebin, "pad-added", G_CALLBACK (pad_added_handler), m_shmsink);
 
     /* Register callback function to be notified of bus messages */
     m_bus = gst_element_get_bus(m_pipeline);
-
-
 
     return 0;
 }
@@ -196,22 +207,27 @@ int GStreamerAppSrcOutduct::BuildPipeline()
 {
     LOG_INFO(subprocess) << "Building Pipeline";
     
-    gst_bin_add_many(GST_BIN(m_pipeline), m_appsrc, m_shmQueue, m_shmsink, NULL); // m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_tee, m_shmQueue, m_decodebin, m_videoconvert, m_autovideosink,  m_displayQueue
+    gst_bin_add_many(GST_BIN(m_pipeline), m_appsrc, m_shmQueue,  m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_decodebin, m_videoconvert, m_shmsink, NULL); // m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_tee, m_shmQueue, m_decodebin, m_videoconvert, m_autovideosink,  m_displayQueue
     
-    if (gst_element_link_many(m_appsrc, m_shmQueue, m_shmsink, NULL) != true) {
-        LOG_ERROR(subprocess) << "Elements could not be linked";
+    if (gst_element_link_many(m_appsrc, m_shmQueue, NULL) != true) {
+        LOG_ERROR(subprocess) << "Appsrc and queue could not be linked";
         return -1;
     }
 
-    // if (gst_element_link_many(m_appsrc, m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_tee, NULL) != true) {
-    //     LOG_ERROR(subprocess) << "Elements could not be linked to tee";
-    //     return -1;
-    // }
+    if (gst_element_link_many(m_shmQueue, m_rtpjitterbuffer, m_rtph264depay, m_h264parse, NULL) != true) {
+        LOG_ERROR(subprocess) << "Queue and rtp pipeline could not be linked";
+        return -1;
+    }
 
-    // if (gst_element_link_many(m_tee, m_shmQueue, m_shmsink, NULL) !=  true) {
-    //     LOG_ERROR(subprocess) << "Could not link elements to shmsink";
-    //     return -1;
-    // }
+    if (gst_element_link_many(m_h264parse, m_decodebin, NULL) !=  true) {
+        LOG_ERROR(subprocess) << "Could not link elements to shmsink";
+        return -1;
+    }
+
+    if (gst_element_link_many(m_decodebin, m_shmsink, NULL) != true) {
+        LOG_ERROR(subprocess) << "Could not decodebin to sink";
+        return -1;
+    }
 
     // if (gst_element_link_many(m_tee, m_displayQueue, m_decodebin, NULL) != true) {
     //     LOG_ERROR(subprocess) << "Could not link elements to display";
@@ -256,6 +272,7 @@ int GStreamerAppSrcOutduct::StartPlaying()
 
 void GStreamerAppSrcOutduct::OnBusMessages()
 {
+    return;
     while (m_running) 
     {
         // LOG_DEBUG(subprocess) << "Waiting for bus messages";
@@ -352,21 +369,12 @@ GstElement * GStreamerAppSrcOutduct::GetPipeline()
     return m_pipeline;
 }
 
+GstElement *GStreamerAppSrcOutduct::GetShmSink()
+{
+    return m_shmsink;
+}
 
-// static void cb_new_pad (GstElement *element, GstPad *pad, gpointer data)
-// {
-// g_print("CALLBACK NEW PAD\n\n\n\n\n");
-//   gchar *name;
-//   GstElement *other = (GstElement *) data;
-//   name = gst_pad_get_name (pad);
-//   g_print ("A new pad %s was created for %s\n", name, gst_element_get_name(element));
-//   g_free (name);
-// 
-//   g_print ("element %s will be linked to %s\n",
-        //    gst_element_get_name(element),
-        //    gst_element_get_name(other));
-//   gst_element_link(element, other);
-// 
-    // GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) s_gStreamerAppSrcOutduct->GetPipeline(), GST_DEBUG_GRAPH_SHOW_ALL, "gst_linked");
-// 
-// }
+GstElement * GStreamerAppSrcOutduct::GetVideoConv()
+{
+    return m_videoconvert;
+}

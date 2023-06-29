@@ -20,6 +20,8 @@
 #define MAX_NUM_BUFFERS_QUEUE2 (10000)
 #define MAX_SIZE_BYTES_QUEUE2 (0) // 0 = disable
 #define MAX_SIZE_TIME_QUEUE2 (0) // 0 = disable
+#define SHMSINK_SIZE (4294967295) // bytes
+
 typedef boost::function<void(padded_vector_uint8_t & wholeBundleVec)> WholeBundleReadyCallback_t;
 void SetCallbackFunction(const WholeBundleReadyCallback_t& wholeBundleReadyCallback);
 
@@ -35,6 +37,8 @@ public:
     // Getters
     GstElement * GetAppSrc();
     GstElement * GetPipeline();
+    GstElement * GetShmSink();
+    GstElement * GetVideoConv();
     
     // <private> 
     bool TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration& timeout);
