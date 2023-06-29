@@ -171,20 +171,17 @@ int GStreamerAppSrcOutduct::CreateElements()
     m_shmsink = gst_element_factory_make("shmsink", NULL);
     
     m_decodebin = gst_element_factory_make("decodebin", NULL);
-    m_videoconvert = gst_element_factory_make("videoconvert", NULL);
 
     m_pipeline   =  gst_pipeline_new(NULL);
 
     if (!m_appsrc || !m_rtpjitterbuffer || !m_rtph264depay || !m_h264parse \
-        || !m_tee || !m_shmQueue || !m_displayQueue || !m_shmsink|| !m_decodebin \
-        || !m_videoconvert || !m_autovideosink) {
+        || !m_tee || !m_shmQueue || !m_displayQueue || !m_shmsink|| !m_decodebin) {
         LOG_ERROR(subprocess) << "Could not create all elements";
         return -1;
     }
    
     g_object_set(G_OBJECT(m_shmQueue), "max-size-buffers", MAX_NUM_BUFFERS_QUEUE2, "max-size-bytes", MAX_SIZE_BYTES_QUEUE2, "max-size-time", MAX_SIZE_TIME_QUEUE2, NULL );
     g_object_set(G_OBJECT(m_shmsink), "socket-path", m_shmSocketPath.c_str(), "wait-for-connection", false, "sync", false, "async", false, "shm-size", SHMSINK_SIZE, NULL);
-    g_object_set(G_OBJECT(m_fakesink), "async", false, "sync", false, "dump", false, NULL);
 
     /* set caps on the src element */
     GstCaps * caps = gst_caps_from_string("application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96");
@@ -207,8 +204,8 @@ int GStreamerAppSrcOutduct::BuildPipeline()
 {
     LOG_INFO(subprocess) << "Building Pipeline";
     
-    gst_bin_add_many(GST_BIN(m_pipeline), m_appsrc, m_shmQueue,  m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_decodebin, m_videoconvert, m_shmsink, NULL); // m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_tee, m_shmQueue, m_decodebin, m_videoconvert, m_autovideosink,  m_displayQueue
-    
+    gst_bin_add_many(GST_BIN(m_pipeline), m_appsrc, m_shmQueue,  m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_decodebin, m_shmsink, NULL);
+
     if (gst_element_link_many(m_appsrc, m_shmQueue, NULL) != true) {
         LOG_ERROR(subprocess) << "Appsrc and queue could not be linked";
         return -1;
@@ -224,10 +221,10 @@ int GStreamerAppSrcOutduct::BuildPipeline()
         return -1;
     }
 
-    if (gst_element_link_many(m_decodebin, m_shmsink, NULL) != true) {
-        LOG_ERROR(subprocess) << "Could not decodebin to sink";
-        return -1;
-    }
+    // if (gst_element_link_many(m_decodebin, m_shmsink, NULL) != true) {
+    //     LOG_ERROR(subprocess) << "Could not decodebin to sink";
+    //     return -1;
+    // }
 
     // if (gst_element_link_many(m_tee, m_displayQueue, m_decodebin, NULL) != true) {
     //     LOG_ERROR(subprocess) << "Could not link elements to display";
