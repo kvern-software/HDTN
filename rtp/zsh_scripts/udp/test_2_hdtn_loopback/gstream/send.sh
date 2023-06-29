@@ -7,6 +7,7 @@ source_config=$config_files/mediasource_stcp.json
 test_files=/home/$USER/test_media/official_test_media
 # filename=lucia_cbr21
 filename=lucia_crf18
+# filename=water_bubble_crf18
 file=$test_files/$filename.mp4
 
 incoming_rtp_port=29999

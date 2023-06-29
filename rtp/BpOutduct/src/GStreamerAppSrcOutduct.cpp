@@ -18,23 +18,34 @@ void SetGStreamerAppSrcOutductInstance(GStreamerAppSrcOutduct * gStreamerAppSrcO
 }
 
 
-static void pad_added_handler (GstElement *src, GstPad *new_pad, GStreamerAppSrcOutduct *data) {
+static void DecodeBinPadAddedHandler (GstElement *src, GstPad *new_pad, GStreamerAppSrcOutduct *data) {
     GstPad *sink_pad = gst_element_get_static_pad (s_gStreamerAppSrcOutduct->GetShmSink(), "sink");
-    GstPadLinkReturn ret;
-    GstCaps *new_pad_caps = NULL;
-    GstStructure *new_pad_struct = NULL;
-    const gchar *new_pad_type = NULL;
-
-    g_print ("Received new pad '%s' from '%s':\n", GST_PAD_NAME (new_pad), GST_ELEMENT_NAME (src));
-
+    
+    g_print("Received new pad '%s' from '%s':\n", GST_PAD_NAME (new_pad), GST_ELEMENT_NAME (src));
     /* If our converter is already linked, we have nothing to do here */
     if (gst_pad_is_linked (sink_pad)) {
-        g_print ("We are already linked. Ignoring.\n");
+        g_print("We are already linked. Ignoring.\n");
     } else {
         if (gst_pad_link(new_pad, sink_pad) != GST_PAD_LINK_OK) {
             g_print("err linking");
         }
-        GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) s_gStreamerAppSrcOutduct->GetPipeline(), GST_DEBUG_GRAPH_SHOW_ALL, "gst_finished_linking");
+        LOG_INFO(subprocess) << "Linked to shmsink";
+        GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) s_gStreamerAppSrcOutduct->GetPipeline(), GST_DEBUG_GRAPH_SHOW_ALL, "gst_finished_linking_decodebin");
+    }
+}
+
+static void H264ParsePadAddedHandler (GstElement *src, GstPad *new_pad, GStreamerAppSrcOutduct *data) {
+    GstPad *sink_pad = gst_element_get_static_pad (s_gStreamerAppSrcOutduct->GetMp4Mux(), "sink");
+    
+    g_print("Received new pad '%s' from '%s':\n", GST_PAD_NAME (new_pad), GST_ELEMENT_NAME (src));
+    /* If our converter is already linked, we have nothing to do here */
+    if (gst_pad_is_linked (sink_pad)) {
+        g_print("We are already linked. Ignoring.\n");
+    } else {
+        if (gst_pad_link(new_pad, sink_pad) != GST_PAD_LINK_OK) {
+            g_print("err linking");
+        }
+        GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) s_gStreamerAppSrcOutduct->GetPipeline(), GST_DEBUG_GRAPH_SHOW_ALL, "gst_finished_linking_filesink");
     }
 }
 
@@ -110,12 +121,12 @@ void GStreamerAppSrcOutduct::PushData()
         static guint buffers_in_appsrc_queue;
 
         g_object_get(G_OBJECT(m_appsrc), "current-level-buffers", &buffers_in_appsrc_queue, NULL);
-        g_object_get(G_OBJECT(m_shmQueue), "current-level-buffers", &buffers_in_queue, NULL);
+        g_object_get(G_OBJECT(m_recordQueue), "current-level-buffers", &buffers_in_queue, NULL);
 
-        // if ((m_numSamples % 5) == 0) {
-        //     printf("buffers_in_queue:%u\n", buffers_in_queue);
-        //     printf("buffers_in_appsrc_queue:%u\n", buffers_in_appsrc_queue);
-        // }
+        if ((m_numSamples % 5) == 0) {
+            printf("buffers_in_queue:%u\n", buffers_in_queue);
+            printf("buffers_in_appsrc_queue:%u\n", buffers_in_appsrc_queue);
+        }
     }
 
     LOG_INFO(subprocess) << "Exiting PushData processing thread";
@@ -127,21 +138,23 @@ void GStreamerAppSrcOutduct::PushData()
 
 GStreamerAppSrcOutduct::GStreamerAppSrcOutduct(std::string shmSocketPath) : m_shmSocketPath(shmSocketPath), m_running(true)
 {
+    int ret;
+
     m_incomingRtpPacketQueue.set_capacity(DEFAULT_NUM_CIRC_BUFFERS);
     
-    gst_init(NULL, NULL); // Initialize gstreamer first
-
+    /* Initialize gstreamer first */
+    gst_init(NULL, NULL); 
 
     LOG_INFO(subprocess) << "Creating GStreamer appsrc pipeline. ShmSocketPath=" << m_shmSocketPath;
-    CreateElements();
-    BuildPipeline();
+    if ((CreateElements() == 0) && (BuildPipeline() == 0)) {
+        m_busMonitoringThread = boost::make_unique<boost::thread>(
+            boost::bind(&GStreamerAppSrcOutduct::OnBusMessages, this)); 
+        StartPlaying();
+        m_processingThread = boost::make_unique<boost::thread>(boost::bind(&GStreamerAppSrcOutduct::PushData, this)); 
+    } else {
+        LOG_ERROR(subprocess) << "Could not initialize GStreamerAppSrcOutduct";
+    }
 
-    m_busMonitoringThread = boost::make_unique<boost::thread>(
-        boost::bind(&GStreamerAppSrcOutduct::OnBusMessages, this)); 
-
-    StartPlaying();
-    
-    m_processingThread = boost::make_unique<boost::thread>(boost::bind(&GStreamerAppSrcOutduct::PushData, this)); 
 }
 
 GStreamerAppSrcOutduct::~GStreamerAppSrcOutduct()
@@ -156,47 +169,75 @@ GStreamerAppSrcOutduct::~GStreamerAppSrcOutduct()
     m_processingThread->join();
 }
 
+int GStreamerAppSrcOutduct::CheckInitializationSuccess()
+{
+    if (!m_appsrc || !m_queue || !m_tee ) {
+        LOG_ERROR(subprocess) << "Could not create head of pipeline";
+        return -1;
+    } 
+
+    if (!m_displayQueue || !m_rtpjitterbuffer || !m_rtph264depay || !m_h264parse || !m_decodebin || !m_shmsink) {
+        LOG_ERROR(subprocess) << "Could not create display portion of pipeline";
+        return -1;
+    }
+    
+    if (!m_recordQueue || !m_record_rtpjitterbuffer || !m_record_rtph264depay || !m_record_h264parse || !m_record_mp4mux || !m_filesink) {
+        LOG_ERROR(subprocess) << "Could not create recording portion of pipeline";
+        return -1;
+    } 
+
+    return 0;
+}
 
 int GStreamerAppSrcOutduct::CreateElements()
 {
+    // head
     m_appsrc = gst_element_factory_make("appsrc", NULL);
+    m_queue = gst_element_factory_make("queue", NULL);
+    m_tee = gst_element_factory_make("tee", NULL);
+    
+    // display branch
+    m_displayQueue = gst_element_factory_make("queue", NULL);
     m_rtpjitterbuffer = gst_element_factory_make("rtpjitterbuffer", NULL);
     m_rtph264depay = gst_element_factory_make("rtph264depay", NULL);
     m_h264parse = gst_element_factory_make("h264parse", NULL);
-    m_tee = gst_element_factory_make("tee", NULL);
-    
-    m_shmQueue = gst_element_factory_make("queue", NULL);
-    m_displayQueue = gst_element_factory_make("queue", NULL);
-    
+    m_decodebin = gst_element_factory_make("decodebin", NULL);
     m_shmsink = gst_element_factory_make("shmsink", NULL);
     
-    m_decodebin = gst_element_factory_make("decodebin", NULL);
-    m_videoconvert = gst_element_factory_make("videoconvert", NULL);
+    // record branch
+    m_recordQueue = gst_element_factory_make("queue", NULL);
+    m_record_rtpjitterbuffer  = gst_element_factory_make("rtpjitterbuffer", NULL);
+    m_record_rtph264depay = gst_element_factory_make("rtph264depay", NULL);
+    m_record_h264parse = gst_element_factory_make("h264parse", NULL);
+    m_record_mp4mux = gst_element_factory_make("mp4mux", NULL);
+    m_filesink = gst_element_factory_make("filesink", NULL);
 
     m_pipeline   =  gst_pipeline_new(NULL);
 
-    if (!m_appsrc || !m_rtpjitterbuffer || !m_rtph264depay || !m_h264parse \
-        || !m_tee || !m_shmQueue || !m_displayQueue || !m_shmsink|| !m_decodebin \
-        || !m_videoconvert || !m_autovideosink) {
-        LOG_ERROR(subprocess) << "Could not create all elements";
-        return -1;
-    }
-   
-    g_object_set(G_OBJECT(m_shmQueue), "max-size-buffers", MAX_NUM_BUFFERS_QUEUE2, "max-size-bytes", MAX_SIZE_BYTES_QUEUE2, "max-size-time", MAX_SIZE_TIME_QUEUE2, NULL );
-    g_object_set(G_OBJECT(m_shmsink), "socket-path", m_shmSocketPath.c_str(), "wait-for-connection", false, "sync", false, "async", false, "shm-size", SHMSINK_SIZE, NULL);
-    g_object_set(G_OBJECT(m_fakesink), "async", false, "sync", false, "dump", false, NULL);
+    if (CheckInitializationSuccess() != 0) {
+        LOG_ERROR(subprocess) << "COULD NOT INITIALIZE! aborting.";
+    } 
 
-    /* set caps on the src element */
+    /* Configure all queues */
+    g_object_set(G_OBJECT(m_queue), "max-size-buffers", MAX_NUM_BUFFERS_QUEUE, "max-size-bytes", MAX_SIZE_BYTES_QUEUE, "max-size-time", MAX_SIZE_TIME_QUEUE, NULL);
+    g_object_set(G_OBJECT(m_displayQueue), "max-size-buffers", MAX_NUM_BUFFERS_QUEUE, "max-size-bytes", MAX_SIZE_BYTES_QUEUE, "max-size-time", MAX_SIZE_TIME_QUEUE, NULL);
+    g_object_set(G_OBJECT(m_recordQueue), "max-size-buffers", MAX_NUM_BUFFERS_QUEUE, "max-size-bytes", MAX_SIZE_BYTES_QUEUE, "max-size-time", MAX_SIZE_TIME_QUEUE, NULL);
+    
+    /* Configure shmsink */
+    g_object_set(G_OBJECT(m_shmsink), "socket-path", m_shmSocketPath.c_str(), "wait-for-connection", false, "sync", false, "async", false, NULL);
+
+    /* Set caps on the src element */
     GstCaps * caps = gst_caps_from_string("application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96");
     g_object_set(G_OBJECT(m_appsrc), "emit-signals", true, "min-latency", 20000000, "is-live", true, "do-timestamp", true, "max-bytes", 20000000, "caps", caps, "format", GST_FORMAT_TIME, "block", true, NULL);
     gst_caps_unref(caps);
 
-    // connect signals to our app
-    g_signal_connect (m_appsrc, "need-data", G_CALLBACK (StartFeed), &g_sourceid);
-    g_signal_connect (m_appsrc, "enough-data", G_CALLBACK (StopFeed), &g_sourceid);
-    g_signal_connect (m_decodebin, "pad-added", G_CALLBACK (pad_added_handler), m_shmsink);
+    /* Connect signals to our app. Elements can not be linked until their pads are created. */
+    g_signal_connect(m_appsrc, "need-data", G_CALLBACK (StartFeed), &g_sourceid);
+    g_signal_connect(m_appsrc, "enough-data", G_CALLBACK (StopFeed), &g_sourceid);
+    // g_signal_connect(m_decodebin, "pad-added", G_CALLBACK (DecodeBinPadAddedHandler), m_shmsink);     // decodebin requires dynamic linking after getting caps
+    // g_signal_connect(m_record_h264parse , "pad-added", G_CALLBACK(H264ParsePadAddedHandler), m_record_mp4mux);
 
-    /* Register callback function to be notified of bus messages */
+    /* Register our bus for later messages in the bus monitoring thread */
     m_bus = gst_element_get_bus(m_pipeline);
 
     return 0;
@@ -207,53 +248,50 @@ int GStreamerAppSrcOutduct::BuildPipeline()
 {
     LOG_INFO(subprocess) << "Building Pipeline";
     
-    gst_bin_add_many(GST_BIN(m_pipeline), m_appsrc, m_shmQueue,  m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_decodebin, m_videoconvert, m_shmsink, NULL); // m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_tee, m_shmQueue, m_decodebin, m_videoconvert, m_autovideosink,  m_displayQueue
+    gst_bin_add_many(
+    GST_BIN(m_pipeline),
+    m_appsrc, m_queue, m_tee,
+    m_displayQueue, m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_decodebin, m_shmsink,
+    m_recordQueue, m_record_rtpjitterbuffer, m_record_rtph264depay, m_record_h264parse, m_record_mp4mux, m_filesink, NULL
+    ); 
     
-    if (gst_element_link_many(m_appsrc, m_shmQueue, NULL) != true) {
-        LOG_ERROR(subprocess) << "Appsrc and queue could not be linked";
-        return -1;
-    }
-
-    if (gst_element_link_many(m_shmQueue, m_rtpjitterbuffer, m_rtph264depay, m_h264parse, NULL) != true) {
-        LOG_ERROR(subprocess) << "Queue and rtp pipeline could not be linked";
-        return -1;
-    }
-
-    if (gst_element_link_many(m_h264parse, m_decodebin, NULL) !=  true) {
-        LOG_ERROR(subprocess) << "Could not link elements to shmsink";
-        return -1;
-    }
-
-    if (gst_element_link_many(m_decodebin, m_shmsink, NULL) != true) {
-        LOG_ERROR(subprocess) << "Could not decodebin to sink";
-        return -1;
-    }
-
-    // if (gst_element_link_many(m_tee, m_displayQueue, m_decodebin, NULL) != true) {
-    //     LOG_ERROR(subprocess) << "Could not link elements to display";
+    
+    // if (gst_element_link_many(m_appsrc, m_recordQueue, NULL) != true) {
+    //     LOG_ERROR(subprocess) << "Appsrc and queue could not be linked";
     //     return -1;
     // }
 
-    // if (gst_element_link_many(m_videoconvert, m_autovideosink, NULL) != true) {
-    //     LOG_ERROR(subprocess) << "Could not link videoconvert to autovideosink";
-    //     return -1;
-    // }
-
-    // if (gst_element_link_many(m_decodebin, m_autovideosink, NULL) != true) {
-        // LOG_ERROR(subprocess) << "Could not link decode to autovideosink";
+    // if (gst_element_link_many(m_recordQueue, m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_decodebin, NULL) != true) {
+    //     LOG_ERROR(subprocess) << "Queue and rtp pipeline could not be linked";
         // return -1;
     // }
 
-    // decodebin requires dynamic linking after getting caps
-    // g_signal_connect(m_decodebin, "pad-added", G_CALLBACK (cb_new_pad), m_autovideosink);
+    /* Head of pipeline */
+    if (gst_element_link_many(m_appsrc, m_queue, m_tee, NULL) != true) {
+        LOG_DEBUG(subprocess) << "Could not link up to tee";
+        return -1;
+    }
 
+    /** Pipeline to display the video, connects with GStreamer in a separate bash
+     * instance. Ensure that the video caps match the actual video that was sent.
+    */
+    if (gst_element_link_many(m_tee, m_displayQueue,
+            m_rtpjitterbuffer, m_rtph264depay, m_h264parse, m_decodebin, NULL ) != true) {
+        LOG_DEBUG(subprocess) << "Could not link up to decodebin";
+        return -1;
+    }
 
-    // /**
-    //  * Elements can not be linked until their pads are created. Pads on the qtdemux are not created until the video 
-    //  * source provides "enough information" to the plugin that it can determine the type of media. We hook up a callback
-    //  * function here to link the two halves of the pipeline together when the pad is added
-    // */
-    // g_signal_connect(m_h264parse , "pad-added", G_CALLBACK(OnPadAdded), m_mp4mux);
+    GstCaps * caps = gst_caps_from_string("video/x-raw, format=(string)I420, width=(int)3840, height=(int)2160, framerate=(fraction)60000/1001");
+    if (gst_element_link_filtered(m_decodebin, m_shmsink, caps)) {
+        LOG_ERROR(subprocess) << "Queue and rtp pipeline could not be linked";
+        return -1;
+    }
+    gst_caps_unref(caps);
+    
+    /** Pipeline to record the video  */
+    // if (gst_element_link_many(m_tee, m_))
+ 
+
 
 
     LOG_INFO(subprocess) << "Succesfully built pipeline";
@@ -265,6 +303,7 @@ int GStreamerAppSrcOutduct::StartPlaying()
     /* Start playing the pipeline */
     gst_element_set_state (m_pipeline, GST_STATE_PLAYING);
     LOG_INFO(subprocess) << "Receiving bin launched";
+
     GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) m_pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "gst_outduct");
     return 0;
 }
@@ -363,7 +402,6 @@ GstElement *GStreamerAppSrcOutduct::GetAppSrc()
     return m_appsrc;
 }
 
-
 GstElement * GStreamerAppSrcOutduct::GetPipeline()
 {
     return m_pipeline;
@@ -374,7 +412,9 @@ GstElement *GStreamerAppSrcOutduct::GetShmSink()
     return m_shmsink;
 }
 
-GstElement * GStreamerAppSrcOutduct::GetVideoConv()
+GstElement *GStreamerAppSrcOutduct::GetMp4Mux()
 {
-    return m_videoconvert;
+    return m_record_mp4mux;
 }
+
+

@@ -17,10 +17,9 @@
 
 #define GST_HDTN_OUTDUCT_SOCKET_PATH "/tmp/hdtn_gst_shm_outduct"
 
-#define MAX_NUM_BUFFERS_QUEUE2 (10000)
-#define MAX_SIZE_BYTES_QUEUE2 (0) // 0 = disable
-#define MAX_SIZE_TIME_QUEUE2 (0) // 0 = disable
-#define SHMSINK_SIZE (4294967295) // bytes
+#define MAX_NUM_BUFFERS_QUEUE (10000)
+#define MAX_SIZE_BYTES_QUEUE (0) // 0 = disable
+#define MAX_SIZE_TIME_QUEUE (0) // 0 = disable
 
 typedef boost::function<void(padded_vector_uint8_t & wholeBundleVec)> WholeBundleReadyCallback_t;
 void SetCallbackFunction(const WholeBundleReadyCallback_t& wholeBundleReadyCallback);
@@ -38,8 +37,8 @@ public:
     GstElement * GetAppSrc();
     GstElement * GetPipeline();
     GstElement * GetShmSink();
-    GstElement * GetVideoConv();
-    
+    GstElement * GetMp4Mux();
+
     // <private> 
     bool TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration& timeout);
     boost::circular_buffer<padded_vector_uint8_t> m_incomingRtpPacketQueue; // consider making this a pre allocated vector
@@ -70,6 +69,7 @@ private:
     int CreateElements();
     int BuildPipeline();
     int StartPlaying();
+    int CheckInitializationSuccess();
     
     GstElement *m_capsfilter;
 
@@ -77,21 +77,26 @@ private:
     GstElement *m_pipeline;
     GstElement *m_appsrc;
     /* cap goes here*/
+
+    GstElement *m_queue;
+    GstElement *m_tee;
+    
+    GstElement *m_displayQueue;
     GstElement *m_rtpjitterbuffer;
     GstElement *m_rtph264depay;
     GstElement *m_h264parse;
-    GstElement *m_tee;
-    GstElement *m_shmsink; 
-    GstElement *m_shmQueue;
-    GstElement *m_displayQueue;
     GstElement *m_decodebin;
-    GstElement *m_videoconvert;
-    GstElement *m_autovideosink;
-    
-    GstElement *m_fakesink;
-    GstElement *m_appsink;
-    GstElement *m_identity;
-    GMainLoop *m_main_loop;
+    GstElement *m_shmsink; 
+
+    GstElement *m_recordQueue;
+    GstElement *m_record_rtpjitterbuffer;
+    GstElement *m_record_rtph264depay;
+    GstElement *m_record_h264parse;
+    GstElement *m_record_mp4mux;
+    GstElement *m_filesink;
+
+    // GstElement *m_appsink;
+
     // stat keeping 
     uint64_t m_totalIncomingCbOverruns = 0;
 
