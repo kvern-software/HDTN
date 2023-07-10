@@ -91,7 +91,7 @@ void BpReceiveStream::ProcessIncomingBundlesThread()
                 if (m_outductType == UDP_OUTDUCT) {
                     SendUdpPacket(rtpFrame);
                 } else if (m_outductType == GSTREAMER_APPSRC_OUTDUCT) {
-                    m_gstreamerAppSrcOutductPtr->PushRtpPacketToGStreamer(rtpFrame); // gets taken
+                    m_gstreamerAppSrcOutductPtr->PushRtpPacketToGStreamerOutduct(rtpFrame); // gets taken
                 }
 
                 m_totalRtpPacketsReceived++;

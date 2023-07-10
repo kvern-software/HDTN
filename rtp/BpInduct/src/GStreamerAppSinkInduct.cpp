@@ -113,12 +113,13 @@ int GStreamerAppSinkInduct::CreateElements()
     m_filesrc        =  gst_element_factory_make("filesrc", NULL);
     m_qtdemux        =  gst_element_factory_make("qtdemux", NULL);
     m_h264parse      =  gst_element_factory_make("h264parse", NULL);
+    m_h264timestamper = gst_element_factory_make("h264timestamper", NULL);
     m_rtph264pay     =  gst_element_factory_make("rtph264pay", NULL);
     m_appsink        =  gst_element_factory_make("appsink", NULL);
     m_progressreport =  gst_element_factory_make("progressreport", NULL);
     m_pipeline       =  gst_pipeline_new(NULL);
 
-    if (!m_filesrc || !m_qtdemux || !m_h264parse || !m_rtph264pay || !m_appsink || !m_progressreport || !m_pipeline) 
+    if (!m_filesrc || !m_qtdemux || !m_h264parse || !m_rtph264pay || !m_h264timestamper || !m_appsink || !m_progressreport || !m_pipeline) 
     {
         LOG_ERROR(subprocess) << "Could not construct all gstreamer objects, aborting";
         return -1;
@@ -138,7 +139,7 @@ int GStreamerAppSinkInduct::BuildPipeline()
 {
     LOG_INFO(subprocess) << "Building Pipeline to stream " << m_fileToStream;
     
-    gst_bin_add_many(GST_BIN(m_pipeline), m_filesrc,  m_qtdemux, m_h264parse, m_rtph264pay, m_progressreport, m_appsink, NULL);
+    gst_bin_add_many(GST_BIN(m_pipeline), m_filesrc,  m_qtdemux, m_h264parse, m_h264timestamper, m_rtph264pay, m_progressreport, m_appsink, NULL);
     
     if (gst_element_link(m_filesrc, m_qtdemux) != TRUE) {
         LOG_ERROR(subprocess) << "Source and qtmux could not be linked";
@@ -150,7 +151,12 @@ int GStreamerAppSinkInduct::BuildPipeline()
     GstCaps * caps = gst_caps_from_string("video/x-h264, stream-format=(string)avc, alignment=(string)au"); // au = output buffer contains the NALs for a whole frame
     // GstCaps * caps = gst_caps_from_string("video/x-h264, stream-format=(string)byte-stream, alignment=(string)nal"); // nal = output buffer contains complete NALs, but those do not need to represent a whole frame.
     // GstCaps * caps = gst_caps_from_string("video/x-h264, stream-format=(string)byte-stream, alignment=(string)au");
-    if (gst_element_link_filtered(m_h264parse, m_rtph264pay, caps) != TRUE) {
+    if (gst_element_link(m_h264parse, m_h264timestamper) != true) {
+        LOG_ERROR(subprocess) << "h264 elements could not be linked";
+        return -1;
+    }
+
+    if (gst_element_link_filtered(m_h264timestamper, m_rtph264pay, caps) != TRUE) {
         LOG_ERROR(subprocess) << "Filtered h264 elements could not be linked";
         return -1;
     }

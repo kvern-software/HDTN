@@ -11,95 +11,121 @@
 #include "DtnUtil.h"
 #include "DtnRtpFrame.h"
 #include "PaddedVectorUint8.h"
+#include "AsyncListener.h"
 
 #define SAMPLE_RATE 90000
-#define DEFAULT_NUM_CIRC_BUFFERS 5000
+#define DEFAULT_NUM_CIRC_BUFFERS 1000000
 
 #define GST_HDTN_OUTDUCT_SOCKET_PATH "/tmp/hdtn_gst_shm_outduct"
+#define GST_APPSRC_MAX_BYTES_IN_BUFFER 20000000
+#define MAX_NUM_BUFFERS_QUEUE (UINT16_MAX) // once around an rtp sequence overflow
+#define MAX_SIZE_BYTES_QUEUE (0) // 0 = disable
+#define MAX_SIZE_TIME_QUEUE (0) // 0 = disable
+#define MIN_THRESHHOLD_TIME_QUEUE_NS (500000) //(3e9) // Min. amount of data in the queue to allow reading (in ns, 0=disable)
 
-#define MAX_NUM_BUFFERS_QUEUE2 (10000)
-#define MAX_SIZE_BYTES_QUEUE2 (0) // 0 = disable
-#define MAX_SIZE_TIME_QUEUE2 (0) // 0 = disable
-#define SHMSINK_SIZE (4294967295) // bytes
+#define RTP_LATENCY_MILLISEC (500) 
+#define RTP_MAX_DROPOUT_TIME_MILLISEC (200) // The maximum time (milliseconds) of missing packets tolerated.
+#define RTP_MAX_MISORDER_TIME_MIILISEC (60000) //The maximum time (milliseconds) of misordered packets tolerated.
+#define RTP_MODE (1) // use only rtp timestamps
+ 
 
 typedef boost::function<void(padded_vector_uint8_t & wholeBundleVec)> WholeBundleReadyCallback_t;
+typedef  boost::circular_buffer<padded_vector_uint8_t> CbQueue_t;
+
 void SetCallbackFunction(const WholeBundleReadyCallback_t& wholeBundleReadyCallback);
 
 class GStreamerAppSrcOutduct
 {
 public:
+    
     GStreamerAppSrcOutduct(std::string shmSocketPath);
     ~GStreamerAppSrcOutduct();
 
-    int PushRtpPacketToGStreamer(padded_vector_uint8_t& rtpPacketToTake);
-   
+    int PushRtpPacketToGStreamerOutduct(padded_vector_uint8_t& rtpPacketToTake);
     
+    bool TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration& timeout);
+    
+    CbQueue_t m_incomingRtpPacketQueue;
+    CbQueue_t m_incomingRtpPacketQueueForDisplay; 
+    CbQueue_t m_incomingRtpPacketQueueForFilesink;
+
+    uint64_t m_numFilesinkSamples = 0;
+    uint64_t m_numDisplaySamples = 0;
+   
     // Getters
     GstElement * GetAppSrc();
     GstElement * GetPipeline();
     GstElement * GetShmSink();
-    GstElement * GetVideoConv();
-    
-    // <private> 
-    bool TryWaitForIncomingDataAvailable(const boost::posix_time::time_duration& timeout);
-    boost::circular_buffer<padded_vector_uint8_t> m_incomingRtpPacketQueue; // consider making this a pre allocated vector
-    // thread members
-    boost::mutex m_incomingQueueMutex;     
-    boost::condition_variable m_incomingQueueCv;
-
-    uint64_t m_numSamples = 0;
 
 private:
     bool GetNextIncomingPacketTimeout(const boost::posix_time::time_duration &timeout);
     
-    
-    std::unique_ptr<boost::thread> m_processingThread;
+    std::unique_ptr<AsyncListener<CbQueue_t>> m_bundleCallbackAsyncListenerPtr;
+    std::unique_ptr<AsyncListener<CbQueue_t>> m_rtpPacketToDisplayAsyncListenerPtr;
+    std::unique_ptr<AsyncListener<CbQueue_t>> m_rtpPacketToFilesinkAsyncListenerPtr;
+
+    // thread members
+    std::unique_ptr<boost::thread> m_packetTeeThread;
+    std::unique_ptr<boost::thread> m_displayThread;
+    std::unique_ptr<boost::thread> m_filesinkThread;
     std::unique_ptr<boost::thread> m_busMonitoringThread;
 
     std::string m_shmSocketPath;
     volatile bool m_running;
-    void OnBusMessages();
-    void PushData();
+    volatile bool m_runDisplayThread;
 
     // gst members
     GstBus *m_bus;
     GstMessage *m_gstMsg;
     GstStateChangeReturn m_GstStateChangeReturn;
 
-    // setup functions
+    /* setup functions */
     int CreateElements();
     int BuildPipeline();
     int StartPlaying();
-    
-    GstElement *m_capsfilter;
+    int CheckInitializationSuccess();
 
-    // pipeline members
+    /* Operating functions */
+    void OnBusMessages();
+    void TeeDataToQueuesThread();
+    void PushDataToFilesinkThread();
+    void PushDataToDisplayThread();
+
+
+    /* pipeline members */
+
+    // To display
     GstElement *m_pipeline;
-    GstElement *m_appsrc;
+    GstElement *m_displayAppsrc;
     /* cap goes here*/
+    GstElement *m_displayQueue;
     GstElement *m_rtpjitterbuffer;
     GstElement *m_rtph264depay;
     GstElement *m_h264parse;
-    GstElement *m_tee;
-    GstElement *m_shmsink; 
-    GstElement *m_shmQueue;
-    GstElement *m_displayQueue;
-    GstElement *m_decodebin;
-    GstElement *m_videoconvert;
-    GstElement *m_autovideosink;
-    
-    GstElement *m_fakesink;
-    GstElement *m_appsink;
-    GstElement *m_identity;
-    GMainLoop *m_main_loop;
+    GstElement *m_h264timestamper;
+    GstElement *m_decodeQueue;
+    GstElement *m_avdec_h264;
+    GstElement *m_postDecodeQueue;
+    GstElement *m_displayShmsink; 
+
+    // To filesink 
+    GstElement *m_filesinkAppsrc;
+    GstElement *m_filesinkQueue;
+    GstElement *m_filesinkShmsink;
+
     // stat keeping 
     uint64_t m_totalIncomingCbOverruns = 0;
-
+    uint64_t m_totalFilesinkCbOverruns = 0;
+    uint64_t m_totalDisplayCbOverruns = 0;
 };
 
 
 
-
+struct HdtnGstHandoffUtils_t {
+    GstBuffer *buffer;
+    GstMapInfo map;
+    GstFlowReturn ret;
+};
 
 void SetGStreamerAppSrcOutductInstance(GStreamerAppSrcOutduct * gStreamerAppSrcOutduct);
 

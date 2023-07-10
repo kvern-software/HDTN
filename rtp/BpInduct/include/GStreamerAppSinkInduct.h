@@ -45,6 +45,7 @@ private:
     GstElement *m_filesrc;
     GstElement *m_qtdemux;
     GstElement *m_h264parse;
+    GstElement *m_h264timestamper;
     GstElement *m_rtph264pay;
     GstElement *m_appsink;
     GstElement *m_progressreport;

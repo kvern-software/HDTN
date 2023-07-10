@@ -86,8 +86,6 @@ BpSendStream::BpSendStream(uint8_t intakeType, size_t maxIncomingUdpPacketSizeBy
 
     m_processingThread = boost::make_unique<boost::thread>(boost::bind(&BpSendStream::ProcessIncomingBundlesThread, this)); 
 
-    m_ioServiceThreadPtr = boost::make_unique<boost::thread>(boost::bind(&boost::asio::io_service::run, &m_ioService));
-    ThreadNamer::SetIoServiceThreadName(m_ioService, "ioServiceBpUdpSink");
 
     m_incomingCircularPacketQueue.set_capacity(numCircularBufferVectors);
     m_outgoingCircularBundleQueue.set_capacity(numCircularBufferVectors);   
@@ -101,6 +99,8 @@ BpSendStream::BpSendStream(uint8_t intakeType, size_t maxIncomingUdpPacketSizeBy
         numCircularBufferVectors, 
         maxIncomingUdpPacketSizeBytes, 
         boost::bind(&BpSendStream::DeleteCallback, this));
+        m_ioServiceThreadPtr = boost::make_unique<boost::thread>(boost::bind(&boost::asio::io_service::run, &m_ioService));
+        ThreadNamer::SetIoServiceThreadName(m_ioService, "ioServiceBpUdpSink");
     } else if (m_intakeType == HDTN_FD_INTAKE) {
         // InitFdSink();
         // m_fdThread = boost::make_unique<boost::thread>(boost::bind(&BpSendStream::FdSinkThread, this)); 

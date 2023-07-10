@@ -55,6 +55,37 @@ set(DTN_SOURCES
 	src/dtn/DtnRtp.cpp
 )
 
+set(REQUIRED_LIBS 
+HDTN::HDTNUtil
+HDTN::TelemetryDefinitions
+HDTN::LtpLib
+HDTN::BpAppPatternsLib
+HDTN::Bpcodec
+HDTN::EgressLib
+HDTN::HDTNConfigLib
+HDTN::HDTNCgrLib
+HDTN::InductManagerLib
+HDTN::IngressLib
+HDTN::LoggerLib
+HDTN::OutductManagerLib
+HDTN::StcpLib
+HDTN::StorageLib
+HDTN::TcpclLib
+HDTN::UdpLib
+HDTN::UdpDelaySimLib
+
+Boost::unit_test_framework
+Boost::timer
+Boost::program_options 
+Boost::thread
+Boost::log
+
+PkgConfig::gstreamer
+PkgConfig::gstreamer-sdp
+PkgConfig::gstreamer-app
+PkgConfig::gstreamer-video
+)
+
 ##### STREAM
 add_executable(bpsend_stream
 	BpSendStream/src/BpSendStream.cpp
@@ -64,47 +95,20 @@ add_executable(bpsend_stream
 	BpInduct/src/GStreamerAppSinkInduct.cpp
 	BpInduct/src/FdIntake.cpp
 	BpOutduct/src/GStreamerAppSrcOutduct.cpp
+	AsyncListener/AsyncListener.cpp
 	${DTN_SOURCES}
 )
+
 target_include_directories(bpsend_stream PUBLIC 
 		BpSendStream/include 
 		src/dtn/include
 		TcpPacketSink/include
 		BpInduct/include
 		BpOutduct/include
+		AsyncListener/
 )
-
-target_link_libraries(bpsend_stream   
-	#HDTN
-	HDTN::HDTNUtil
-	HDTN::TelemetryDefinitions
-	HDTN::LtpLib
-	HDTN::BpAppPatternsLib
-	HDTN::Bpcodec
-	HDTN::EgressLib
-	HDTN::HDTNConfigLib
-	HDTN::HDTNCgrLib
-	HDTN::InductManagerLib
-	HDTN::IngressLib
-	HDTN::LoggerLib
-	HDTN::OutductManagerLib
-	HDTN::StcpLib
-	HDTN::StorageLib
-	HDTN::TcpclLib
-	HDTN::UdpLib
-	HDTN::UdpDelaySimLib
-
-	Boost::unit_test_framework
-	Boost::timer
-    Boost::program_options 
-	Boost::thread
-	Boost::log
-
-    PkgConfig::gstreamer
-    PkgConfig::gstreamer-sdp
-    PkgConfig::gstreamer-app
-    PkgConfig::gstreamer-video
-) 
+	
+target_link_libraries(bpsend_stream ${REQUIRED_LIBS}) 
 
 
 ##### STREAM
@@ -119,35 +123,7 @@ target_include_directories(bprecv_stream PUBLIC
 		BpReceiveStream/include 
 		src/dtn/include
 		BpOutduct/include
+		AsyncListener/
 )
-target_link_libraries(bprecv_stream   
-	#HDTN
-	HDTN::HDTNUtil
-	HDTN::TelemetryDefinitions
-	HDTN::LtpLib
-	HDTN::BpAppPatternsLib
-	HDTN::Bpcodec
-	HDTN::EgressLib
-	HDTN::HDTNConfigLib
-	HDTN::HDTNCgrLib
-	HDTN::InductManagerLib
-	HDTN::IngressLib
-	HDTN::LoggerLib
-	HDTN::OutductManagerLib
-	HDTN::StcpLib
-	HDTN::StorageLib
-	HDTN::TcpclLib
-	HDTN::UdpLib
-	HDTN::UdpDelaySimLib
 
-	Boost::unit_test_framework
-	Boost::timer
-    Boost::program_options 
-	Boost::thread
-	Boost::log
-
-	PkgConfig::gstreamer
-    PkgConfig::gstreamer-sdp
-    PkgConfig::gstreamer-app
-    PkgConfig::gstreamer-video
-) 
+target_link_libraries(bprecv_stream  ${REQUIRED_LIBS}) 

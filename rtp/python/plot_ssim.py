@@ -3,7 +3,7 @@ import numpy as np
 import sys, getopt
 from savitzky_golay_filter import savitzky_golay
 
-logfile_prefix="/home/kyle/nasa/dev/test_outputs"
+logfile_prefix="/home/kyle/test_outputs"
 
 #argv
 """

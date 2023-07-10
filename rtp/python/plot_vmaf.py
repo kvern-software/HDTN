@@ -4,7 +4,7 @@ import sys, getopt
 import json
 import csv
 from savitzky_golay_filter import savitzky_golay
-logfile_prefix="/home/kyle/nasa/dev/test_outputs"
+logfile_prefix="/home/kyle/test_outputs"
 
 # function to add value labels
 def addlabels(x,y):
