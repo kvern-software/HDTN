@@ -6,7 +6,7 @@
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 static volatile bool blocked;
 // static GstClockTime duration = 33333333; //.0333 seconds aka 30fps
-static GstClockTime duration    = 1; // .0.016666667 seconds aka 60fps
+static GstClockTime duration    = 33333333; // .0.016666667 seconds aka 60fps
                             //    33333333
 static GStreamerAppSrcOutduct * s_gStreamerAppSrcOutduct;
 void SetGStreamerAppSrcOutductInstance(GStreamerAppSrcOutduct * gStreamerAppSrcOutduct)
@@ -118,7 +118,7 @@ int GStreamerAppSrcOutduct::CreateElements()
         "max-misorder-time", RTP_MAX_MISORDER_TIME_MIILISEC, "mode", RTP_MODE, "drop-on-latency", true, NULL);
     
     /* Configure decoder */
-    g_object_set(G_OBJECT(m_avdec_h264), "lowres", 2, NULL);
+    g_object_set(G_OBJECT(m_avdec_h264), "lowres", 0, "output-corrupt", false, "discard-corrupted-frames", true,  NULL);
 
     /* set caps on the src element */
     GstCaps * caps = gst_caps_from_string("application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96");
@@ -246,10 +246,17 @@ void GStreamerAppSrcOutduct::PushDataToFilesinkThread()
                 continue;
             } 
             m_numFilesinkSamples += 1;
-            
-
         }
+
+    // if ((m_numFilesinkSamples % 6) == 0) {
+    //     static guint bytes_in_appsrc_queue, buffers_in_decodeBuffer, buffersInDisplayQueue, buffersInPostDecodeQueue;
+    //     g_object_get(G_OBJECT(m_filesinkAppsrc), "current-level-bytes", &bytes_in_appsrc_queue, NULL);
+    //     g_object_get(G_OBJECT(m_filesinkQueue), "current-level-buffers", &buffersInDisplayQueue, NULL);
+    //     printf("filesik::bytes_in_appsrc_queue:%u\n", bytes_in_appsrc_queue);
+    //     printf("filesik::buffers_in_display_queue:%u\n", buffersInDisplayQueue);
+    //     }
     }
+
     LOG_INFO(subprocess) << "Exiting PushDataToFilesinkThread processing thread";
 }
 
@@ -263,6 +270,7 @@ void GStreamerAppSrcOutduct::PushDataToDisplayThread()
         
         bool notInWaitForNewPacketsState = m_rtpPacketToDisplayAsyncListenerPtr->TryWaitForIncomingDataAvailable();
         if (notInWaitForNewPacketsState) {
+            
             m_rtpPacketToDisplayAsyncListenerPtr->Lock();
                 incomingRtpFrame = std::move(m_rtpPacketToDisplayAsyncListenerPtr->m_queue.front());
                 m_rtpPacketToDisplayAsyncListenerPtr->PopFront();
@@ -298,24 +306,17 @@ void GStreamerAppSrcOutduct::PushDataToDisplayThread()
             m_numDisplaySamples += 1;
         }   
 
-        // static guint buffers_in_appsrc_queue;
-        // g_object_get(G_OBJECT(m_displayAppsrc), "current-level-bytes", &buffers_in_appsrc_queue, NULL);
-        if ((m_numDisplaySamples % 10) == 0) {
-                    static guint bytes_in_appsrc_queue, buffers_in_decodeBuffer, buffersInDisplayQueue, buffersInPostDecodeQueue;
-    g_object_get(G_OBJECT(m_filesinkAppsrc), "current-level-bytes", &bytes_in_appsrc_queue, NULL);
-    g_object_get(G_OBJECT(m_displayQueue), "current-level-bytes", &buffersInDisplayQueue, NULL);
-    g_object_get(G_OBJECT(m_decodeQueue), "current-level-buffers", &buffers_in_decodeBuffer, NULL);
-    g_object_get(G_OBJECT(m_postDecodeQueue), "current-level-buffers", &buffersInPostDecodeQueue, NULL);
-
-
-    // printf("bytes_in_appsrc_queue:%u\n", bytes_in_appsrc_queue);
-    // printf("buffers_in_display_queue:%u\n", buffersInDisplayQueue);
-    // printf("buffers_in_decode_queue:%u\n", buffers_in_decodeBuffer);
-    // printf("buffers_in__post_decode_queue:%u\n", buffersInPostDecodeQueue);
-
-
+        if ((m_numDisplaySamples % 6) == 0) {
+            static guint bytes_in_appsrc_queue, buffers_in_decodeBuffer, buffersInDisplayQueue, buffersInPostDecodeQueue;
+            // g_object_get(G_OBJECT(m_displayAppsrc), "current-level-bytes", &bytes_in_appsrc_queue, NULL);
+            // g_object_get(G_OBJECT(m_displayQueue), "current-level-buffers", &buffersInDisplayQueue, NULL);
+            // g_object_get(G_OBJECT(m_decodeQueue), "current-level-buffers", &buffers_in_decodeBuffer, NULL);
+            // g_object_get(G_OBJECT(m_postDecodeQueue), "current-level-buffers", &buffersInPostDecodeQueue, NULL);
+            // printf("display::bytes_in_appsrc_queue:%u\n", bytes_in_appsrc_queue);
+            // printf("display::buffers_in_display_queue:%u\n", buffersInDisplayQueue);
+            // printf("display::buffers_in_decode_queue:%u\n", buffers_in_decodeBuffer);
+            // printf("display::buffers_in__post_decode_queue:%u\n", buffersInPostDecodeQueue);
         }
-        //     printf("bytes_in_appsrc_queue:%u\n", buffers_in_appsrc_queue);
     }
 
     LOG_INFO(subprocess) << "Exiting PushDataToDisplayThread processing thread";

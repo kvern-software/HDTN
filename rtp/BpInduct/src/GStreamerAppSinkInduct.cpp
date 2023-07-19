@@ -32,6 +32,7 @@ void OnPadAdded(GstElement *element, GstPad *pad, GStreamerAppSinkInduct *GStrea
     GstPad *sinkpad = gst_element_get_static_pad((GstElement *) GStreamerAppSinkInduct, "sink");;
     if (gst_pad_is_linked (sinkpad)) {
         LOG_INFO(subprocess) << "We are already linked. Ignoring.";
+        gst_object_unref(sinkpad);
         return;
     }
 
@@ -113,13 +114,12 @@ int GStreamerAppSinkInduct::CreateElements()
     m_filesrc        =  gst_element_factory_make("filesrc", NULL);
     m_qtdemux        =  gst_element_factory_make("qtdemux", NULL);
     m_h264parse      =  gst_element_factory_make("h264parse", NULL);
-    m_h264timestamper = gst_element_factory_make("h264timestamper", NULL);
     m_rtph264pay     =  gst_element_factory_make("rtph264pay", NULL);
     m_appsink        =  gst_element_factory_make("appsink", NULL);
     m_progressreport =  gst_element_factory_make("progressreport", NULL);
     m_pipeline       =  gst_pipeline_new(NULL);
 
-    if (!m_filesrc || !m_qtdemux || !m_h264parse || !m_rtph264pay || !m_h264timestamper || !m_appsink || !m_progressreport || !m_pipeline) 
+    if (!m_filesrc || !m_qtdemux || !m_h264parse || !m_rtph264pay  || !m_appsink || !m_progressreport || !m_pipeline) 
     {
         LOG_ERROR(subprocess) << "Could not construct all gstreamer objects, aborting";
         return -1;
@@ -139,7 +139,7 @@ int GStreamerAppSinkInduct::BuildPipeline()
 {
     LOG_INFO(subprocess) << "Building Pipeline to stream " << m_fileToStream;
     
-    gst_bin_add_many(GST_BIN(m_pipeline), m_filesrc,  m_qtdemux, m_h264parse, m_h264timestamper, m_rtph264pay, m_progressreport, m_appsink, NULL);
+    gst_bin_add_many(GST_BIN(m_pipeline), m_filesrc,  m_qtdemux, m_h264parse,  m_rtph264pay, m_progressreport, m_appsink, NULL);
     
     if (gst_element_link(m_filesrc, m_qtdemux) != TRUE) {
         LOG_ERROR(subprocess) << "Source and qtmux could not be linked";
@@ -148,27 +148,13 @@ int GStreamerAppSinkInduct::BuildPipeline()
 
     // byte stream vs avc (h264 packetized) ---> https://stackoverflow.com/questions/6342224/what-is-the-difference-between-byte-stream-and-packetized-stream-in-gstreamer-rt
     // avc is packetized to the maximum transmission unit
-    GstCaps * caps = gst_caps_from_string("video/x-h264, stream-format=(string)avc, alignment=(string)au"); // au = output buffer contains the NALs for a whole frame
+    // GstCaps * caps = gst_caps_from_string("video/x-h264, stream-format=(string)avc, alignment=(string)au"); // au = output buffer contains the NALs for a whole frame
+    // gst_caps_unref(caps);
     // GstCaps * caps = gst_caps_from_string("video/x-h264, stream-format=(string)byte-stream, alignment=(string)nal"); // nal = output buffer contains complete NALs, but those do not need to represent a whole frame.
     // GstCaps * caps = gst_caps_from_string("video/x-h264, stream-format=(string)byte-stream, alignment=(string)au");
-    if (gst_element_link(m_h264parse, m_h264timestamper) != true) {
-        LOG_ERROR(subprocess) << "h264 elements could not be linked";
-        return -1;
-    }
 
-    if (gst_element_link_filtered(m_h264timestamper, m_rtph264pay, caps) != TRUE) {
-        LOG_ERROR(subprocess) << "Filtered h264 elements could not be linked";
-        return -1;
-    }
-
-    if (gst_element_link_many(m_rtph264pay, m_progressreport, NULL) != true) {
-        LOG_ERROR(subprocess) << "Elements could not be linked";
-        return -1;
-    }
-    gst_caps_unref(caps);
-
-    if (gst_element_link_many(m_progressreport, m_appsink, NULL) != true) {
-        LOG_ERROR(subprocess) << "Elements could not be linked";
+    if (gst_element_link_many(m_h264parse, m_rtph264pay, m_progressreport, m_appsink, NULL) != true) {
+        LOG_ERROR(subprocess) << "Pipeline could not be linked";
         return -1;
     }
 

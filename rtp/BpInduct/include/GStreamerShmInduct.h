@@ -11,41 +11,35 @@
 #include "DtnRtpFrame.h"
 #include "PaddedVectorUint8.h"
 
-
 typedef boost::function<void(padded_vector_uint8_t & wholeBundleVec)> WholeBundleReadyCallback_t;
 
-void SetCallbackFunction(const WholeBundleReadyCallback_t& wholeBundleReadyCallback);
+void SetShmInductCallbackFunction(const WholeBundleReadyCallback_t& wholeBundleReadyCallback);
 
-class GStreamerAppSinkInduct
+class GStreamerShmInduct
 {
 public:
 
-    GStreamerAppSinkInduct(std::string fileToStream);
-    ~GStreamerAppSinkInduct();
-    
+    GStreamerShmInduct(std::string shmSocketPath);
+    ~GStreamerShmInduct();
+
 private:
-    std::string m_fileToStream;
-
-    std::unique_ptr<boost::thread> m_busMonitoringThread;
-
-    void OnBusMessages();
-    // setup functions
     int CreateElements();
     int BuildPipeline();
     int StartPlaying();
-
+    
+    std::string m_shmSocketPath;
     volatile bool m_running;
+    
+    std::unique_ptr<boost::thread> m_busMonitoringThread;
+    void OnBusMessages();
 
     // members
     GstBus *m_bus;
     GstMessage *m_gstMsg;
     
     GstElement *m_pipeline;
-    GstElement *m_filesrc;
-    GstElement *m_qtdemux;
-    GstElement *m_h264parse;
-    GstElement *m_h264timestamper;
-    GstElement *m_rtph264pay;
+    GstElement *m_shmsrc;
+    GstElement *m_queue;
     GstElement *m_appsink;
-    GstElement *m_progressreport;
 };
+

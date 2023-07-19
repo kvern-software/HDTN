@@ -6,6 +6,7 @@
 #include "StcpBundleSink.h"
 #include "TcpPacketSink.h"
 #include "GStreamerAppSinkInduct.h"
+#include "GStreamerShmInduct.h"
 
 #include "DtnRtp.h"
 
@@ -24,7 +25,8 @@ typedef enum {
     HDTN_APPSINK_INTAKE = 0,
     HDTN_UDP_INTAKE = 1,
     HDTN_FD_INTAKE = 2,
-    HDTN_TCP_INTAKE = 3
+    HDTN_TCP_INTAKE = 3,
+    HDTN_SHM_INTAKE = 4
 } BpSendStreamIntakeTypes;
 
 
@@ -66,6 +68,7 @@ private:
 
     /* Gstreamer App Sink Intake */
     std::unique_ptr<GStreamerAppSinkInduct> m_GStreamerAppSinkInductPtr;
+    std::unique_ptr<GStreamerShmInduct> m_GStreamerShmInductPtr;
     /* Udp Intake*/
     std::shared_ptr<UdpBundleSink> m_bundleSinkPtr; 
 

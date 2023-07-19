@@ -93,7 +93,10 @@ BpSendStream::BpSendStream(uint8_t intakeType, size_t maxIncomingUdpPacketSizeBy
     if (m_intakeType == HDTN_APPSINK_INTAKE) {
         SetCallbackFunction(boost::bind(&BpSendStream::WholeBundleReadyCallback, this, boost::placeholders::_1));
         m_GStreamerAppSinkInductPtr = boost::make_unique<GStreamerAppSinkInduct>(m_fileToStream);
-    } else if (m_intakeType == HDTN_UDP_INTAKE) {
+    } else if (m_intakeType == HDTN_SHM_INTAKE) {
+        SetShmInductCallbackFunction(boost::bind(&BpSendStream::WholeBundleReadyCallback, this, boost::placeholders::_1));
+        m_GStreamerShmInductPtr = boost::make_unique<GStreamerShmInduct>(m_fileToStream);
+    }   else if (m_intakeType == HDTN_UDP_INTAKE) {
         m_bundleSinkPtr = std::make_shared<UdpBundleSink>(m_ioService, m_incomingRtpStreamPort, 
         boost::bind(&BpSendStream::WholeBundleReadyCallback, this, boost::placeholders::_1),
         numCircularBufferVectors, 
@@ -137,7 +140,7 @@ BpSendStream::~BpSendStream()
 
     // shut down whatever sink is running
     m_GStreamerAppSinkInductPtr.reset();
-
+    m_GStreamerShmInductPtr.reset();
     m_bundleSinkPtr.reset();
 
     if (m_tcpAcceptorPtr->is_open()) {

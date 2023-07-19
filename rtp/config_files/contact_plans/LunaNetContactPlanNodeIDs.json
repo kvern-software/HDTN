@@ -5,7 +5,7 @@
    "finalDestination":4,
    "startTime": 0,
    "endTime": 86400,
-   "rateBitsPerSec": 1000 ,
+   "rateBitsPerSec": 100000000 ,
    "owlt": 1 
    },
     {"contact": 1,
@@ -14,7 +14,7 @@
    "finalDestination":5,
    "startTime": 0,
    "endTime": 77498,
-   "rateBitsPerSec": 1000 ,
+   "rateBitsPerSec": 100000000 ,
    "owlt": 1 
    },
    
@@ -24,7 +24,7 @@
    "finalDestination":5,
    "startTime": 79613,
    "endTime": 86400,
-   "rateBitsPerSec": 1000 ,
+   "rateBitsPerSec": 100000000 ,
    "owlt": 1 
    },
    
@@ -34,7 +34,7 @@
    "finalDestination":5,
    "startTime": 0,
    "endTime": 75933,
-   "rateBitsPerSec": 1000 ,
+   "rateBitsPerSec": 100000000 ,
    "owlt": 1 
    },
    
@@ -44,7 +44,7 @@
    "finalDestination":5,
    "startTime": 77563,
    "endTime": 86400,
-   "rateBitsPerSec": 1000 ,
+   "rateBitsPerSec": 100000000 ,
    "owlt": 1 
    },
    
@@ -54,7 +54,7 @@
    "finalDestination":4,
    "startTime": 0,
    "endTime": 86400,
-   "rateBitsPerSec": 1000 ,
+   "rateBitsPerSec": 100000000 ,
    "owlt": 1 
    },
    
@@ -64,7 +64,7 @@
    "finalDestination":2,
    "startTime": 0,
    "endTime": 86400,
-   "rateBitsPerSec": 1000 ,
+   "rateBitsPerSec": 100000000 ,
    "owlt": 1 
    },
    
@@ -74,7 +74,7 @@
    "finalDestination":3,
    "startTime": 0,
    "endTime": 21735,
-   "rateBitsPerSec": 1000 ,
+   "rateBitsPerSec": 100000000 ,
    "owlt": 1 
    },
    
@@ -84,7 +84,7 @@
    "finalDestination":3,
    "startTime": 31570,
    "endTime": 64965,
-   "rateBitsPerSec": 1000 ,
+   "rateBitsPerSec": 100000000 ,
    "owlt": 1 
    },
    
@@ -94,6 +94,39 @@
    "finalDestination":3,
    "startTime": 74801,
    "endTime": 86400,
-   "rateBitsPerSec": 1000 ,
+   "rateBitsPerSec": 100000000 ,
    "owlt": 1 
-   }]}
+   },
+   
+   {"contact": 10,
+    "source": 5,
+    "dest": 6,
+    "finalDestination":6,
+    "startTime": 0,
+    "endTime": 86400,
+    "rate": 1000 ,
+    "rateBitsPerSec": 100000000 ,
+    "owlt": 1 
+    },
+
+    {"contact": 11,
+    "source": 4,
+    "dest": 6,
+    "finalDestination":6,
+    "startTime": 0,
+    "endTime": 86400,
+    "rate": 1000 ,
+    "rateBitsPerSec": 100000000 ,
+    "owlt": 1 
+    },
+    {"contact": 12,
+    "source": 6,
+    "dest": 7,
+    "finalDestination":7,
+    "startTime": 0,
+    "endTime": 86400,
+    "rate": 1000 ,
+    "rateBitsPerSec": 100000000 ,
+    "owlt": 1 
+    }
+]}

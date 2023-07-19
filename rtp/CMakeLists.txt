@@ -93,9 +93,11 @@ add_executable(bpsend_stream
 	BpSendStream/src/BpSendStreamRunner.cpp
 	TcpPacketSink/src/TcpPacketSink.cpp
 	BpInduct/src/GStreamerAppSinkInduct.cpp
+	BpInduct/src/GStreamerShmInduct.cpp
 	BpInduct/src/FdIntake.cpp
 	BpOutduct/src/GStreamerAppSrcOutduct.cpp
 	AsyncListener/AsyncListener.cpp
+	
 	${DTN_SOURCES}
 )
 

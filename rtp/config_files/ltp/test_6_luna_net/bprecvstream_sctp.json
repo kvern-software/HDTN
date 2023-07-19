@@ -1,5 +1,5 @@
 {
-    "inductConfigName": "mission operations center (moc) from CSO",
+    "inductConfigName": "mission operations center (moc) from local hdtn one process",
     "inductVector": [
         {
             "name": "stcp_bpsink",

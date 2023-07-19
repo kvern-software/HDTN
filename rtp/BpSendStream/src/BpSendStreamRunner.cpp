@@ -71,7 +71,7 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
                 ("incoming-rtp-stream-port", boost::program_options::value<uint16_t>()->default_value(50000), "Where incoming RTP stream is being delivered")
                 ("rtp-packets-per-bundle", boost::program_options::value<uint16_t>()->default_value(1), "Number of RTP packets placed into a bundle before sending")
                 ("induct-type", boost::program_options::value<std::string>()->default_value("udp"), "Type of induct to use. Either embedded gstreamer appsink, udp, fd, or tcp")
-                ("file-to-stream", boost::program_options::value<std::string>()->default_value("file.mp4"), "Full filepath of the file to be streamed if reading from file")
+                ("file-to-stream", boost::program_options::value<std::string>()->default_value("file.mp4"), "Full filepath of the file to be streamed if reading from file OR socket path if reading from a shared memory induct")
                 ;
             
                 boost::program_options::variables_map vm;
@@ -181,6 +181,9 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
         } else if (strcmp(inductType.c_str(), "tcp") == 0) {
             inductTypeInt = HDTN_TCP_INTAKE;
             LOG_INFO(subprocess) << "Using tcp induct type";
+        } else if (strcmp(inductType.c_str(), "shm") == 0) {
+            inductTypeInt = HDTN_SHM_INTAKE;
+            LOG_INFO(subprocess) << "Using shared memory (shm) induct type"; 
         } else {
             LOG_ERROR(subprocess) << "Unrecognized intake type. Aborting!";
             return false;

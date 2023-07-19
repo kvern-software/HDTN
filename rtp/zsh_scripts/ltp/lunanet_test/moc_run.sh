@@ -1,79 +1,73 @@
 #!/bin/sh
 #run this on moc 
 # path variables
-config_files=$HDTN_RTP_DIR/config_files/luna_net
-bprecvstream_config=$config_files/bprecvstream_from_cso.json
+config_files=$HDTN_RTP_DIR/config_files/ltp/test_6_luna_net
 contact_plan=$HDTN_RTP_DIR/config_files/contact_plans/LunaNetContactPlanNodeIDs.json
+hdtn_config=$config_files/hdtn_one_process_node_6.json
+bprecvstream_config=$config_files/bprecvstream_sctp.json
 
-outgoing_rtp_port=60000
+output_file_path="/home/$USER/test_outputs/lunanet"
+# filename=water_bubble_cbr21
+filename=water_bubble_crf18
+# filename=lucia_cbr21                 # change this for whatever file you want to name
+# filename=lucia_crf18
+file=$output_file_path/$filename
 
-cd $HDTN_RTP_DIR 
-# # # receive stream and save to file
-# ffmpeg -y -protocol_whitelist file,udp,rtp \
-#         -strict experimental \
-#         -fflags +genpts \
-#         -seek2any 1 \
-#         -avoid_negative_ts +make_zero \
-#         -max_delay 500 \
-#         -reorder_queue_size 5 \
-#         -loglevel verbose \
-#         -i stream_file.sdp -vcodec copy -acodec copy -f mp4 test_output_LTP.mp4 & 
+shm_socket_path_display=/tmp/hdtn_gst_shm_outduct_display
+shm_socket_path_filesink=/tmp/hdtn_gst_shm_outduct_filesink
+
+mkdir -p  $output_file_path/$filename
 
 
-./build/bprecv_stream  --my-uri-eid=ipn:7.1 --inducts-config-file=$sink_config  --outgoing-rtp-hostname=127.0.0.1 \
-        --outgoing-rtp-port=$outgoing_rtp_port --num-circular-buffer-vectors=500 --max-outgoing-rtp-packet-size-bytes=1472 \
-        --ffmpeg-command="\
-        ffmpeg -y -protocol_whitelist file,udp,rtp,data \
-        -strict experimental \
-        -fflags +genpts \
-        -seek2any 1 \
-        -avoid_negative_ts +make_zero \
-        -reorder_queue_size 0 \
-        -loglevel verbose \
-        -fflags nobuffer+fastseek+flush_packets -flags low_delay \
-        -re -i  \
-        -vcodec copy -acodec copy \
-        -f sap sap://224.0.0.255?same_port=1" &
-       
+export GST_DEBUG_FILE=/tmp/gst_log.log
+#################################################################################
+pkill -9 BpRecvStream
+pkill -9 gst-launch-1.0
+echo "Deleting old socket file: "
+echo $shm_socket_path_display
+rm $shm_socket_path_display
+echo $shm_socket_path_filesink
+rm $shm_socket_path_filesink
+echo "Deleting old output file: "
+echo $file/$filename.mp4
+rm $file/$filename.mp4
+sleep .5
+#################################################################################
+
+# HDTN one process
+cd $HDTN_SOURCE_ROOT
+cd /home/$USER/HDTN
+./build/module/hdtn_one_process/hdtn-one-process  --contact-plan-file=$contact_plan --hdtn-config-file=$hdtn_config &
+one_process_pid=$!
+
 sleep 5
 
-# ffmpeg -y -protocol_whitelist file,udp,rtp \
-#         -strict experimental \
-#         -fflags +genpts \
-#         -seek2any 1 \
-#         -avoid_negative_ts +make_zero \
-#         -reorder_queue_size 0 \
-#         -loglevel verbose \
-#         -fflags nobuffer+fastseek+flush_packets -flags low_delay \
-#         -re -i HDTN_TO_IN_SDP.sdp \
-#         -vcodec copy -acodec copy \
-#         -f sap sap://224.0.0.255?same_port=1" &
+#################################################################################
+export GST_DEBUG=3
+cd $HDTN_RTP_DIR
+./build/bprecv_stream  --my-uri-eid=ipn:7.1 --inducts-config-file=$bprecvstream_config --max-rx-bundle-size-bytes 14000 \
+        --num-circular-buffer-vectors=10000 --max-outgoing-rtp-packet-size-bytes=1460 --outduct-type="appsrc" --shm-socket-path=$shm_socket_path_display &
+bprecv_stream_pid=$!
+sleep 3
+#################################################################################
+# if we are using appsrc, launch a separate gstreamer instance to save the video stream to file 
+export GST_DEBUG=3,shmsrc:3,filesink:6,rtpjitterbuffer:3
+gst-launch-1.0 shmsrc socket-path=$shm_socket_path_display  is-live=true do-timestamp=true \
+        ! queue max-size-time=0 max-size-bytes=0 ! "video/x-raw, format=(string)I420, width=(int)1920, height=(int)1080, framerate=(fraction)30000/1001" \
+        ! timeoverlay halignment=right valignment=bottom text="Stream time:" shaded-background=true font-desc="Sans, 14" \
+        ! glupload ! glimagesink &
+display_pid=$! 
 
+gst-launch-1.0 shmsrc socket-path=$shm_socket_path_filesink is-live=true do-timestamp=true \
+        ! queue ! "application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" \
+        ! queue ! rtpjitterbuffer ! rtph264depay ! h264parse config-interval=1 \
+        ! h264timestamper \
+        ! qtmux faststart=true \
+        ! filesink location=$file/$filename.mp4 -e &
+filesink_pid=$!
 
-
-# --ffmpeg-command="\
-#         ffplay -i  -protocol_whitelist data,file,udp,rtp  -reorder_queue_size 0  -fflags nobuffer+fastseek+flush_packets -sync ext -flags low_delay " &
-        # ffmpeg -y -protocol_whitelist data,file,udp,rtp \
-        # -strict experimental \
-        # -fflags +genpts \
-        # -seek2any 1 \
-        # -avoid_negative_ts +make_zero \
-        # -reorder_queue_size 0 \
-        # -max_delay 0 \
-        # -loglevel verbose \
-        # -i  -vcodec copy -acodec copy -f mp4 test_water_stcp.mp4"
-# stream_recv_id=$!               
-
-# ffmpeg -y -protocol_whitelist data,file,udp,rtp -reorder_queue_size 0 -i HDTN.sdp -f rawvideo -pixel_format yuv422p10le -video_size 3840x2160 output.raw #- | ffplay -protocol_whitelist data,file,udp,rtp,fd -f rawvideo -pixel_format yuv422p10le -video_size 3840x2160 -i -
-
-
-#  -i water_raw.raw
-
-# ffmpeg -hwaccel cuda -hwaccel_output_format cuda  -protocol_whitelist data,file,udp,rtp -re -listen_timeout -1  -i  HDTN.sdp -c:v copy -reorder_queue_size 0  -fflags nobuffer+fastseek+flush_packets -f matroska - | ffplay -i -   -sync ext -flags low_delay -framedrop
-
+sleep 1000
 # cleanup
-sleep 360
-# echo "\nk
-
-echo "\nkilling HDTN bp receive stream process ..." && kill -2 $stream_recv_id
-echo "\nkillingffplay process ..." && kill -2 $ffplay_id
+echo "\nkilling HDTN bp receive stream process ..." && kill -2 $bprecv_stream_pid
+echo "\n killing both gstreamer processes ..." && kill -2 $filesink_pid && kill -2 $display_pid
+echo "\nkilling HDTN one process ..." && kill -2 $one_process_pid
