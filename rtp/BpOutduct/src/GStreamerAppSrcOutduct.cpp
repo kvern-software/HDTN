@@ -320,6 +320,7 @@ int GStreamerAppSrcOutduct::PushRtpPacketToGStreamerOutduct(padded_vector_uint8_
             m_totalIncomingCbOverruns++;
         m_bundleCallbackAsyncListenerPtr->m_queue.push_back(std::move(rtpPacketToTake));  // copy out bundle to circular buffer for sending
     m_bundleCallbackAsyncListenerPtr->Unlock();
+    m_bundleCallbackAsyncListenerPtr->Notify();
     return 0;
 }
 
