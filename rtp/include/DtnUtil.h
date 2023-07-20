@@ -1,7 +1,5 @@
-/// \file util.hh
 #pragma once
 
-/// \cond DO_NOT_DOCUMENT
 #ifdef _WIN32
 #include <winsock2.h>
 #include <windows.h>
@@ -9,7 +7,6 @@
 #include <sys/time.h>
 #endif
 
-// ssize_t definition for all systems
 #if defined(_MSC_VER)
 typedef SSIZE_T ssize_t;
 #else
@@ -17,15 +14,10 @@ typedef SSIZE_T ssize_t;
 #endif
 
 #include <stdint.h>
-#include <cstring> // memcpy
+#include <cstring> 
 #include <random>
 
 #include <boost/circular_buffer.hpp>
-
-uint32_t GenRandom();
-
-
-
 
 struct buffer {
         void   *start;
@@ -49,14 +41,7 @@ struct buffer {
 
             memcpy(start, src, length);
         }
-
 };
-
-
-
-
-
-
 
 typedef enum RTP_FORMAT {
     // See RFC 3551 for more details
@@ -126,53 +111,3 @@ typedef enum RTP_FORMAT {
     RTP_FORMAT_H266      = 108  ///< H.266/VVC
     
 } rtp_format_t;
-
-
-
-
-#include <boost/thread/condition.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
-#include <boost/circular_buffer.hpp>
-
-// Thread safe circular buffer 
-template <typename T> class ThreadSafeCircularBuffer //: private boost::noncopyable
-{
-public:
-    typedef boost::mutex::scoped_lock lock;
-
-    ThreadSafeCircularBuffer() {}
-    ThreadSafeCircularBuffer(int n) {cb.set_capacity(n);}
-    
-    void PushBack(const T& element) {
-        lock lk(m_monitor);
-        cb.push_back(std::move(element));
-        m_cbNotEmpty.notify_one();
-    }
-
-    // pop front element
-    T Pop() {
-        lock lk(m_monitor);
-        while (cb.empty())
-            m_cbNotEmpty.wait(lk);
-        T element = cb.front();
-        cb.pop_front();
-        return element;
-    }
-    void Clear() {
-        lock lk(m_monitor);
-        cb.clear();
-    }
-    int Size() {
-        lock lk(m_monitor);
-        return cb.size();
-    }
-    void SetCapacity(int capacity) {
-        lock lk(m_monitor);
-        cb.set_capacity(capacity);
-    }
-private:
-    boost::condition m_cbNotEmpty;
-    boost::mutex m_monitor;
-    boost::circular_buffer<T> cb;
-};

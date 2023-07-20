@@ -1,3 +1,4 @@
+// THIS IS NOT THREAD SAFE 
 #include <boost/asio.hpp>
 #include <boost/process.hpp>
 #include <boost/smart_ptr/make_unique.hpp>
@@ -11,8 +12,6 @@ class AsyncListener
 public:
     AsyncListener(T &queue, boost::posix_time::time_duration timeout);
     ~AsyncListener();
-
-    // boost::mutex * GetMutex();
 
     bool TryWaitForIncomingDataAvailable();
     bool GetNextIncomingItemTimeout();

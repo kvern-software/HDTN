@@ -45,14 +45,8 @@ pkg_search_module(gstreamer-video REQUIRED IMPORTED_TARGET gstreamer-video-1.0>=
 
 
 set(DTN_SOURCES 
-	# src/dtn/DtnContext.cpp
-	# src/dtn/DtnEncoder.cpp
-	# src/dtn/DtnFrameQueue.cpp
-	# src/dtn/DtnMedia.cpp
-	# src/dtn/DtnMediaStream.cpp
-	# src/dtn/DtnSession.cpp
-	src/dtn/DtnUtil.cpp
-	src/dtn/DtnRtp.cpp
+	src/DtnUtil.cpp
+	src/DtnRtp.cpp
 )
 
 set(REQUIRED_LIBS 
@@ -91,23 +85,18 @@ add_executable(bpsend_stream
 	BpSendStream/src/BpSendStream.cpp
 	BpSendStream/src/BpSendStreamMain.cpp
 	BpSendStream/src/BpSendStreamRunner.cpp
-	TcpPacketSink/src/TcpPacketSink.cpp
 	BpInduct/src/GStreamerAppSinkInduct.cpp
 	BpInduct/src/GStreamerShmInduct.cpp
-	BpInduct/src/FdIntake.cpp
 	BpOutduct/src/GStreamerAppSrcOutduct.cpp
-	AsyncListener/AsyncListener.cpp
 	
 	${DTN_SOURCES}
 )
 
 target_include_directories(bpsend_stream PUBLIC 
 		BpSendStream/include 
-		src/dtn/include
-		TcpPacketSink/include
+		include/
 		BpInduct/include
 		BpOutduct/include
-		AsyncListener/
 )
 	
 target_link_libraries(bpsend_stream ${REQUIRED_LIBS}) 
@@ -123,9 +112,8 @@ add_executable(bprecv_stream
 )
 target_include_directories(bprecv_stream PUBLIC 
 		BpReceiveStream/include 
-		src/dtn/include
+		include/
 		BpOutduct/include
-		AsyncListener/
 )
 
 target_link_libraries(bprecv_stream  ${REQUIRED_LIBS}) 

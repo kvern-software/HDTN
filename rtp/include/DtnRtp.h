@@ -17,7 +17,6 @@
 #define USE_INCOMING_SEQ true
 #define USE_OUTGOING_SEQ false
 
-#define SDP_FILE_STR_HEADER 0xffffffffffffffff // 8 bytes
 
 
 /**
@@ -70,10 +69,6 @@ public:
     void FillHeader(rtp_frame * frame);     // takes pointer to a rtp frame and fills the header with the current information about the rtp session
     int PacketHandler(ssize_t size, void *packet, int rce_flags, std::shared_ptr<DtnFrameQueue> incomingFrameQueue);
     rtp_packet_status_t PacketHandler(padded_vector_uint8_t &wholeBundleVec, const rtp_header * currentRtpFrameHeader);
-    rtp_packet_status_t BundleHandler(padded_vector_uint8_t &wholeBundleVec);
 
     void UpdateSequence(rtp_frame * frame); // takes pointer to a rtp frame and updates the header with the curent sequence number
-    void UpdateHeader(const rtp_header * nextHeaderPointer, bool useIncomingSeq);
-
-    
 };

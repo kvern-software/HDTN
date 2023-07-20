@@ -175,12 +175,6 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
         } else if (strcmp(inductType.c_str(), "udp") == 0) {
             inductTypeInt = HDTN_UDP_INTAKE;
             LOG_INFO(subprocess) << "Using udp induct type";
-        } else if (strcmp(inductType.c_str(), "fd") == 0) {
-            inductTypeInt = HDTN_FD_INTAKE;
-            LOG_INFO(subprocess) << "Using fd induct type";
-        } else if (strcmp(inductType.c_str(), "tcp") == 0) {
-            inductTypeInt = HDTN_TCP_INTAKE;
-            LOG_INFO(subprocess) << "Using tcp induct type";
         } else if (strcmp(inductType.c_str(), "shm") == 0) {
             inductTypeInt = HDTN_SHM_INTAKE;
             LOG_INFO(subprocess) << "Using shared memory (shm) induct type"; 
@@ -192,8 +186,6 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
         BpSendStream bpSendStream(inductTypeInt, maxIncomingUdpPacketSizeBytes, incomingRtpStreamPort, 
                 numCircularBufferVectors, maxBundleSizeBytes,  rtpPacketsPerBundle, fileLocation);
         
-
-
         bpSendStream.Start(
             outductsConfigPtr,
             inductsConfigPtr,
@@ -210,10 +202,8 @@ bool BpSendStreamRunner::Run(int argc, const char* const argv[], volatile bool &
             useBpVersion7
         );
 
-
         LOG_INFO(subprocess) << "running";
             
-
         if (useSignalHandler) {
             sigHandler.Start(false);
         }

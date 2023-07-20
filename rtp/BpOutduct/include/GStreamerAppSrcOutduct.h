@@ -26,7 +26,7 @@
 #define RTP_LATENCY_MILLISEC (500) 
 #define RTP_MAX_DROPOUT_TIME_MILLISEC (200) // The maximum time (milliseconds) of missing packets tolerated.
 #define RTP_MAX_MISORDER_TIME_MIILISEC (60000) //The maximum time (milliseconds) of misordered packets tolerated.
-#define RTP_MODE (1) // use only rtp timestamps
+#define RTP_MODE (1) // gst default
  
 
 typedef boost::function<void(padded_vector_uint8_t & wholeBundleVec)> WholeBundleReadyCallback_t;
@@ -52,11 +52,6 @@ public:
     uint64_t m_numFilesinkSamples = 0;
     uint64_t m_numDisplaySamples = 0;
    
-    // Getters
-    GstElement * GetAppSrc();
-    GstElement * GetPipeline();
-    GstElement * GetShmSink();
-
 private:
     bool GetNextIncomingPacketTimeout(const boost::posix_time::time_duration &timeout);
     
@@ -132,10 +127,10 @@ void SetGStreamerAppSrcOutductInstance(GStreamerAppSrcOutduct * gStreamerAppSrcO
 
 
 // Use sync=true if:
-    // There is a human watching the output, e.g. movie playback
+// There is a human watching the output, e.g. movie playback
 // Use sync=false if:
-    // You are using a live source
-    // The pipeline is being post-processed, e.g. neural net
+// You are using a live source
+// The pipeline is being post-processed, e.g. neural net
 
 //     alignment=au means that each output buffer contains the NALs for a whole
 // picture. alignment=nal just means that each output buffer contains

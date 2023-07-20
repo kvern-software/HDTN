@@ -1,7 +1,6 @@
 #pragma once
 #include <queue>
 
-#include "../../video_driver/VideoDriver.h"
 #include "DtnRtpFrame.h"
 
 class DtnFrameQueue

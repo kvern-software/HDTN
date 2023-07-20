@@ -91,7 +91,7 @@ int GStreamerShmInduct::StartPlaying()
 
 void OnNewSampleFromSink(GstElement *element, GStreamerShmInduct *GStreamerShmInduct)
 {
-    GstSample *sample, *copySample;
+    GstSample *sample;
     GstBuffer *buffer;
     GstMapInfo map;
 
@@ -103,11 +103,11 @@ void OnNewSampleFromSink(GstElement *element, GStreamerShmInduct *GStreamerShmIn
       return;
     }
 
-    // Copy for final time into buffer, from here we can std::move rather than copy
+    /* Copy into buffer, from here we can std::move rather than copy */
     padded_vector_uint8_t bufferToForward(map.size);
     memcpy(bufferToForward.data(), map.data, map.size);
     
-    // the order here matters, unref before exporting bundle, also unrefs buffer
+    /* the order here matters, unref before exporting bundle, also unrefs buffer */
     gst_sample_unref(sample);  
 
     /* push buffer to HDTN */

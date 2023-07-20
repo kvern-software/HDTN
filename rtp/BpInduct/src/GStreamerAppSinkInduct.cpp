@@ -60,27 +60,24 @@ void OnPadAdded(GstElement *element, GstPad *pad, GStreamerAppSinkInduct *GStrea
 
 void OnNewSampleFromSink(GstElement *element, GStreamerAppSinkInduct *GStreamerAppSinkInduct)
 {
-    GstSample *sample, *copySample;
+    GstSample *sample;
     GstBuffer *buffer;
     GstMapInfo map;
 
     /* get the sample from appsink */
     sample = gst_app_sink_pull_sample(GST_APP_SINK (element));
-    /* make a copy */
-    copySample = gst_sample_copy(sample);
-    gst_sample_unref(sample);  
-    buffer = gst_sample_get_buffer(copySample);
+    buffer = gst_sample_get_buffer(sample);
     if(!gst_buffer_map(buffer, &map, GST_MAP_READ)) {
       LOG_WARNING(subprocess) <<"could not map buffer";
       return;
     }
 
-    // Copy for final time into buffer, from here we can std::move rather than copy
+    /* Copy into buffer, from here we can std::move rather than copy */
     padded_vector_uint8_t bufferToForward(map.size);
     memcpy(bufferToForward.data(), map.data, map.size);
     
-    // the order here matters, unref before exporting bundle
-    gst_sample_unref(copySample);  
+    /* the order here matters, unref before exporting bundle */
+    gst_sample_unref(sample);  
 
     /* push buffer to HDTN */
     s_wholeBundleReadyCallback(bufferToForward);
@@ -189,13 +186,8 @@ int GStreamerAppSinkInduct::StartPlaying()
         LOG_ERROR(subprocess) << "Unable to set the pipeline to the playing state";
         return -1;
     }
-        
+    
     LOG_INFO(subprocess) << "Going to set state to play";
-
-    /* launching things */
-    gst_element_set_state(m_appsink, GST_STATE_PLAYING);
-    gst_element_set_state(m_filesrc, GST_STATE_PLAYING);
-
     return 0;
 }
 

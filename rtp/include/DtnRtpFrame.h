@@ -1,9 +1,4 @@
 #pragma once
-// This file borrows the packet definitions provided by uvgRTP
-
-// #include "../../video_driver/VideoDriver.h"
-
-// #include "DtnRtp.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -198,11 +193,3 @@ struct rtcp_app_packet {
     size_t payload_len = 0;
 };
 
-// PACK(struct zrtp_frame {
-//     uint8_t version:4;
-//     uint16_t unused:12;
-//     uint16_t seq = 0;
-//     uint32_t magic = 0;
-//     uint32_t ssrc = 0;
-//     uint8_t payload[1];
-// });

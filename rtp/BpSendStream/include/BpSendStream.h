@@ -3,8 +3,6 @@
 #include "app_patterns/BpSourcePattern.h"
 
 #include "UdpBundleSink.h"
-#include "StcpBundleSink.h"
-#include "TcpPacketSink.h"
 #include "GStreamerAppSinkInduct.h"
 #include "GStreamerShmInduct.h"
 
@@ -13,20 +11,11 @@
 #include <boost/asio.hpp>
 #include <boost/process.hpp>
 
-#include <stddef.h>
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 
 typedef enum {
     HDTN_APPSINK_INTAKE = 0,
     HDTN_UDP_INTAKE = 1,
-    HDTN_FD_INTAKE = 2,
-    HDTN_TCP_INTAKE = 3,
-    HDTN_SHM_INTAKE = 4
+    HDTN_SHM_INTAKE = 2
 } BpSendStreamIntakeTypes;
 
 
@@ -72,26 +61,6 @@ private:
     /* Udp Intake*/
     std::shared_ptr<UdpBundleSink> m_bundleSinkPtr; 
 
-    /* Tcp Intake*/
-    // experimental stcp sink
-    // std::shared_ptr<StcpBundleSink> m_stcpBundleSinkPtr; 
-    // std::shared_ptr<boost::asio::ip::tcp::socket> m_stcpSocketPtr;
-    // void StartTcpAccept();
-    // void HandleTcpAccept(std::shared_ptr<boost::asio::ip::tcp::socket> &newTcpSocketPtr, const boost::system::error_code & error);
-    std::unique_ptr<boost::asio::ip::tcp::acceptor> m_tcpAcceptorPtr;
-    std::shared_ptr<boost::asio::ip::tcp::socket> m_tcpSocketPtr;
-    std::shared_ptr<TcpPacketSink> m_tcpPacketSinkPtr; 
-    void StartTcpAccept();
-    void HandleTcpAccept(std::shared_ptr<boost::asio::ip::tcp::socket> & newTcpSocketPtr, const boost::system::error_code& error);
-    
-    /* FD intake*/
-    void InitFdSink();
-    void FdSinkThread();
-    void ExecuteGst(std::string gstCommand);
-    int m_fd = 0;
-    std::unique_ptr<boost::thread> m_fdThread;
-    void FdPushToQueue(void * buf, size_t size);
-
     padded_vector_uint8_t m_currentFrame;  
     size_t m_offset = 0;
 
@@ -120,12 +89,10 @@ private:
     
     std::string m_fileToStream;
 
+    /* stat tracking */
     uint64_t m_totalRtpPacketsReceived = 0; // counted when received from udp sink
     uint64_t m_totalRtpPacketsSent = 0; // counted when send to bundler
     uint64_t m_totalRtpPacketsQueued = 0; // counted when pushed into outgoing queue
-    uint64_t m_totalConcatenationsPerformed = 0; // counted when a packet is successfully concatenated 
-    uint64_t m_totalMarkerBits = 0;
-    uint64_t m_totalTimestampChanged = 0;
     uint64_t m_totalIncomingCbOverruns = 0;
     uint64_t m_totalOutgoingCbOverruns = 0;
 

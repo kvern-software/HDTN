@@ -5,21 +5,13 @@
 
 static constexpr hdtn::Logger::SubProcess subprocess = hdtn::Logger::SubProcess::none;
 static volatile bool blocked;
-// static GstClockTime duration = 33333333; //.0333 seconds aka 30fps
 static GstClockTime duration    = 33333333; // .0.016666667 seconds aka 60fps
-                            //    33333333
 static GStreamerAppSrcOutduct * s_gStreamerAppSrcOutduct;
+
 void SetGStreamerAppSrcOutductInstance(GStreamerAppSrcOutduct * gStreamerAppSrcOutduct)
 {
     s_gStreamerAppSrcOutduct = gStreamerAppSrcOutduct;
 }
-
-
-static void SyncHandler(GstElement* object, guint arg0)
-{
-    LOG_INFO(subprocess) << "rtpjitterbuffer sync handler";
-}
-
 
 
 GStreamerAppSrcOutduct::GStreamerAppSrcOutduct(std::string shmSocketPath) : 
@@ -105,7 +97,7 @@ int GStreamerAppSrcOutduct::CreateElements()
    
     /* Configure queues */
     g_object_set(G_OBJECT(m_displayQueue), "max-size-buffers", MAX_NUM_BUFFERS_QUEUE, "max-size-bytes", MAX_SIZE_BYTES_QUEUE, "max-size-time", MAX_SIZE_TIME_QUEUE, "min-threshold-time", (uint64_t) 0,  NULL );
-    g_object_set(G_OBJECT(m_decodeQueue), "max-size-buffers", 200, "max-size-bytes", 0, "max-size-time", 0, "min-threshold-time", (uint64_t) 0, "leaky", 1,  NULL );
+    g_object_set(G_OBJECT(m_decodeQueue), "max-size-buffers", 0, "max-size-bytes", 0, "max-size-time", 0, "min-threshold-time", (uint64_t) 0, "leaky", 0,  NULL );
     g_object_set(G_OBJECT(m_filesinkQueue), "max-size-buffers", 0, "max-size-bytes", MAX_SIZE_BYTES_QUEUE, "max-size-time", MAX_SIZE_TIME_QUEUE, "leaky", 0, NULL );
 
 
@@ -126,9 +118,6 @@ int GStreamerAppSrcOutduct::CreateElements()
     g_object_set(G_OBJECT(m_filesinkAppsrc), "emit-signals", false, "min-latency", 0, "is-live", false, "do-timestamp", false, "max-bytes", GST_APPSRC_MAX_BYTES_IN_BUFFER, "caps", caps, "format", GST_FORMAT_TIME, "block", false, NULL);
     gst_caps_unref(caps);
 
-
-    /* connect signals to our app */
-    g_signal_connect (m_rtpjitterbuffer, "handle-sync", G_CALLBACK(SyncHandler), NULL);
     /* Register our bus to be notified of bus messages */
     m_bus = gst_element_get_bus(m_pipeline);
 
@@ -334,21 +323,6 @@ int GStreamerAppSrcOutduct::PushRtpPacketToGStreamerOutduct(padded_vector_uint8_
     return 0;
 }
 
-GstElement *GStreamerAppSrcOutduct::GetAppSrc()
-{
-    return m_displayAppsrc;
-}
-
-
-GstElement * GStreamerAppSrcOutduct::GetPipeline()
-{
-    return m_pipeline;
-}
-
-GstElement *GStreamerAppSrcOutduct::GetShmSink()
-{
-    return m_displayShmsink;
-}
 
 void GStreamerAppSrcOutduct::OnBusMessages()
 {
