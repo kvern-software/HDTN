@@ -1,8 +1,8 @@
-test_media_folder=/home/kyle/nasa/dev/test_media/official_test_media
-filename=lucia_cbr21
+test_media_folder=/home/$USER/test_media/
+filename=your_mp4_filename
 file=$test_media_folder/$filename.mp4
 
-output_file=/home/kyle/nasa/dev/test_outputs/test_1
+output_file=/home/kyle/test_outputs/
 mkdir -p $output_file/$filename
 
 outgoing_rtp_port=5000

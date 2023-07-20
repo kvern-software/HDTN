@@ -29,7 +29,7 @@ BpReceiveStream::BpReceiveStream(size_t numCircularBufferVectors, bp_recv_stream
         socket.open(boost::asio::ip::udp::v4());
 
     } else if (m_outductType == GSTREAMER_APPSRC_OUTDUCT) {
-        m_gstreamerAppSrcOutductPtr = boost::make_unique<GStreamerAppSrcOutduct>(params.shmSocketPath);
+        m_gstreamerAppSrcOutductPtr = boost::make_unique<GStreamerAppSrcOutduct>(params.shmSocketPath, params.gstCaps);
         SetGStreamerAppSrcOutductInstance(m_gstreamerAppSrcOutductPtr.get());
     }
 

@@ -41,6 +41,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
         size_t numCircularBufferVectors;
         uint16_t maxOutgoingRtpPacketSizeBytes;
         std::string shmSocketPath;
+        std::string gstCaps;
 
         std::string outductType;
 
@@ -59,6 +60,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
                 ("max-outgoing-rtp-packet-size-bytes", boost::program_options::value<uint16_t>()->default_value(1400), "Max size in bytes of the outgoing rtp packets")
                 ("shm-socket-path", boost::program_options::value<std::string>()->default_value(GST_HDTN_OUTDUCT_SOCKET_PATH), "Location of the socket for shared memory sink to gstreamer")
                 ("outduct-type", boost::program_options::value<std::string>()->default_value("udp"), "Outduct type to offboard RTP stream")
+                ("gst-caps",boost::program_options::value<std::string>()->default_value("application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96"), "Caps to apply to GStreamer elements before shared memory interface")
                 ;
 
             boost::program_options::variables_map vm;
@@ -114,6 +116,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
             maxOutgoingRtpPacketSizeBytes = vm["max-outgoing-rtp-packet-size-bytes"].as<uint16_t>();
             shmSocketPath                 = vm["shm-socket-path"].as<std::string>();
             outductType                   = vm["outduct-type"].as<std::string>();
+            gstCaps                       = vm["gst-caps"].as<std::string>();
         }
         catch (boost::bad_any_cast & e) {
             LOG_ERROR(subprocess) << "invalid data error: " << e.what() << "\n";
@@ -149,6 +152,7 @@ bool BpReceiveStreamRunner::Run(int argc, const char *const argv[], volatile boo
         bpRecvStreamParams.maxOutgoingRtpPacketSizeBytes = maxOutgoingRtpPacketSizeBytes;
         bpRecvStreamParams.shmSocketPath = shmSocketPath;
         bpRecvStreamParams.outductType = outductTypeInt;
+        bpRecvStreamParams.gstCaps = gstCaps;
 
         LOG_INFO(subprocess) << "starting..";
 

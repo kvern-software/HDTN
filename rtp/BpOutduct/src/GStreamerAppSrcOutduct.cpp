@@ -14,8 +14,8 @@ void SetGStreamerAppSrcOutductInstance(GStreamerAppSrcOutduct * gStreamerAppSrcO
 }
 
 
-GStreamerAppSrcOutduct::GStreamerAppSrcOutduct(std::string shmSocketPath) : 
-    m_shmSocketPath(shmSocketPath), m_running(true), m_runDisplayThread(true)
+GStreamerAppSrcOutduct::GStreamerAppSrcOutduct(std::string shmSocketPath, std::string gstCaps) : 
+    m_shmSocketPath(shmSocketPath), m_running(true), m_runDisplayThread(true), m_gstCaps(gstCaps)
 {
     m_incomingRtpPacketQueue.set_capacity(DEFAULT_NUM_CIRC_BUFFERS);
     m_incomingRtpPacketQueueForDisplay.set_capacity(DEFAULT_NUM_CIRC_BUFFERS);
@@ -113,7 +113,7 @@ int GStreamerAppSrcOutduct::CreateElements()
     g_object_set(G_OBJECT(m_avdec_h264), "lowres", 0, "output-corrupt", false, "discard-corrupted-frames", true,  NULL);
 
     /* set caps on the src element */
-    GstCaps * caps = gst_caps_from_string("application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96");
+    GstCaps * caps = gst_caps_from_string(m_gstCaps.c_str());
     g_object_set(G_OBJECT(m_displayAppsrc), "emit-signals", false, "min-latency", 0, "is-live", true, "do-timestamp", true, "max-bytes", GST_APPSRC_MAX_BYTES_IN_BUFFER, "caps", caps, "format", GST_FORMAT_TIME, "block", false, NULL);
     g_object_set(G_OBJECT(m_filesinkAppsrc), "emit-signals", false, "min-latency", 0, "is-live", false, "do-timestamp", false, "max-bytes", GST_APPSRC_MAX_BYTES_IN_BUFFER, "caps", caps, "format", GST_FORMAT_TIME, "block", false, NULL);
     gst_caps_unref(caps);

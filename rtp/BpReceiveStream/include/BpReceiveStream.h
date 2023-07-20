@@ -19,6 +19,7 @@ struct bp_recv_stream_params_t {
     uint16_t maxOutgoingRtpPacketSizeBytes;
     uint8_t outductType;
     std::string shmSocketPath;
+    std::string gstCaps;
 };
 
 class BpReceiveStream : public BpSinkPattern {

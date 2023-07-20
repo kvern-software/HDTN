@@ -45,9 +45,8 @@ pkg_search_module(gstreamer-video REQUIRED IMPORTED_TARGET gstreamer-video-1.0>=
 
 
 set(DTN_SOURCES 
-	src/DtnUtil.cpp
-	src/DtnRtp.cpp
-)
+src/DtnFrameQueue.cpp
+src/DtnRtp.cpp)
 
 set(REQUIRED_LIBS 
 HDTN::HDTNUtil

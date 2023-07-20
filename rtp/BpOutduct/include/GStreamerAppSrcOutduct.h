@@ -38,7 +38,7 @@ class GStreamerAppSrcOutduct
 {
 public:
     
-    GStreamerAppSrcOutduct(std::string shmSocketPath);
+    GStreamerAppSrcOutduct(std::string shmSocketPath, std::string gstCaps);
     ~GStreamerAppSrcOutduct();
 
     int PushRtpPacketToGStreamerOutduct(padded_vector_uint8_t& rtpPacketToTake);
@@ -66,6 +66,7 @@ private:
     std::unique_ptr<boost::thread> m_busMonitoringThread;
 
     std::string m_shmSocketPath;
+    std::string m_gstCaps;
     volatile bool m_running;
     volatile bool m_runDisplayThread;
 

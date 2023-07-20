@@ -2,6 +2,7 @@
 #include <queue>
 
 #include "DtnRtpFrame.h"
+#include <boost/thread.hpp>
 
 class DtnFrameQueue
 {
