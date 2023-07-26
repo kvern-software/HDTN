@@ -9,7 +9,7 @@ bprecvstream_config=$config_files/bprecvstream_sctp.json
 output_file_path="/home/$USER/test_outputs/lunanet"
 # filename=water_bubble_cbr21
 filename=water_bubble_crf18
-# filename=lucia_cbr21                 # change this for whatever file you want to name
+#filename=lucia_cbr21                 # change this for whatever file you want to name
 # filename=lucia_crf18
 file=$output_file_path/$filename
 
@@ -19,8 +19,10 @@ shm_socket_path_filesink=/tmp/hdtn_gst_shm_outduct_filesink
 mkdir -p  $output_file_path/$filename
 
 
+
 export GST_DEBUG_FILE=/tmp/gst_log.log
 #################################################################################
+pkill -9 HdtnOneProcessM
 pkill -9 BpRecvStream
 pkill -9 gst-launch-1.0
 echo "Deleting old socket file: "
@@ -44,25 +46,36 @@ sleep 5
 
 #################################################################################
 export GST_DEBUG=3
+export GST_DEBUG_FILE=/tmp/hdtn_gst_log.log
 cd $HDTN_RTP_DIR
-./build/bprecv_stream  --my-uri-eid=ipn:7.1 --inducts-config-file=$bprecvstream_config --max-rx-bundle-size-bytes 14000 \
+./build/bprecv_stream  --my-uri-eid=ipn:7.1 --inducts-config-file=$bprecvstream_config --max-rx-bundle-size-bytes 63000 \
         --num-circular-buffer-vectors=10000 --max-outgoing-rtp-packet-size-bytes=1460 --outduct-type="appsrc" --shm-socket-path=$shm_socket_path_display &
 bprecv_stream_pid=$!
 sleep 3
 #################################################################################
 # if we are using appsrc, launch a separate gstreamer instance to save the video stream to file 
-export GST_DEBUG=3,shmsrc:3,filesink:6,rtpjitterbuffer:3
+export GST_DEBUG=4,shmsrc:3,filesink:6,rtpjitterbuffer:4
+export GST_DEBUG_FILE=/tmp/gst_display_log.log
 gst-launch-1.0 shmsrc socket-path=$shm_socket_path_display  is-live=true do-timestamp=true \
-        ! queue max-size-time=0 max-size-bytes=0 ! "video/x-raw, format=(string)I420, width=(int)1920, height=(int)1080, framerate=(fraction)30000/1001" \
+        ! queue max-size-time=0 max-size-bytes=0 \
+        ! "video/x-raw, format=(string)I420, width=(int)3840, height=(int)2160, framerate=(fraction)60000/1001" \
+        ! queue \
         ! timeoverlay halignment=right valignment=bottom text="Stream time:" shaded-background=true font-desc="Sans, 14" \
         ! glupload ! glimagesink &
 display_pid=$! 
 
+export GST_DEBUG=3,filesink:9,qtmux:3,shmsrc:8
+export GST_DEBUG_FILE=/tmp/gst_filesink_log.log
 gst-launch-1.0 shmsrc socket-path=$shm_socket_path_filesink is-live=true do-timestamp=true \
-        ! queue ! "application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" \
-        ! queue ! rtpjitterbuffer ! rtph264depay ! h264parse config-interval=1 \
+        ! queue max-size-time=0 max-size-bytes=0  \
+        ! "application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" \
+        ! queue max-size-time=0 max-size-bytes=0 \
+        ! rtpjitterbuffer \
+        ! rtph264depay \
+        ! h264parse config-interval=1 \
         ! h264timestamper \
         ! qtmux faststart=true \
+        ! queue max-size-time=0 max-size-bytes=0 \
         ! filesink location=$file/$filename.mp4 -e &
 filesink_pid=$!
 

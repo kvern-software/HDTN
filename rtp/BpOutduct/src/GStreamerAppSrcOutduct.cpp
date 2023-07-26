@@ -15,7 +15,7 @@ void SetGStreamerAppSrcOutductInstance(GStreamerAppSrcOutduct * gStreamerAppSrcO
 
 
 GStreamerAppSrcOutduct::GStreamerAppSrcOutduct(std::string shmSocketPath, std::string gstCaps) : 
-    m_shmSocketPath(shmSocketPath), m_running(true), m_runDisplayThread(true), m_gstCaps(gstCaps)
+    m_shmSocketPath(shmSocketPath), m_running(true), m_runDisplayThread(true), m_runFilesinkThread(true), m_gstCaps(gstCaps)
 {
     m_incomingRtpPacketQueue.set_capacity(DEFAULT_NUM_CIRC_BUFFERS);
     m_incomingRtpPacketQueueForDisplay.set_capacity(DEFAULT_NUM_CIRC_BUFFERS);
@@ -69,9 +69,13 @@ GStreamerAppSrcOutduct::~GStreamerAppSrcOutduct()
     
     m_running = false;
     m_runDisplayThread = false;
+    m_runFilesinkThread = false; 
 
     m_busMonitoringThread->join();
     m_packetTeeThread->join();
+    m_filesinkThread->join();
+    m_displayThread->join();
+
 }
 
 int GStreamerAppSrcOutduct::CreateElements()
@@ -102,7 +106,7 @@ int GStreamerAppSrcOutduct::CreateElements()
 
 
     /* Configure shared memory sinks */
-    g_object_set(G_OBJECT(m_displayShmsink), "socket-path", m_shmSocketPath.c_str(), "wait-for-connection", false, "sync", false, "async", false, NULL);
+    g_object_set(G_OBJECT(m_displayShmsink), "socket-path", m_shmSocketPath.c_str(), "wait-for-connection", false, "sync", false, "async", false,  "processing-deadline", (uint64_t) 30e9,  NULL);
     g_object_set(G_OBJECT(m_filesinkShmsink), "socket-path", "/tmp/hdtn_gst_shm_outduct_filesink", "wait-for-connection", false, "sync", false, "async", false, NULL);
 
     /* Configure rtpjitterbuffer */
@@ -159,9 +163,9 @@ int GStreamerAppSrcOutduct::StartPlaying()
 void GStreamerAppSrcOutduct::TeeDataToQueuesThread()
 {
     padded_vector_uint8_t incomingRtpFrame;
-    incomingRtpFrame.reserve(1400);
+    incomingRtpFrame.reserve(1600);
 
-    while (1) {
+    while (m_running) {
         bool notInWaitForNewBundlesState = m_bundleCallbackAsyncListenerPtr->TryWaitForIncomingDataAvailable();
         if (notInWaitForNewBundlesState) {
             /* Make local copy to allow bundle thread to continue asap */
@@ -199,9 +203,9 @@ void GStreamerAppSrcOutduct::PushDataToFilesinkThread()
 {
     static HdtnGstHandoffUtils_t hdtnGstHandoffUtils;
     static padded_vector_uint8_t incomingRtpFrame;
-    incomingRtpFrame.reserve(1400);
+    incomingRtpFrame.reserve(1600);
 
-    while (m_running) {
+    while (m_runFilesinkThread) {
         
         bool notInWaitForNewPacketsState = m_rtpPacketToFilesinkAsyncListenerPtr->TryWaitForIncomingDataAvailable();
         if (notInWaitForNewPacketsState) {
@@ -225,25 +229,23 @@ void GStreamerAppSrcOutduct::PushDataToFilesinkThread()
             gst_buffer_unmap(hdtnGstHandoffUtils.buffer, &hdtnGstHandoffUtils.map);
 
             /* Push the buffer into the appsrc */
-            boost::this_thread::sleep_for(boost::chrono::microseconds(50));
+            // boost::this_thread::sleep_for(boost::chrono::microseconds(100));
             hdtnGstHandoffUtils.ret = gst_app_src_push_buffer((GstAppSrc *) m_filesinkAppsrc, hdtnGstHandoffUtils.buffer); // takes ownership of buffer we DO NOT deref
 
+            m_numFilesinkSamples += 1;
             if (hdtnGstHandoffUtils.ret != GST_FLOW_OK) { 
                 GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) m_pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "gst_error");
                 /* We got some error */
                 std::cout << "WARNING: could not push data into app src. Err code: " << hdtnGstHandoffUtils.ret << std::endl;
                 continue;
             } 
-            m_numFilesinkSamples += 1;
         }
 
-    // if ((m_numFilesinkSamples % 6) == 0) {
-    //     static guint bytes_in_appsrc_queue, buffers_in_decodeBuffer, buffersInDisplayQueue, buffersInPostDecodeQueue;
-    //     g_object_get(G_OBJECT(m_filesinkAppsrc), "current-level-bytes", &bytes_in_appsrc_queue, NULL);
-    //     g_object_get(G_OBJECT(m_filesinkQueue), "current-level-buffers", &buffersInDisplayQueue, NULL);
-    //     printf("filesik::bytes_in_appsrc_queue:%u\n", bytes_in_appsrc_queue);
-    //     printf("filesik::buffers_in_display_queue:%u\n", buffersInDisplayQueue);
-    //     }
+    if ((m_numFilesinkSamples % 10) == 0) {
+        static guint buffersInFilesinkQueue;
+        g_object_get(G_OBJECT(m_filesinkQueue), "current-level-buffers", &buffersInFilesinkQueue, NULL);
+        printf("filesink::buffers_in_display_queue:%u\n", buffersInFilesinkQueue);
+        }
     }
 
     LOG_INFO(subprocess) << "Exiting PushDataToFilesinkThread processing thread";
@@ -253,7 +255,7 @@ void GStreamerAppSrcOutduct::PushDataToDisplayThread()
 {
     static HdtnGstHandoffUtils_t hdtnGstHandoffUtils;
     static padded_vector_uint8_t incomingRtpFrame;
-    incomingRtpFrame.reserve(1400);
+    incomingRtpFrame.reserve(1600);
 
     while (m_runDisplayThread) {
         
@@ -277,22 +279,20 @@ void GStreamerAppSrcOutduct::PushDataToDisplayThread()
             GST_BUFFER_PTS(hdtnGstHandoffUtils.buffer) = gst_util_uint64_scale(m_numDisplaySamples, GST_SECOND, SAMPLE_RATE);
             GST_BUFFER_DURATION(hdtnGstHandoffUtils.buffer) = duration;
 
-            // gst_buffer_unmap(hdtnGstHandoffUtils.buffer, &hdtnGstHandoffUtils.map);
-            gst_memory_unmap(hdtnGstHandoffUtils.map.memory, &hdtnGstHandoffUtils.map);
-            gst_memory_unref(hdtnGstHandoffUtils.map.memory);
+            gst_buffer_unmap(hdtnGstHandoffUtils.buffer, &hdtnGstHandoffUtils.map);
 
             /* Push the buffer into the appsrc */
             // code crashes if we get to push_buffer too quickly (too often?). Need to find a better solution. Crashes reguardless of the method used to push_buffer
-            boost::this_thread::sleep_for(boost::chrono::microseconds(50));
+            // boost::this_thread::sleep_for(boost::chrono::microseconds(50));
             hdtnGstHandoffUtils.ret = gst_app_src_push_buffer((GstAppSrc *) m_displayAppsrc, hdtnGstHandoffUtils.buffer); // takes ownership of buffer we DO NOT deref
 
+            m_numDisplaySamples += 1;
             if (hdtnGstHandoffUtils.ret != GST_FLOW_OK) { 
                 GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) m_pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "gst_error");
                 /* We got some error */
                 std::cout << "WARNING: could not push data into app src. Err code: " << hdtnGstHandoffUtils.ret << std::endl;
                 continue;
             } 
-            m_numDisplaySamples += 1;
         }   
 
         if ((m_numDisplaySamples % 6) == 0) {

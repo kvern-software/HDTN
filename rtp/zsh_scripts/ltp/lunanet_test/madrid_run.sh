@@ -1,6 +1,9 @@
 #!/bin/sh
 #run this on madrid 
 # path variables
+pkill -9 HdtnOneProcessM
+
+
 config_files=$HDTN_RTP_DIR/config_files/ltp/test_6_luna_net
 hdtn_config=$config_files/hdtn_one_process_node_4.json
 contact_plan=$HDTN_RTP_DIR/config_files/contact_plans/LunaNetContactPlanNodeIDs.json

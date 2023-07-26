@@ -69,7 +69,7 @@ private:
     std::string m_gstCaps;
     volatile bool m_running;
     volatile bool m_runDisplayThread;
-
+    volatile bool m_runFilesinkThread;
     // gst members
     GstBus *m_bus;
     GstMessage *m_gstMsg;
