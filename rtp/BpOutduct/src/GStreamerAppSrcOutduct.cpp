@@ -53,19 +53,6 @@ GStreamerAppSrcOutduct::~GStreamerAppSrcOutduct()
     LOG_INFO(subprocess) << "GStreamerAppSrcOutduct::m_numDisplaySamples " << m_numDisplaySamples;
     LOG_INFO(subprocess) << "GStreamerAppSrcOutduct::m_numFilesinkSamples " << m_numFilesinkSamples;
 
-
-    // GstStructure rtpstats;
-    // g_object_get(G_OBJECT(m_rtpjitterbuffer), "stats", &rtpstats, NULL);
-    // char * num_push =       g_strdup_value_contents(gst_structure_get_value(&rtpstats, "num-push"));
-    // char * num_lost =       g_strdup_value_contents(gst_structure_get_value(&rtpstats, "num-lost"));
-    // char * num_duplicates = g_strdup_value_contents(gst_structure_get_value(&rtpstats, "num-duplicates"));
-    // char * avg_jitter =     g_strdup_value_contents(gst_structure_get_value(&rtpstats, "avg-jitter"));
-    // LOG_INFO(subprocess) << "rtpjitterbuffer:num-push: " <<       num_push;
-    // LOG_INFO(subprocess) << "rtpjitterbuffer:num-lost: " <<       num_lost;
-    // LOG_INFO(subprocess) << "rtpjitterbuffer:num-duplicates: " << num_duplicates;
-    // LOG_INFO(subprocess) << "rtpjitterbuffer:avg-jitter: " <<     avg_jitter;  
-    
-    gst_element_set_state(m_pipeline, GST_STATE_NULL);
     
     m_running = false;
     m_runDisplayThread = false;
@@ -76,6 +63,7 @@ GStreamerAppSrcOutduct::~GStreamerAppSrcOutduct()
     m_filesinkThread->join();
     m_displayThread->join();
 
+    gst_element_set_state(m_pipeline, GST_STATE_NULL);
 }
 
 int GStreamerAppSrcOutduct::CreateElements()
@@ -96,18 +84,18 @@ int GStreamerAppSrcOutduct::CreateElements()
     m_filesinkAppsrc = gst_element_factory_make("appsrc", NULL);
     m_filesinkQueue = gst_element_factory_make("queue", NULL);
     m_filesinkShmsink = gst_element_factory_make("shmsink", NULL);
-    
+
     m_pipeline   =  gst_pipeline_new(NULL);
-   
+    
+
     /* Configure queues */
     g_object_set(G_OBJECT(m_displayQueue), "max-size-buffers", MAX_NUM_BUFFERS_QUEUE, "max-size-bytes", MAX_SIZE_BYTES_QUEUE, "max-size-time", MAX_SIZE_TIME_QUEUE, "min-threshold-time", (uint64_t) 0,  NULL );
     g_object_set(G_OBJECT(m_decodeQueue), "max-size-buffers", 0, "max-size-bytes", 0, "max-size-time", 0, "min-threshold-time", (uint64_t) 0, "leaky", 0,  NULL );
-    g_object_set(G_OBJECT(m_filesinkQueue), "max-size-buffers", 0, "max-size-bytes", MAX_SIZE_BYTES_QUEUE, "max-size-time", MAX_SIZE_TIME_QUEUE, "leaky", 0, NULL );
-
+    g_object_set(G_OBJECT(m_filesinkQueue), "max-size-buffers", 0, "max-size-bytes", MAX_SIZE_BYTES_QUEUE, "max-size-time", MAX_SIZE_TIME_QUEUE, "min-threshold-time", (uint64_t) 0, "leaky", 0, NULL );
 
     /* Configure shared memory sinks */
-    g_object_set(G_OBJECT(m_displayShmsink), "socket-path", m_shmSocketPath.c_str(), "wait-for-connection", false, "sync", false, "async", false,  "processing-deadline", (uint64_t) 30e9,  NULL);
-    g_object_set(G_OBJECT(m_filesinkShmsink), "socket-path", "/tmp/hdtn_gst_shm_outduct_filesink", "wait-for-connection", false, "sync", false, "async", false, NULL);
+    g_object_set(G_OBJECT(m_displayShmsink), "socket-path", m_shmSocketPath.c_str(), "wait-for-connection", false, "sync", false, "async", false,  "processing-deadline", (uint64_t) 30e9,  "shm-size", 4294967295, NULL);
+    g_object_set(G_OBJECT(m_filesinkShmsink), "max-bitrate", 20000000,  "socket-path", "/tmp/hdtn_gst_shm_outduct_filesink", "wait-for-connection", true, "sync", false, "async", false, "processing-deadline", (uint64_t) 30e9, "shm-size", 4294967295, NULL);
 
     /* Configure rtpjitterbuffer */
     g_object_set(G_OBJECT(m_rtpjitterbuffer), "latency", RTP_LATENCY_MILLISEC, "max-dropout-time", RTP_MAX_DROPOUT_TIME_MILLISEC,
@@ -119,8 +107,9 @@ int GStreamerAppSrcOutduct::CreateElements()
     /* set caps on the src element */
     GstCaps * caps = gst_caps_from_string(m_gstCaps.c_str());
     g_object_set(G_OBJECT(m_displayAppsrc), "emit-signals", false, "min-latency", 0, "is-live", true, "do-timestamp", true, "max-bytes", GST_APPSRC_MAX_BYTES_IN_BUFFER, "caps", caps, "format", GST_FORMAT_TIME, "block", false, NULL);
-    g_object_set(G_OBJECT(m_filesinkAppsrc), "emit-signals", false, "min-latency", 0, "is-live", false, "do-timestamp", false, "max-bytes", GST_APPSRC_MAX_BYTES_IN_BUFFER, "caps", caps, "format", GST_FORMAT_TIME, "block", false, NULL);
+    g_object_set(G_OBJECT(m_filesinkAppsrc),  "emit-signals", false, "min-latency", 0, "is-live", true, "do-timestamp", true, "max-bytes", GST_APPSRC_MAX_BYTES_IN_BUFFER, "caps", caps, "format", GST_FORMAT_TIME, "block", false, NULL);
     gst_caps_unref(caps);
+
 
     /* Register our bus to be notified of bus messages */
     m_bus = gst_element_get_bus(m_pipeline);
@@ -176,9 +165,9 @@ void GStreamerAppSrcOutduct::TeeDataToQueuesThread()
             m_bundleCallbackAsyncListenerPtr->Notify();
 
             /* hard copy the data to the filesink queue */
+            padded_vector_uint8_t frameToPush(incomingRtpFrame.size());
+            memcpy(frameToPush.data(), incomingRtpFrame.data(), incomingRtpFrame.size());
             m_rtpPacketToFilesinkAsyncListenerPtr->Lock();
-                padded_vector_uint8_t frameToPush(incomingRtpFrame.size());
-                memcpy(frameToPush.data(), incomingRtpFrame.data(), incomingRtpFrame.size());
                 if (m_rtpPacketToFilesinkAsyncListenerPtr->m_queue.full())
                     m_totalFilesinkCbOverruns++;
                 m_rtpPacketToFilesinkAsyncListenerPtr->m_queue.push_front(std::move(frameToPush));
@@ -191,7 +180,6 @@ void GStreamerAppSrcOutduct::TeeDataToQueuesThread()
                 if (m_rtpPacketToDisplayAsyncListenerPtr->m_queue.full())
                     m_totalDisplayCbOverruns++;
                 m_rtpPacketToDisplayAsyncListenerPtr->m_queue.push_front(std::move(incomingRtpFrame));
-
             m_rtpPacketToDisplayAsyncListenerPtr->Unlock();
             m_rtpPacketToDisplayAsyncListenerPtr->Notify();
         }
@@ -215,7 +203,6 @@ void GStreamerAppSrcOutduct::PushDataToFilesinkThread()
             m_rtpPacketToFilesinkAsyncListenerPtr->Unlock();
             m_rtpPacketToFilesinkAsyncListenerPtr->Notify();
 
-
             hdtnGstHandoffUtils.buffer = gst_buffer_new_and_alloc(incomingRtpFrame.size());
 
             /* copy in from our local queue */
@@ -229,22 +216,15 @@ void GStreamerAppSrcOutduct::PushDataToFilesinkThread()
             gst_buffer_unmap(hdtnGstHandoffUtils.buffer, &hdtnGstHandoffUtils.map);
 
             /* Push the buffer into the appsrc */
-            // boost::this_thread::sleep_for(boost::chrono::microseconds(100));
             hdtnGstHandoffUtils.ret = gst_app_src_push_buffer((GstAppSrc *) m_filesinkAppsrc, hdtnGstHandoffUtils.buffer); // takes ownership of buffer we DO NOT deref
 
             m_numFilesinkSamples += 1;
-            if (hdtnGstHandoffUtils.ret != GST_FLOW_OK) { 
-                GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) m_pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "gst_error");
-                /* We got some error */
-                std::cout << "WARNING: could not push data into app src. Err code: " << hdtnGstHandoffUtils.ret << std::endl;
-                continue;
-            } 
         }
 
-    if ((m_numFilesinkSamples % 10) == 0) {
-        static guint buffersInFilesinkQueue;
-        g_object_get(G_OBJECT(m_filesinkQueue), "current-level-buffers", &buffersInFilesinkQueue, NULL);
-        printf("filesink::buffers_in_display_queue:%u\n", buffersInFilesinkQueue);
+        if ((m_numFilesinkSamples % 150) == 0) {
+            static guint buffersInFilesinkQueue;
+            g_object_get(G_OBJECT(m_filesinkQueue), "current-level-buffers", &buffersInFilesinkQueue, NULL);
+            // printf("filesink::buffers_in_display_queue:%u\n", buffersInFilesinkQueue);
         }
     }
 
@@ -282,30 +262,10 @@ void GStreamerAppSrcOutduct::PushDataToDisplayThread()
             gst_buffer_unmap(hdtnGstHandoffUtils.buffer, &hdtnGstHandoffUtils.map);
 
             /* Push the buffer into the appsrc */
-            // code crashes if we get to push_buffer too quickly (too often?). Need to find a better solution. Crashes reguardless of the method used to push_buffer
-            // boost::this_thread::sleep_for(boost::chrono::microseconds(50));
             hdtnGstHandoffUtils.ret = gst_app_src_push_buffer((GstAppSrc *) m_displayAppsrc, hdtnGstHandoffUtils.buffer); // takes ownership of buffer we DO NOT deref
 
             m_numDisplaySamples += 1;
-            if (hdtnGstHandoffUtils.ret != GST_FLOW_OK) { 
-                GST_DEBUG_BIN_TO_DOT_FILE((GstBin *) m_pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "gst_error");
-                /* We got some error */
-                std::cout << "WARNING: could not push data into app src. Err code: " << hdtnGstHandoffUtils.ret << std::endl;
-                continue;
-            } 
         }   
-
-        if ((m_numDisplaySamples % 6) == 0) {
-            static guint bytes_in_appsrc_queue, buffers_in_decodeBuffer, buffersInDisplayQueue, buffersInPostDecodeQueue;
-            // g_object_get(G_OBJECT(m_displayAppsrc), "current-level-bytes", &bytes_in_appsrc_queue, NULL);
-            // g_object_get(G_OBJECT(m_displayQueue), "current-level-buffers", &buffersInDisplayQueue, NULL);
-            // g_object_get(G_OBJECT(m_decodeQueue), "current-level-buffers", &buffers_in_decodeBuffer, NULL);
-            // g_object_get(G_OBJECT(m_postDecodeQueue), "current-level-buffers", &buffersInPostDecodeQueue, NULL);
-            // printf("display::bytes_in_appsrc_queue:%u\n", bytes_in_appsrc_queue);
-            // printf("display::buffers_in_display_queue:%u\n", buffersInDisplayQueue);
-            // printf("display::buffers_in_decode_queue:%u\n", buffers_in_decodeBuffer);
-            // printf("display::buffers_in__post_decode_queue:%u\n", buffersInPostDecodeQueue);
-        }
     }
 
     LOG_INFO(subprocess) << "Exiting PushDataToDisplayThread processing thread";
@@ -327,11 +287,8 @@ int GStreamerAppSrcOutduct::PushRtpPacketToGStreamerOutduct(padded_vector_uint8_
 
 void GStreamerAppSrcOutduct::OnBusMessages()
 {
-    return;
     while (m_running) 
     {
-
-        // LOG_DEBUG(subprocess) << "Waiting for bus messages";
         GstMessage * msg = gst_bus_timed_pop(m_bus, GST_MSECOND*100);
         if (!msg) 
             continue;
@@ -357,7 +314,9 @@ void GStreamerAppSrcOutduct::OnBusMessages()
             case GST_MESSAGE_BUFFERING: 
                 break;
             case GST_MESSAGE_TAG:
-                LOG_INFO(subprocess) << "Got tag message";
+                GstTagList *list;
+                // gst_message_parse_tag(msg, &list);                
+                LOG_INFO(subprocess) << "Got tag message from element " << GST_OBJECT_NAME(msg->src);
                 break;
             case GST_MESSAGE_ASYNC_DONE:
                 LOG_INFO(subprocess) << "Got GST_MESSAGE_ASYNC_DONE";
@@ -372,9 +331,6 @@ void GStreamerAppSrcOutduct::OnBusMessages()
                 break;
         }
     }
-
-    
-
 }
 
 

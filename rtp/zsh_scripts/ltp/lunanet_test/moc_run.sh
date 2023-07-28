@@ -8,16 +8,16 @@ bprecvstream_config=$config_files/bprecvstream_sctp.json
 
 output_file_path="/home/$USER/test_outputs/lunanet"
 # filename=water_bubble_cbr21
-filename=water_bubble_crf18
-#filename=lucia_cbr21                 # change this for whatever file you want to name
-# filename=lucia_crf18
+# filename=water_bubble_crf18
+# filename=lucia_cbr21                 # change this for whatever file you want to name
+#filename=lucia_crf18
+filename=live_rover
 file=$output_file_path/$filename
 
 shm_socket_path_display=/tmp/hdtn_gst_shm_outduct_display
 shm_socket_path_filesink=/tmp/hdtn_gst_shm_outduct_filesink
 
 mkdir -p  $output_file_path/$filename
-
 
 
 export GST_DEBUG_FILE=/tmp/gst_log.log
@@ -45,7 +45,7 @@ one_process_pid=$!
 sleep 5
 
 #################################################################################
-export GST_DEBUG=3
+export GST_DEBUG=3,filesink:7,mp4mux:7
 export GST_DEBUG_FILE=/tmp/hdtn_gst_log.log
 cd $HDTN_RTP_DIR
 ./build/bprecv_stream  --my-uri-eid=ipn:7.1 --inducts-config-file=$bprecvstream_config --max-rx-bundle-size-bytes 63000 \
@@ -58,13 +58,14 @@ export GST_DEBUG=4,shmsrc:3,filesink:6,rtpjitterbuffer:4
 export GST_DEBUG_FILE=/tmp/gst_display_log.log
 gst-launch-1.0 shmsrc socket-path=$shm_socket_path_display  is-live=true do-timestamp=true \
         ! queue max-size-time=0 max-size-bytes=0 \
-        ! "video/x-raw, format=(string)I420, width=(int)3840, height=(int)2160, framerate=(fraction)60000/1001" \
+        ! "video/x-raw, format=(string)I420, width=(int)1920, height=(int)1080, framerate=(fraction)30000/1001" \
         ! queue \
         ! timeoverlay halignment=right valignment=bottom text="Stream time:" shaded-background=true font-desc="Sans, 14" \
+        ! clockoverlay halignment=left valignment=bottom text="Clock time:" shaded-background=true font-desc="Sans, 14" \
         ! glupload ! glimagesink &
 display_pid=$! 
 
-export GST_DEBUG=3,filesink:9,qtmux:3,shmsrc:8
+export GST_DEBUG=3,filesink:9,qtmux:3,shmsrc:9
 export GST_DEBUG_FILE=/tmp/gst_filesink_log.log
 gst-launch-1.0 shmsrc socket-path=$shm_socket_path_filesink is-live=true do-timestamp=true \
         ! queue max-size-time=0 max-size-bytes=0  \
@@ -72,15 +73,18 @@ gst-launch-1.0 shmsrc socket-path=$shm_socket_path_filesink is-live=true do-time
         ! queue max-size-time=0 max-size-bytes=0 \
         ! rtpjitterbuffer \
         ! rtph264depay \
-        ! h264parse config-interval=1 \
+        ! h264parse \
         ! h264timestamper \
-        ! qtmux faststart=true \
+        ! qtmux latency=200000 min-upstream-latency=200000000 moov-recovery-file=/tmp/moov.mrf \
         ! queue max-size-time=0 max-size-bytes=0 \
         ! filesink location=$file/$filename.mp4 -e &
 filesink_pid=$!
+echo $filesink_pid
 
 sleep 1000
 # cleanup
 echo "\nkilling HDTN bp receive stream process ..." && kill -2 $bprecv_stream_pid
 echo "\n killing both gstreamer processes ..." && kill -2 $filesink_pid && kill -2 $display_pid
 echo "\nkilling HDTN one process ..." && kill -2 $one_process_pid
+
+#gst-launch-1.0 qtmoovrecover recovery-input=/tmp/moov broken-input=lucia_crf18.mp4 fixed-output=test.mp4

@@ -158,7 +158,6 @@ bool BpReceiveStream::GetSuccessfulSendTimeout(const boost::posix_time::time_dur
 }
 
 
-
 void BpReceiveStream::OnSentRtpPacketCallback(bool success, std::shared_ptr<std::vector<UdpSendPacketInfo>> &udpSendPacketInfoVecSharedPtr, const std::size_t numPacketsSent)
 {
     m_sentPacketsSuccess = true;
@@ -174,66 +173,9 @@ void BpReceiveStream::OnSentRtpPacketCallback(bool success, std::shared_ptr<std:
     }
 }
 
-
-int BpReceiveStream::SendUdpPacket(padded_vector_uint8_t& message) {
-
-
+int BpReceiveStream::SendUdpPacket(padded_vector_uint8_t& message) 
+{
     m_totalRtpBytesSent += socket.send_to(boost::asio::buffer(message), m_udpEndpoint);
-    // LOG_DEBUG(subprocess) << "Send RTP Packet";
-	// try {
-	// } catch (const boost::system::system_error& ex) {
-	// 	// Exception thrown!
-	// 	// Examine ex.code() and ex.what() to see what went wrong!
-    //     m_totalRtpPacketsFailedToSend++;
-    //     LOG_ERROR(subprocess) << "Failed to send code: " << ex.code() << " what:" << ex.what();
-	// 	return -1;
-	// }
-
     m_totalRtpPacketsSent++;
 	return 0;
 }
-
-
-
-
-
-
-
-
-
-
-// // we need to change the port number to the outgoing rtp port
-// int BpReceiveStream::TranslateBpSdpToInSdp(std::string sdp)
-// {
-//     std::string newSdp;
-    
-//     // "c" field
-//     newSdp.append("c=IN IP4 ");
-//     newSdp.append(m_udpEndpoint.address().to_string());
-//     newSdp.append("\n");
-
-//     // "m" field
-//     newSdp.append("m=");
-//     if (sdp.find("m=video") != std::string::npos)
-//         newSdp.append("video ");
-//     if (sdp.find("m=audio") != std::string::npos)
-//         newSdp.append("audio ");
-//     newSdp.append(std::to_string(m_udpEndpoint.port()));
-//     newSdp.append(" ");
-    
-//     // append the rest of the original SDP message
-//     size_t rtpLocation = sdp.find("RTP/AVP"); // sdp protocol for RTP
-//     if (rtpLocation == std::string::npos) 
-//     {
-//         LOG_ERROR(subprocess) << "Invalid SDP file";
-//         return -1;
-//     }
-
-//     std::string sdpSubString = sdp.substr(rtpLocation, UINT64_MAX);
-//     newSdp.append(sdpSubString);
-    
-//     m_sdpFileString = newSdp;
-//     LOG_INFO(subprocess) << "Translated IN SDP:\n" << m_sdpFileString;
-    
-//     return 0;
-// }

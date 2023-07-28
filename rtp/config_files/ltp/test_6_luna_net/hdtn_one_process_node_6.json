@@ -28,7 +28,7 @@
                 "thisLtpEngineId": 6000,
                 "remoteLtpEngineId": 4002,
                 "ltpReportSegmentMtu": 1360,
-                "oneWayLightTimeMs": 2,
+                "oneWayLightTimeMs": 20,
                 "oneWayMarginTimeMs": 20,
                 "clientServiceId": 1,
                 "preallocatedRedDataBytes": 200000,
@@ -52,7 +52,7 @@
                 "thisLtpEngineId": 6001,
                 "remoteLtpEngineId": 5002,
                 "ltpReportSegmentMtu": 1360,
-                "oneWayLightTimeMs": 2,
+                "oneWayLightTimeMs": 20,
                 "oneWayMarginTimeMs": 20,
                 "clientServiceId": 1,
                 "preallocatedRedDataBytes": 200000,
@@ -79,8 +79,8 @@
                 "nextHopNodeId": 7,
                 "remoteHostname": "localhost",
                 "remotePort": 7000,
-                "maxNumberOfBundlesInPipeline": 30000,
-                "maxSumOfBundleBytesInPipeline": 1000000000,
+                "maxNumberOfBundlesInPipeline": 300000000,
+                "maxSumOfBundleBytesInPipeline": 100000000000,
                 "finalDestinationEidUris": ["ipn:7.*"],
                 "keepAliveIntervalSeconds": 17
             }
